@@ -1,0 +1,42 @@
+name: App checks
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python scripts/vendor_core.py
+      - run: python -m pip install -r ai_running_coach/core/requirements.txt
+      - run: python -m unittest discover -s tests -v
+      - run: python run_offline_tests.py
+        working-directory: ai_running_coach/core
+        env:
+          COACH_TEST_NO_NETWORK: "1"
+      - run: python scripts/vendor_core.py
+
+  container:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux/amd64
+          - runner: ubuntu-24.04-arm
+            platform: linux/arm64
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build --platform ${{ matrix.platform }} -t coach-app:test ai_running_coach
+      - run: python3 scripts/smoke_container.py coach-app:test --platform ${{ matrix.platform }}

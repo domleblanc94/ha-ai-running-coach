@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "local-ai-running-coach"
+version = "0.2.3b1"
+description = "Self-hosted running coach with AI-authored plans, local activity analysis and an HTML dashboard"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = ["python-dotenv>=1.0,<2", "requests>=2.32,<3"]
+
+[project.optional-dependencies]
+gemini = []
+openai = []
+anthropic = []
+garmin = []
+all = []
+
+[tool.setuptools]
+py-modules = ["source_policy","import_activities","ai_coach", "planning_engine", "model_provider", "database_manager", "garmin_sync", "garmin_personal_api", "workout_schema", "parse_coach_output", "cron_daily_update", "generate_dashboard", "dashboard_template", "dashboard_panels", "publish_if_ready", "health_status", "coach_checkin", "coaching_eval", "migrate_plan", "setup_coach"]

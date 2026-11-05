@@ -1,0 +1,2 @@
+ai_running_coach/core/** -text
+ai_running_coach/run.sh text eol=lf

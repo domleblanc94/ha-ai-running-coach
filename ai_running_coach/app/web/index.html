@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Running Coach</title>
+  <link rel="stylesheet" href="./assets/coach.css">
+  <script src="./assets/coach.js" defer></script>
+</head>
+<body>
+  <header class="masthead">
+    <div class="shell brand"><span class="brand-mark" aria-hidden="true">↗</span><div><strong>AI Running Coach</strong><small>Home Assistant</small></div></div>
+  </header>
+  <main class="shell">
+    <section id="setup-hero" class="hero">
+      <p class="eyebrow">YOUR TRAINING SPACE</p>
+      <h1>Make your next run count.</h1>
+      <p>Set up your coach, check your plan, and see what’s scheduled next.</p>
+    </section>
+    <section class="card run-card" aria-labelledby="run-title">
+      <div><p class="eyebrow">COACH STATUS</p><h2 id="run-title">Checking setup</h2><p id="run-detail" role="status" aria-live="polite">Connecting to the coach…</p><ul id="issues" hidden></ul></div>
+      <div class="actions"><button id="new-plan" type="button" disabled>Generate new plan</button><button id="run-now" type="button" class="secondary" disabled>Run now</button></div>
+    </section>
+    <nav aria-label="Coach views" class="tabs">
+      <button id="settings-tab" type="button" aria-pressed="true">Setup &amp; settings</button>
+      <button id="dashboard-tab" type="button" aria-pressed="false" disabled>Training dashboard</button>
+    </nav>
+    <div id="settings">
+      <form id="connection-form" class="card">
+        <p class="eyebrow">01 / CONNECTION</p><h2>Connect your coach</h2>
+        <p>Choose a model you can access and how to supply activity history.</p>
+        <div class="grid">
+          <label>Model provider<select name="provider"><option value="gemini">Google Gemini</option><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option></select></label>
+          <label>Model identifier<input name="model" maxlength="120" required placeholder="gemini-3.5-flash-lite"></label>
+          <label id="provider-key-label">Provider API key<input name="provider_key" type="password" maxlength="1024" autocomplete="new-password"><small id="provider-key-hint"></small></label>
+          <label>Activity source<select name="source"><option value="offline">Offline / no activity sync</option><option value="garmin">Garmin Personal API</option></select></label>
+          <div id="garmin-fields" class="grid full" hidden>
+            <label>Garmin Personal API key<input name="garmin_api_key" type="password" maxlength="1024" autocomplete="new-password"><small id="garmin-key-hint"></small></label>
+            <label>Garmin account region<select name="garmin_region"><option value="global">Global</option><option value="china">China</option></select></label>
+          </div>
+        </div>
+        <p class="hint">Offline mode skips Garmin sync. Generating or reviewing a plan uses your selected model API.</p>
+        <div class="actions"><button type="submit">Save connection</button><span class="form-result" role="status"></span></div>
+      </form>
+      <form id="profile-form" class="card">
+        <p class="eyebrow">02 / ATHLETE</p><h2>Tell the coach about your running</h2>
+        <div class="grid">
+          <label>Athlete name<input name="name" maxlength="100" required autocomplete="off"></label>
+          <label>Training goal<input name="goal" maxlength="500" placeholder="Build consistency or prepare for a race"></label>
+          <label>Running experience<textarea name="experience" maxlength="500" rows="3" placeholder="Current weekly distance, recent long run, or time away from running"></textarea></label>
+          <label>Current injury or training constraints<textarea name="injuries" maxlength="500" rows="3" placeholder="Optional"></textarea></label>
+          <fieldset class="full"><legend>Available training days</legend><div id="days" class="days"></div></fieldset>
+          <label>Event name <span class="optional">optional</span><input name="event" maxlength="150"></label>
+          <label>Race date <span class="optional">optional</span><input name="race_date" type="date"></label>
+          <label>Race target <span class="optional">optional</span><input name="target_time" maxlength="100" placeholder="Finish comfortably"></label>
+          <label>Heart rate zones<select name="zone_mode"><option value="unknown">Unknown / use effort</option><option value="known">Enter configured ranges</option></select></label>
+          <fieldset id="zones" class="full" hidden><legend>Configured ranges in bpm</legend><p class="hint">Enter Zone 2 and any other ranges you know. Leave unknown ranges blank.</p><div id="zone-fields" class="zone-grid"></div></fieldset>
+        </div>
+        <div class="actions"><button type="submit">Save athlete profile</button><span class="form-result" role="status"></span></div>
+      </form>
+      <form id="schedule-form" class="card">
+        <p class="eyebrow">03 / SCHEDULE</p><h2>Daily review</h2>
+        <p>Generate your first plan before turning on unattended reviews.</p>
+        <div class="grid">
+          <label class="switch"><input name="enabled" type="checkbox"> Run automatically each day</label>
+          <label>Local review time<input name="time" type="time" value="03:00" required></label>
+          <label>Time zone<input name="timezone" list="timezones" value="UTC" maxlength="80" required><datalist id="timezones"></datalist></label>
+        </div>
+        <div class="actions"><button type="submit">Save schedule</button><span class="form-result" role="status"></span></div>
+      </form>
+    </div>
+    <section id="dashboard-panel" hidden>
+      <p class="hint">The coach status above reflects current runs. The dashboard shows the last saved plan.</p>
+      <iframe id="dashboard" title="Saved running plan and workout downloads" sandbox="allow-scripts allow-downloads"></iframe>
+    </section>
+    <dialog id="new-plan-confirm">
+      <form method="dialog">
+        <h2>Generate a new training plan?</h2>
+        <p>This uses your selected model API. A valid response replaces the upcoming block and preserves your past sessions.</p>
+        <div class="actions"><button value="cancel" class="secondary" autofocus>Cancel</button><button value="confirm">Generate plan</button></div>
+      </form>
+    </dialog>
+  </main>
+</body>
+</html>

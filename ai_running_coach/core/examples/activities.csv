@@ -1,0 +1,3 @@
+id,start_date,type,name,distance_m,moving_time_s,elapsed_time_s,elevation_gain_m,avg_heartrate,description
+1,2027-01-01T08:00:00Z,Run,Fictional example run,4000,1800,1900,35,,Synthetic example only
+2,2027-01-03T09:00:00Z,Walk,Fictional example walk,,1200,,,,Missing distance remains unknown

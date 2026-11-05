@@ -1,0 +1,4 @@
+# Setup, offline operation and supported provider REST adapters.
+python-dotenv>=1.0,<2
+requests>=2.32,<3
+# Official Garmin Personal API uses the same HTTP client; no unofficial Garmin SDK.

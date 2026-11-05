@@ -1,0 +1,547 @@
+[
+  {
+    "case_id": "conversational_high_hr",
+    "anonymized_synthetic": true,
+    "profile": {
+      "schema_version": 1,
+      "source_hash": "synthetic-evaluation-profile",
+      "zones": {
+        "2": {
+          "label": "Endurance",
+          "min": 130,
+          "max": 150,
+          "display": "130 - 150 bpm"
+        }
+      },
+      "zone_method": "synthetic configured estimate",
+      "active_injuries": "None",
+      "goals": [
+        {
+          "priority": "A-Race",
+          "event": "Example Trail 30km",
+          "date": "December 1, 2026",
+          "target_time": "Completion"
+        }
+      ],
+      "preferences": {
+        "Weekly Availability": "4 days"
+      },
+      "athlete_facts": {
+        "Sporting Background": "Recreational runner"
+      },
+      "communication_preferences": "Collaborative and concise. Explain uncertainty."
+    },
+    "plan": {
+      "schema_version": 1,
+      "revision": 1,
+      "profile_hash": "synthetic-evaluation-profile",
+      "goals": [
+        {
+          "priority": "A-Race",
+          "event": "Example Trail 30km",
+          "date": "December 1, 2026",
+          "target_time": "Completion"
+        }
+      ],
+      "sessions": [
+        {
+          "id": "long-weekend",
+          "date": "2026-11-07",
+          "workout_type": "Long Run",
+          "amount": "12 km",
+          "target": "Coach-selected comfortable effort."
+        },
+        {
+          "id": "sunday-rest",
+          "date": "2026-11-08",
+          "workout_type": "Rest",
+          "amount": "-",
+          "target": "Rest."
+        }
+      ],
+      "requires_coach_reconciliation": false
+    },
+    "evidence": {
+      "today": "2026-11-05",
+      "window_start": "2026-09-11",
+      "running_28d": {
+        "count": 12,
+        "total_km": 90,
+        "avg_weekly_km": 22.5,
+        "longest_km": 12
+      },
+      "running_weeks_8": [
+        {
+          "ending": "2026-11-05",
+          "run_count": 3,
+          "km": 24,
+          "minutes": 180,
+          "ascent_m": 500,
+          "ascent_coverage": 3,
+          "longest_duration_min": 90
+        }
+      ],
+      "recent_7d": [
+        {
+          "activity_id": 101,
+          "type": "Run",
+          "start_date": "2026-11-04",
+          "distance_m": 6000,
+          "moving_time_s": 2400,
+          "avg_heartrate": 158,
+          "pace_min_km": 6.67,
+          "notes": "Felt conversational.",
+          "perceived_exertion": 4,
+          "elevation_gain_m": 60
+        }
+      ],
+      "feedback_history": [],
+      "current_athlete_reports": [],
+      "limitations": [
+        "Configured zones are estimates; no time-in-zone measurements supplied."
+      ]
+    },
+    "question": "That run felt conversational despite a higher recorded HR. How should we interpret it?",
+    "expected_focus": [
+      "Acknowledge reported effort alongside HR; do not turn a single average HR into a blanket walking mandate.",
+      "Explain uncertainty in zone/sensor context without diagnosing a sensor failure.",
+      "Assess the plan and goals collaboratively; no required trajectory label."
+    ]
+  },
+  {
+    "case_id": "missing_rpe",
+    "anonymized_synthetic": true,
+    "profile": {
+      "schema_version": 1,
+      "source_hash": "synthetic-evaluation-profile",
+      "zones": {
+        "2": {
+          "label": "Endurance",
+          "min": 130,
+          "max": 150,
+          "display": "130 - 150 bpm"
+        }
+      },
+      "zone_method": "synthetic configured estimate",
+      "active_injuries": "None",
+      "goals": [
+        {
+          "priority": "A-Race",
+          "event": "Example Trail 30km",
+          "date": "December 1, 2026",
+          "target_time": "Completion"
+        }
+      ],
+      "preferences": {
+        "Weekly Availability": "4 days"
+      },
+      "athlete_facts": {
+        "Sporting Background": "Recreational runner"
+      },
+      "communication_preferences": "Collaborative and concise. Explain uncertainty."
+    },
+    "plan": {
+      "schema_version": 1,
+      "revision": 1,
+      "profile_hash": "synthetic-evaluation-profile",
+      "goals": [
+        {
+          "priority": "A-Race",
+          "event": "Example Trail 30km",
+          "date": "December 1, 2026",
+          "target_time": "Completion"
+        }
+      ],
+      "sessions": [
+        {
+          "id": "long-weekend",
+          "date": "2026-11-07",
+          "workout_type": "Long Run",
+          "amount": "12 km",
+          "target": "Coach-selected comfortable effort."
+        },
+        {
+          "id": "sunday-rest",
+          "date": "2026-11-08",
+          "workout_type": "Rest",
+          "amount": "-",
+          "target": "Rest."
+        }
+      ],
+      "requires_coach_reconciliation": false
+    },
+    "evidence": {
+      "today": "2026-11-05",
+      "window_start": "2026-09-11",
+      "running_28d": {
+        "count": 12,
+        "total_km": 90,
+        "avg_weekly_km": 22.5,
+        "longest_km": 12
+      },
+      "running_weeks_8": [
+        {
+          "ending": "2026-11-05",
+          "run_count": 3,
+          "km": 24,
+          "minutes": 180,
+          "ascent_m": 500,
+          "ascent_coverage": 3,
+          "longest_duration_min": 90
+        }
+      ],
+      "recent_7d": [
+        {
+          "activity_id": 101,
+          "type": "Run",
+          "start_date": "2026-11-04",
+          "distance_m": 6000,
+          "moving_time_s": 2400,
+          "avg_heartrate": 158,
+          "pace_min_km": 6.67,
+          "notes": "",
+          "perceived_exertion": null,
+          "elevation_gain_m": 60
+        }
+      ],
+      "feedback_history": [],
+      "current_athlete_reports": [],
+      "limitations": [
+        "Configured zones are estimates; no time-in-zone measurements supplied."
+      ]
+    },
+    "question": "Review my training.",
+    "expected_focus": [
+      "Identify missing subjective effort and recovery information.",
+      "Do not interpret missing RPE as low fatigue.",
+      "Ask a focused useful question or explain uncertainty while making the coaching decision."
+    ]
+  },
+  {
+    "case_id": "hilly_run",
+    "anonymized_synthetic": true,
+    "profile": {
+      "schema_version": 1,
+      "source_hash": "synthetic-evaluation-profile",
+      "zones": {
+        "2": {
+          "label": "Endurance",
+          "min": 130,
+          "max": 150,
+          "display": "130 - 150 bpm"
+        }
+      },
+      "zone_method": "synthetic configured estimate",
+      "active_injuries": "None",
+      "goals": [
+        {
+          "priority": "A-Race",
+          "event": "Example Trail 30km",
+          "date": "December 1, 2026",
+          "target_time": "Completion"
+        }
+      ],
+      "preferences": {
+        "Weekly Availability": "4 days"
+      },
+      "athlete_facts": {
+        "Sporting Background": "Recreational runner"
+      },
+      "communication_preferences": "Collaborative and concise. Explain uncertainty."
+    },
+    "plan": {
+      "schema_version": 1,
+      "revision": 1,
+      "profile_hash": "synthetic-evaluation-profile",
+      "goals": [
+        {
+          "priority": "A-Race",
+          "event": "Example Trail 30km",
+          "date": "December 1, 2026",
+          "target_time": "Completion"
+        }
+      ],
+      "sessions": [
+        {
+          "id": "long-weekend",
+          "date": "2026-11-07",
+          "workout_type": "Long Run",
+          "amount": "12 km",
+          "target": "Coach-selected comfortable effort."
+        },
+        {
+          "id": "sunday-rest",
+          "date": "2026-11-08",
+          "workout_type": "Rest",
+          "amount": "-",
+          "target": "Rest."
+        }
+      ],
+      "requires_coach_reconciliation": false
+    },
+    "evidence": {
+      "today": "2026-11-05",
+      "window_start": "2026-09-11",
+      "running_28d": {
+        "count": 12,
+        "total_km": 90,
+        "avg_weekly_km": 22.5,
+        "longest_km": 12
+      },
+      "running_weeks_8": [
+        {
+          "ending": "2026-11-05",
+          "run_count": 3,
+          "km": 24,
+          "minutes": 180,
+          "ascent_m": 500,
+          "ascent_coverage": 3,
+          "longest_duration_min": 90
+        }
+      ],
+      "recent_7d": [
+        {
+          "activity_id": 101,
+          "type": "Run",
+          "start_date": "2026-11-04",
+          "distance_m": 12000,
+          "moving_time_s": 6600,
+          "avg_heartrate": 158,
+          "pace_min_km": 9.17,
+          "notes": "Hilly trail, some hiking on climbs.",
+          "perceived_exertion": 4,
+          "elevation_gain_m": 650
+        }
+      ],
+      "feedback_history": [],
+      "current_athlete_reports": [],
+      "limitations": [
+        "Configured zones are estimates; no time-in-zone measurements supplied."
+      ]
+    },
+    "question": "Was this trail outing useful for my goal?",
+    "expected_focus": [
+      "Use ascent and time on feet when interpreting pace and effort.",
+      "Distinguish a hill-heavy outing from a comparable flat run.",
+      "Avoid unsupported claims about aerobic failure from HR alone."
+    ]
+  },
+  {
+    "case_id": "schedule_change",
+    "anonymized_synthetic": true,
+    "profile": {
+      "schema_version": 1,
+      "source_hash": "synthetic-evaluation-profile",
+      "zones": {
+        "2": {
+          "label": "Endurance",
+          "min": 130,
+          "max": 150,
+          "display": "130 - 150 bpm"
+        }
+      },
+      "zone_method": "synthetic configured estimate",
+      "active_injuries": "None",
+      "goals": [
+        {
+          "priority": "A-Race",
+          "event": "Example Trail 30km",
+          "date": "December 1, 2026",
+          "target_time": "Completion"
+        }
+      ],
+      "preferences": {
+        "Weekly Availability": "4 days"
+      },
+      "athlete_facts": {
+        "Sporting Background": "Recreational runner"
+      },
+      "communication_preferences": "Collaborative and concise. Explain uncertainty."
+    },
+    "plan": {
+      "schema_version": 1,
+      "revision": 1,
+      "profile_hash": "synthetic-evaluation-profile",
+      "goals": [
+        {
+          "priority": "A-Race",
+          "event": "Example Trail 30km",
+          "date": "December 1, 2026",
+          "target_time": "Completion"
+        }
+      ],
+      "sessions": [
+        {
+          "id": "long-weekend",
+          "date": "2026-11-07",
+          "workout_type": "Long Run",
+          "amount": "12 km",
+          "target": "Coach-selected comfortable effort."
+        },
+        {
+          "id": "sunday-rest",
+          "date": "2026-11-08",
+          "workout_type": "Rest",
+          "amount": "-",
+          "target": "Rest."
+        }
+      ],
+      "requires_coach_reconciliation": false
+    },
+    "evidence": {
+      "today": "2026-11-05",
+      "window_start": "2026-09-11",
+      "running_28d": {
+        "count": 12,
+        "total_km": 90,
+        "avg_weekly_km": 22.5,
+        "longest_km": 12
+      },
+      "running_weeks_8": [
+        {
+          "ending": "2026-11-05",
+          "run_count": 3,
+          "km": 24,
+          "minutes": 180,
+          "ascent_m": 500,
+          "ascent_coverage": 3,
+          "longest_duration_min": 90
+        }
+      ],
+      "recent_7d": [
+        {
+          "activity_id": 101,
+          "type": "Run",
+          "start_date": "2026-11-04",
+          "distance_m": 6000,
+          "moving_time_s": 2400,
+          "avg_heartrate": 158,
+          "pace_min_km": 6.67,
+          "notes": "Felt conversational.",
+          "perceived_exertion": 4,
+          "elevation_gain_m": 60
+        }
+      ],
+      "feedback_history": [],
+      "current_athlete_reports": [],
+      "limitations": [
+        "Configured zones are estimates; no time-in-zone measurements supplied."
+      ]
+    },
+    "question": "Please move my Saturday long run to Sunday because I am unavailable Saturday.",
+    "expected_focus": [
+      "Apply a future-session change reflecting the athlete request, not just commentary.",
+      "Keep stable IDs for moved sessions; reconcile the existing Sunday rest session.",
+      "Do not change historical activities or configured goals."
+    ]
+  },
+  {
+    "case_id": "legacy_conflict",
+    "anonymized_synthetic": true,
+    "profile": {
+      "schema_version": 1,
+      "source_hash": "synthetic-evaluation-profile",
+      "zones": {
+        "2": {
+          "label": "Endurance",
+          "min": 130,
+          "max": 150,
+          "display": "130 - 150 bpm"
+        }
+      },
+      "zone_method": "synthetic configured estimate",
+      "active_injuries": "None",
+      "goals": [
+        {
+          "priority": "A-Race",
+          "event": "Example Trail 30km",
+          "date": "December 1, 2026",
+          "target_time": "Completion"
+        }
+      ],
+      "preferences": {
+        "Weekly Availability": "4 days"
+      },
+      "athlete_facts": {
+        "Sporting Background": "Recreational runner"
+      },
+      "communication_preferences": "Collaborative and concise. Explain uncertainty."
+    },
+    "plan": {
+      "schema_version": 1,
+      "revision": 1,
+      "profile_hash": "synthetic-evaluation-profile",
+      "goals": [
+        {
+          "priority": "A-Race",
+          "event": "Example Trail 30km",
+          "date": "December 1, 2026",
+          "target_time": "Completion"
+        }
+      ],
+      "sessions": [
+        {
+          "id": "long-weekend",
+          "date": "2026-11-07",
+          "workout_type": "Easy Power Walk",
+          "amount": "12 km",
+          "target": "Legacy target superseded by current profile; awaiting AI coach reconciliation."
+        },
+        {
+          "id": "sunday-rest",
+          "date": "2026-11-08",
+          "workout_type": "Rest",
+          "amount": "-",
+          "target": "Rest."
+        }
+      ],
+      "requires_coach_reconciliation": true
+    },
+    "evidence": {
+      "today": "2026-11-05",
+      "window_start": "2026-09-11",
+      "running_28d": {
+        "count": 12,
+        "total_km": 90,
+        "avg_weekly_km": 22.5,
+        "longest_km": 12
+      },
+      "running_weeks_8": [
+        {
+          "ending": "2026-11-05",
+          "run_count": 3,
+          "km": 24,
+          "minutes": 180,
+          "ascent_m": 500,
+          "ascent_coverage": 3,
+          "longest_duration_min": 90
+        }
+      ],
+      "recent_7d": [
+        {
+          "activity_id": 101,
+          "type": "Run",
+          "start_date": "2026-11-04",
+          "distance_m": 6000,
+          "moving_time_s": 2400,
+          "avg_heartrate": 158,
+          "pace_min_km": 6.67,
+          "notes": "Felt conversational.",
+          "perceived_exertion": 4,
+          "elevation_gain_m": 60
+        }
+      ],
+      "feedback_history": [],
+      "current_athlete_reports": [],
+      "limitations": [
+        "Configured zones are estimates; no time-in-zone measurements supplied."
+      ]
+    },
+    "question": "Please rebuild the upcoming block using my current profile, not the old walking restriction.",
+    "expected_focus": [
+      "Resolve incompatible legacy targets using the current configured profile.",
+      "Let the coach choose sessions, rather than carrying forward mandatory walking by repetition.",
+      "Do not redefine profile zones or invent an active injury."
+    ]
+  }
+]

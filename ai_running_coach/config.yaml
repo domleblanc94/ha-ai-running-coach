@@ -1,0 +1,20 @@
+name: AI Running Coach
+version: "0.1.0-beta.1"
+slug: ai_running_coach
+description: "Personal AI running coach with a private dashboard in Home Assistant"
+url: https://github.com/domleblanc94/ha-ai-running-coach/tree/main/ai_running_coach
+arch:
+  - amd64
+  - aarch64
+startup: application
+boot: manual
+stage: experimental
+init: true
+timeout: 90
+ingress: true
+ingress_port: 8099
+panel_admin: true
+panel_icon: mdi:run
+backup: cold
+options: {}
+schema: {}

@@ -1,0 +1,15 @@
+{
+  "tailwind.js": "https://cdn.tailwindcss.com (vendored response; content SHA256 pinned by release manifest)",
+  "chart.js": "https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js",
+  "marked.js": "https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js",
+  "purify.js": "https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js",
+  "fontawesome.css": "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css",
+  "fa-solid-900.woff2": "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-solid-900.woff2",
+  "fa-regular-400.woff2": "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-regular-400.woff2",
+  "fa-brands-400.woff2": "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-brands-400.woff2",
+  "tailwind-LICENSE.txt": "https://cdn.jsdelivr.net/npm/tailwindcss@3.4.17/LICENSE",
+  "chart-LICENSE.md": "https://cdn.jsdelivr.net/npm/chart.js@4.4.8/LICENSE.md",
+  "marked-LICENSE.md": "https://cdn.jsdelivr.net/npm/marked@15.0.12/LICENSE.md",
+  "purify-LICENSE.txt": "https://cdn.jsdelivr.net/npm/dompurify@3.2.6/LICENSE",
+  "fontawesome-LICENSE.txt": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/LICENSE.txt"
+}
