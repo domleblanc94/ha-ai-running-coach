@@ -68,4 +68,52 @@ class DailyBudgetTests(unittest.TestCase):
         rows[0]=(1,'different-digest','gemini-2.5-flash','failed','503 high demand','daily')
         with self.assertRaises(ValueError):ai_coach.operator_recovery_eligibility(rows,today,'Explicit user recovery approval','digest',prior)
 
+    def test_new_starter_prompt_cannot_spend_third_utc_request_after_truncation(self):
+        with tempfile.TemporaryDirectory() as d:
+            paths = self.fixture(Path(d))
+            paths['PLAN_FILE'].unlink()
+            paths['CANONICAL_FILE'].unlink()
+            truncated = types.SimpleNamespace(text='{"summary":"partial', usage_metadata=None, finish_reason='MAX_TOKENS')
+            generate = Mock(side_effect=[Unavailable('503 high demand'), truncated])
+            client = types.SimpleNamespace(models=types.SimpleNamespace(generate_content=generate))
+            env = {'COACH_PROVIDER': 'gemini', 'COACH_MODELS': 'gemini-2.5-flash', 'COACH_MAX_DAILY_REQUESTS': '2'}
+            with patch.multiple(ai_coach, **paths), patch.object(ai_coach, 'SCRIPT_DIR', Path(d)), patch.dict(os.environ, env, clear=True), redirect_stdout(io.StringIO()):
+                with patch.object(ai_coach, 'STARTER_PROMPT_VERSION', ai_coach.PROMPT_VERSION), patch.object(ai_coach, 'api_client', return_value=client):
+                    previous = ai_coach.run_daily_coach_check(dry_run=True)['fingerprint']
+                    with self.assertRaisesRegex(RuntimeError, '503'):
+                        ai_coach.run_daily_coach_check(max_attempts_this_run=1)
+                    with self.assertRaisesRegex(RuntimeError, 'truncated'):
+                        ai_coach.run_daily_coach_check(max_attempts_this_run=1)
+                current = ai_coach.run_daily_coach_check(dry_run=True)['fingerprint']
+                self.assertNotEqual(previous, current)
+                with patch.object(ai_coach, 'api_client') as api:
+                    with self.assertRaisesRegex(RuntimeError, 'Daily coaching API request budget exhausted'):
+                        ai_coach.run_daily_coach_check(max_attempts_this_run=1)
+                    api.assert_not_called()
+            self.assertEqual(generate.call_count, 2)
+            self.assertFalse(paths['PLAN_FILE'].exists())
+            self.assertFalse(paths['CANONICAL_FILE'].exists())
+            with closing(sqlite3.connect(paths['DB_PATH'])) as conn:
+                self.assertEqual([(row[1],row[3]) for row in ai_coach.daily_coaching_requests(conn)],
+                                 [(previous, 'failed'), (previous, 'invalid')])
+
+    def test_first_plan_resulting_review_remains_cached_across_prompt_mode_change(self):
+        with tempfile.TemporaryDirectory() as d:
+            paths = self.fixture(Path(d))
+            paths['PLAN_FILE'].unlink()
+            paths['CANONICAL_FILE'].unlink()
+            session = {'id': 'first-session', 'date': (date.today()+timedelta(days=1)).isoformat(),
+                       'workout_type': 'Run', 'amount': '30 min', 'target': 'Conversational effort'}
+            payload = {'summary': 'A short first block.', 'trajectory': 'insufficient_evidence', 'reviews': [],
+                       'plan_changes': [{'op': 'add', 'session_id': session['id'], 'session': session, 'reason': 'First evidence-led session.'}]}
+            generate = Mock(return_value=types.SimpleNamespace(text=json.dumps(payload), usage_metadata=None))
+            client = types.SimpleNamespace(models=types.SimpleNamespace(generate_content=generate))
+            env = {'COACH_PROVIDER': 'gemini', 'COACH_MODELS': 'gemini-2.5-flash'}
+            with patch.multiple(ai_coach, **paths), patch.object(ai_coach, 'SCRIPT_DIR', Path(d)), patch.dict(os.environ, env, clear=True), patch.object(ai_coach, 'api_client', return_value=client), redirect_stdout(io.StringIO()):
+                self.assertEqual(ai_coach.run_daily_coach_check()['status'], 'complete')
+                self.assertEqual(ai_coach.run_daily_coach_check()['status'], 'unchanged')
+            self.assertEqual(generate.call_count, 1)
+            with closing(sqlite3.connect(paths['DB_PATH'])) as conn:
+                self.assertEqual(conn.execute('SELECT prompt_version FROM coach_api_requests').fetchall(), [(ai_coach.STARTER_PROMPT_VERSION,)])
+
 if __name__=='__main__':unittest.main()

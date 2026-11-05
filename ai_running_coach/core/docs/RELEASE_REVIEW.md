@@ -1,6 +1,6 @@
 # Public source release review
 
-Status: **public beta 0.2.3b1**, intended for technical self-hosters running one personal source-checkout installation. It is not a stable, universally validated provider/device integration. Repository pushes and GitHub Release publication are separate maintainer operations. A separate personal Linux installation was backed up, migrated and checked against the official Garmin Personal API. Provider validation scope is recorded below.
+Status: **public beta 0.2.3b2**, intended for technical self-hosters running one personal source-checkout installation. It is not a stable, universally validated provider/device integration. Repository pushes and GitHub Release publication are separate maintainer operations. A separate personal Linux installation was backed up, migrated and checked against the official Garmin Personal API. Provider validation scope is recorded below.
 
 ## Findings corrected
 
@@ -20,13 +20,17 @@ Status: **public beta 0.2.3b1**, intended for technical self-hosters running one
 
 ## Verified scope
 
-Local verification uses Windows and CPython 3.13. The clean-source flow installs only base HTTP/dotenv dependencies in a new virtual environment, initializes without an existing profile/database/plan, runs an offline new-plan preview, imports synthetic summaries, and renders a synthetic dashboard. The latest network-blocked suite ran **166 tests: 162 passed and four optional checks skipped**. Seven FIT checks separately passed with Garmin's official decoder available. Provider protocol and failure-path tests use mocked HTTP responses; these establish request handling and validation behavior, not coaching quality.
+Local verification uses Windows and CPython 3.13. The clean-source flow installs only base HTTP/dotenv dependencies in a new virtual environment, initializes without an existing profile/database/plan, runs an offline new-plan preview, imports synthetic summaries, and renders a synthetic dashboard. The latest network-blocked suite ran **170 tests: 166 passed and four optional checks skipped**. Seven FIT checks separately passed with Garmin's official decoder available. Provider protocol and failure-path tests use mocked HTTP responses; these establish request handling and validation behavior, not coaching quality.
 
-One separately authorized live evaluation request to `gemini-3.5-flash-lite` succeeded with a 4096-token output cap. Provider-reported usage was 2861 input and 875 output tokens. The synthetic response contained three future calendar entries: a 30-minute easy running workout with an open/conversational target and two rest days, plus an `insufficient_evidence` trajectory. The same saved response then passed normal validation, journaled SQLite/file plan application and HTML rendering offline, without another API call. Production configuration, profile, plan and database were unchanged. This checks one account/model and a small synthetic end-to-end plan path; it does not establish free-tier eligibility, actual billed cost or coaching suitability for a real athlete.
+During beta 1, one separately authorized live evaluation request to `gemini-3.5-flash-lite` succeeded with a 4096-token output cap. Provider-reported usage was 2861 input and 875 output tokens. The synthetic response contained three future calendar entries: a 30-minute easy running workout with an open/conversational target and two rest days, plus an `insufficient_evidence` trajectory. The same saved response then passed normal validation, journaled SQLite/file plan application and HTML rendering offline, without another API call. Production configuration, profile, plan and database were unchanged. This checks one account/model and a small synthetic end-to-end plan path; it does not establish free-tier eligibility, actual billed cost or coaching suitability for a real athlete.
 
 Physical Forerunner 965 transfer/execution remains untested, so FIT export is experimental and does not claim automatic watch delivery. A personal-installation check additionally verified official Garmin authentication, current and historical sync, and Linux deployment. This is one installation, not universal account/device compatibility. OpenAI/Anthropic/custom endpoint live access, real-athlete coaching quality and provider billing remain unverified.
 
 The GitHub Actions workflow targets Linux/Windows and Python 3.11-3.13. Check the public repository's run for the exact beta commit; local results do not establish that this beta has passed the public CI matrix. This is a source-checkout application: installed module wheels alone do not include adjacent dashboard/template assets. Run the supplied scripts from the extracted tree.
+
+### Beta 2
+
+First-plan generation and explicit plan replacement now ask for a compact seven-day block with at most seven entries and one optional structured workout. A truncated response still leaves the previous dashboard in place and reports the output limit in the status panel. The ordinary review flow and request budget are unchanged.
 
 ## Beta tester path
 

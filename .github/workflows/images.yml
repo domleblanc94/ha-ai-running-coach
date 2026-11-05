@@ -40,7 +40,13 @@ jobs:
         run: |
           version=${GITHUB_REF_NAME#image-v}
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]
+          case "$ARCH" in
+            amd64) hass_arch=amd64 ;;
+            arm64) hass_arch=aarch64 ;;
+            *) exit 1 ;;
+          esac
           docker build --platform "linux/$ARCH" -t coach-app:release \
+            --build-arg "BUILD_ARCH=$hass_arch" --build-arg "BUILD_VERSION=$version" \
             --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
             --label "org.opencontainers.image.revision=$GITHUB_SHA" \
             --label "org.opencontainers.image.version=$version" ai_running_coach
@@ -69,8 +75,13 @@ jobs:
         run: |
           version=${GITHUB_REF_NAME#image-v}
           printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          if docker buildx imagetools inspect "$IMAGE:$version" >/dev/null 2>&1; then
+          if result=$(docker buildx imagetools inspect "$IMAGE:$version" 2>&1); then
             echo "Release image already exists. Use a new version."
+            exit 1
+          fi
+          if [[ "$result" != *"not found"* && "$result" != *"manifest unknown"* ]]; then
+            echo "Could not verify that the release tag is unused."
+            printf '%s\n' "$result"
             exit 1
           fi
           docker buildx imagetools create -t "$IMAGE:$version" \

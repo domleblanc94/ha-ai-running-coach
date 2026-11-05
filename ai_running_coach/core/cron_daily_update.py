@@ -80,6 +80,27 @@ def read_garmin_auth(project):
         return result
     except (OSError,ValueError,TypeError,KeyError):return None
 
+def coach_failure_message(project, attempted_at):
+    """Report recognized failures from this run without exposing provider content."""
+    try:
+        uri = (Path(project) / "ai_coach_master.sqlite").resolve().as_uri() + "?mode=ro"
+        with contextlib.closing(sqlite3.connect(uri, uri=True)) as conn:
+            request = conn.execute(
+                "SELECT status,error,started_at FROM coach_api_requests "
+                "WHERE request_kind IN ('daily','operator_recovery') ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+        if not request or datetime.fromisoformat(request[2]) < datetime.fromisoformat(attempted_at):
+            return None
+        status, error, _ = request
+        if status == "invalid" and error == "Model output was truncated by its token budget; last-good plan retained.":
+            return "AI response exceeded its output limit; last published dashboard retained"
+        if status == "failed" and re.search(r"(?:^|HTTP )(500|502|503|504|529)\b", error or ""):
+            return "AI provider remained unavailable; last successful review retained"
+    except (OSError, sqlite3.Error, TypeError, ValueError):
+        return None
+    return None
+
+
 def run_pipeline(coach_args=()):
     status = {"attempted_at": datetime.now(timezone.utc).isoformat(), "errors": []}
     previous = SCRIPT_DIR / "pipeline_status.json"
@@ -137,13 +158,9 @@ def run_pipeline(coach_args=()):
         if now < scheduled and deferred_retry_eligible(SCRIPT_DIR, scheduled)[0]:
             health_errors = ["AI provider temporarily unavailable; 04:15 UTC retry scheduled; previous review retained"]
         else:
-            try:
-                with sqlite3.connect((SCRIPT_DIR / "ai_coach_master.sqlite").resolve().as_uri() + "?mode=ro", uri=True) as conn:
-                    last = conn.execute("SELECT error FROM coach_api_requests ORDER BY id DESC LIMIT 1").fetchone()
-                if last and re.search(r"(?:^|HTTP )(500|502|503|504|529)\b", last[0] or ""):
-                    health_errors = ["AI provider remained unavailable; last successful review retained"]
-            except (OSError, sqlite3.Error):
-                pass
+            message = coach_failure_message(SCRIPT_DIR, status["attempted_at"])
+            if message:
+                health_errors = [message]
     changes={"phase":"failed" if status["errors"] else "awaiting_publish","pipeline_errors":health_errors,"plan_revision":revision}
     if not status["errors"]:changes["last_pipeline_success_at"]=stamp()
     update_health(SCRIPT_DIR,**changes)

@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "release": "0.2.3-beta.1",
+  "release": "0.2.3-beta.2",
   "license_status": "selected",
   "files": [
     {
@@ -21,11 +21,11 @@
     },
     {
       "path": "README.md",
-      "sha256": "534adcfc824f9067e53cb386e76db40ceb272a068b787a6418a59d551334db44"
+      "sha256": "c0a377787c4cba26d0e7af378d85bfb386bae73c79d7653fc86b17d0290bd9f7"
     },
     {
       "path": "ai_coach.py",
-      "sha256": "bf4de0ce36cc320ba77c6efee0345a8482671ee69534c69f03e3ae0293129d01"
+      "sha256": "2f688e23bcabc616863ab5004718dbc48c170381b14c02c43a8c0bba6c84fa59"
     },
     {
       "path": "coach_checkin.py",
@@ -37,7 +37,7 @@
     },
     {
       "path": "cron_daily_update.py",
-      "sha256": "fd99d5444cac2af6fed0fdfe0fbc5d67b3ecb2b25e8f498062be23b6eae7beb0"
+      "sha256": "38ec294b2dd86fc05bd5c66c67a76c548b154eab4dbba2e9f3262ce401fc4f9d"
     },
     {
       "path": "dashboard_assets/chart-LICENSE.md",
@@ -105,7 +105,7 @@
     },
     {
       "path": "dashboard_panels.py",
-      "sha256": "ca4c1d0f0e6e21bcb545d849bf72881ae0847ebd6ca1f46335beb50d20951318"
+      "sha256": "63b34ca375047e2c248fa2d8413ea94a66d78d1cfcd57792fc1bdec1533c3f36"
     },
     {
       "path": "dashboard_template.py",
@@ -117,7 +117,7 @@
     },
     {
       "path": "docs/RELEASE_REVIEW.md",
-      "sha256": "c33aada0282403a75dc05adda7ab02579ab928b78c41b14d6cc8dcd7aa8d9836"
+      "sha256": "bde0eb53c421c1533383a46866ea7a01da1970ff170cee27ab47b5c1c363b1f9"
     },
     {
       "path": "docs/THIRD_PARTY.md",
@@ -149,7 +149,7 @@
     },
     {
       "path": "generate_dashboard.py",
-      "sha256": "a4806ba8a67678b720a9dfc5230808189ce138b0695a1288ab3c08a3f2234d93"
+      "sha256": "2bdd30938712e0ae0b8343a0de4ed22a0ad28d4cc8f353620d6bd8080541fb47"
     },
     {
       "path": "health_status.py",
@@ -177,7 +177,7 @@
     },
     {
       "path": "prepare_release.py",
-      "sha256": "af66f8e380e44527b50f8b45694d0d2d6ccfe8a41307b399328711adfdc8f4f6"
+      "sha256": "826808d76b07f02a759c3b601cdafc03730180b62f2c4fc330d9fd1248f2b4d2"
     },
     {
       "path": "publish_if_ready.py",
@@ -185,7 +185,7 @@
     },
     {
       "path": "pyproject.toml",
-      "sha256": "daab875cdba90763f8c831c38c236ef2129c2a61e1be87c74dad7c6ce778ef9e"
+      "sha256": "4b04eed8360870f48b28aeb4f2139b0558b796bb3ed3e09ad7a250d4299c459c"
     },
     {
       "path": "requirements.txt",
@@ -209,11 +209,11 @@
     },
     {
       "path": "tests/test_daily_request_budget.py",
-      "sha256": "2cd31f1dc6c184a75705790e736d56812ac5e3ad500cd19ec1dfcc4321efbc2e"
+      "sha256": "88f2d2061c6d33b6c5a14f8a75cec28b5b5253715f3e2b8d41d9e4f7eb4c9b9a"
     },
     {
       "path": "tests/test_dashboard_regression.py",
-      "sha256": "c74d7b5dc68346a13790fb96dd985ea13213eb59486474d03888a8d3cb65dd25"
+      "sha256": "3a136d9e8f72fb0c001688698fbebd097e5f43b330706a32b92089c9070817eb"
     },
     {
       "path": "tests/test_dashboard_workflow.py",
@@ -249,11 +249,11 @@
     },
     {
       "path": "tests/test_health_status.py",
-      "sha256": "10d4be4a9de6c52ce82313b82ade53b73cba2468eb3006ba9c942db920d245ad"
+      "sha256": "675ea408c5df49ded96ec7b72b7c8f89360b182a587dbd80e625254e3758d998"
     },
     {
       "path": "tests/test_model_providers.py",
-      "sha256": "1cac7b8fe215ed1c2938bfecddbfeed3bb6e0e4a6403be4348c7d5d799a128cd"
+      "sha256": "32fe559821a1062a5f9d9cca22755d74052dd7547218c9a4baef931b7699da77"
     },
     {
       "path": "tests/test_operations.py",

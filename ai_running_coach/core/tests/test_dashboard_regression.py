@@ -65,6 +65,22 @@ class RestoredDashboardTests(unittest.TestCase):
             conn.commit()
         return db,md
 
+    def test_starter_review_renders_without_regular_review_alias(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            db, md = self.fixture(root)
+            with closing(sqlite3.connect(db)) as conn:
+                response = json.loads(conn.execute('SELECT response_json FROM coach_review_jobs').fetchone()[0])
+                response['weekly_priorities'] = [{'priority': 'Starter weekly priority', 'reason': 'Synthetic reason', 'evidence': ['Activity 1']}]
+                response['plan_changes'] = [{'op': 'add', 'session_id': 'starter-session', 'reason': 'Starter session rationale'}]
+                conn.execute('UPDATE coach_review_jobs SET prompt_version=?, response_json=?',
+                             ('autonomous-coach-v4-starter-week', json.dumps(response)))
+                conn.commit()
+            page = dashboard.build_dashboard(db, md, root/'dashboard.html', today=date(2026, 10, 31))
+            html = page.read_text(encoding='utf-8')
+            self.assertIn('Starter weekly priority', html)
+            self.assertIn('Starter session rationale', html)
+
     def metric_fixture(self,root):
         db,md=self.fixture(root)
         with closing(sqlite3.connect(db)) as conn:

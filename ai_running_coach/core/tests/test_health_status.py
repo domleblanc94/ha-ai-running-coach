@@ -3,6 +3,7 @@ from datetime import datetime,timezone,timedelta
 import json
 from pathlib import Path
 import shlex
+import sqlite3
 import shutil
 import subprocess
 import tempfile
@@ -42,6 +43,33 @@ class HealthTests(unittest.TestCase):
             self.assertTrue(status['issues'])
             self.assertEqual((ha/'dashboard.html').read_text(),'last-good')
             self.assertFalse(status['last_pipeline_success_at'])
+
+    def test_truncation_reports_safe_detail_without_changing_retry_state(self):
+        with tempfile.TemporaryDirectory() as d:
+            project, _ = self.project(Path(d))
+            started = datetime.now(timezone.utc) + timedelta(seconds=2)
+            with contextlib.closing(sqlite3.connect(project / "ai_coach_master.sqlite")) as db:
+                db.execute("CREATE TABLE coach_api_requests(id INTEGER PRIMARY KEY,status,error,started_at,request_kind)")
+                db.execute(
+                    "INSERT INTO coach_api_requests VALUES(1,'invalid',?,?,'daily')",
+                    ("Model output was truncated by its token budget; last-good plan retained.", started.isoformat()),
+                )
+                db.commit()
+            with (
+                patch.object(pipeline, "SCRIPT_DIR", project),
+                patch.object(pipeline, "activity_source_mode", return_value="garmin"),
+                patch.object(pipeline, "run_script", side_effect=[2, 0, 1, 0]),
+                patch.object(pipeline, "upload_health", return_value=True),
+            ):
+                self.assertEqual(pipeline.run_pipeline(), 1)
+            sidecar = json.loads((project / "coach-status.json").read_text())
+            self.assertEqual(sidecar["status"], "error")
+            self.assertEqual(sidecar["issues"], ["AI response exceeded its output limit; last published dashboard retained"])
+            self.assertEqual(
+                json.loads((project / "pipeline_status.json").read_text())["errors"],
+                ["Coach review pending; previous review retained"],
+            )
+            self.assertIsNone(pipeline.coach_failure_message(project, (started + timedelta(seconds=1)).isoformat()))
 
     def test_status_transport_failures_persist_and_never_expose_commands(self):
         with tempfile.TemporaryDirectory() as d:

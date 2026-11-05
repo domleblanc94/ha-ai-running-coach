@@ -24,7 +24,7 @@ def coach_payload(conn):
     tables={row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     if 'coach_review_jobs' not in tables:return {}
     import json
-    row=conn.execute("SELECT response_json FROM coach_review_jobs WHERE status='complete' AND prompt_version IN ('autonomous-coach-v2','autonomous-coach-v3') ORDER BY updated_at DESC LIMIT 1").fetchone()
+    row=conn.execute("SELECT response_json FROM coach_review_jobs WHERE status='complete' AND prompt_version IN ('autonomous-coach-v2','autonomous-coach-v3','autonomous-coach-v4-starter-week') ORDER BY updated_at DESC LIMIT 1").fetchone()
     try:
         payload=json.loads(row[0]) if row and row[0] else {}
         return payload if isinstance(payload,dict) else {}

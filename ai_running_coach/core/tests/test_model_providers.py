@@ -199,6 +199,10 @@ class NewPlanTests(unittest.TestCase):
             with patch.multiple(ai_coach,ATHLETE_FILE=profile,PLAN_FILE=root/'training_plan.md',CANONICAL_FILE=root/'training_plan.json',DB_PATH=root/'missing.sqlite'),patch.object(ai_coach,'api_client',side_effect=AssertionError('No API')),contextlib.redirect_stdout(io.StringIO()):
                 result=ai_coach.run_daily_coach_check(new_plan=True,dry_run=True)
             self.assertEqual(result['status'],'dry_run');self.assertIn('NEW plan',result['prompt'])
+            today=date.fromisoformat(result['evidence']['today'])
+            self.assertIn(f'from {today} through {today+timedelta(days=6)}, inclusive',result['prompt'])
+            self.assertIn('at most seven calendar entries',result['prompt'])
+            self.assertIn('at most one optional structured workout with at most six steps',result['prompt'])
             self.assertEqual(list(root.iterdir()),[profile])
 
 if __name__=='__main__':unittest.main()
