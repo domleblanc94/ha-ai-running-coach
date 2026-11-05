@@ -4,14 +4,19 @@ const byId = id => document.getElementById(id);
 const connection = byId("connection-form");
 const profile = byId("profile-form");
 const schedule = byId("schedule-form");
+const baseline = byId("baseline-form");
 const field = (form, name) => form.elements.namedItem(name);
 const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const goals = [["A", "Primary"], ["B", "Secondary"], ["C", "Supporting"]];
+const goalFields = [["event", "Goal name", "text", 150], ["race_date", "Date", "date", 0], ["target_time", "Existing or general target", "text", 500]];
+const outcomeFields = [["A", "A outcome · Ideal"], ["B", "B outcome · Main"], ["C", "C outcome · Fallback"]];
 let state = {};
 let csrf = "";
 let working = false;
 let initialized = false;
 let dashboardRevision = "";
 let displayedRevision = null;
+let candidateSignature = "";
 
 for (const day of weekdays) {
   const label = document.createElement("label");
@@ -21,6 +26,59 @@ for (const day of weekdays) {
   input.value = day;
   label.append(input, day.slice(0, 3));
   byId("days").append(label);
+}
+for (const [priority, description] of goals) {
+  const group = document.createElement("fieldset");
+  const legend = document.createElement("legend");
+  legend.textContent = priority + " goal · " + description;
+  group.append(legend);
+  const kindLabel = document.createElement("label");
+  const kind = document.createElement("select");
+  kind.name = "goal_" + priority + "_kind";
+  kind.add(new Option("Training goal", "training"));
+  kind.add(new Option("Race", "race"));
+  kindLabel.append("Goal type", kind);
+  group.append(kindLabel);
+  for (const [key, title, type, length] of goalFields) {
+    const label = document.createElement("label");
+    const input = document.createElement("input");
+    input.name = "goal_" + priority + "_" + key;
+    input.type = type;
+    if (length) input.maxLength = length;
+    label.append(title, input);
+    group.append(label);
+  }
+  const outcomes = document.createElement("details");
+  const summary = document.createElement("summary");
+  summary.textContent = "Race outcomes (optional)";
+  outcomes.append(summary);
+  for (const [key, title] of outcomeFields) {
+    const label = document.createElement("label");
+    const input = document.createElement("input");
+    input.name = "goal_" + priority + "_outcome_" + key;
+    input.maxLength = 250;
+    label.append(title, input);
+    outcomes.append(label);
+  }
+  const defaultTarget = document.createElement("small");
+  defaultTarget.textContent = "Leave the outcomes and target blank to use Just finish.";
+  outcomes.append(defaultTarget);
+  group.append(outcomes);
+  const showOutcomes = () => { outcomes.hidden = kind.value !== "race"; };
+  kind.addEventListener("change", showOutcomes);
+  showOutcomes();
+  const clear = document.createElement("button");
+  clear.type = "button";
+  clear.className = "secondary";
+  clear.textContent = "Clear " + priority + " goal";
+  clear.addEventListener("click", () => {
+    for (const [key] of goalFields) field(profile, "goal_" + priority + "_" + key).value = "";
+    for (const [key] of outcomeFields) field(profile, "goal_" + priority + "_outcome_" + key).value = "";
+    kind.value = "training";
+    showOutcomes();
+  });
+  group.append(clear);
+  byId("goal-fields").append(group);
 }
 for (let zone = 1; zone <= 5; zone += 1) {
   const row = document.createElement("div");
@@ -120,12 +178,60 @@ function draw(next) {
   }
   issues.hidden = issues.children.length === 0;
   byId("new-plan").disabled = busy || working || next.worker_ok === false || !next.setup_ready || !next.profile_ready;
+  byId("new-plan").textContent = next.hr_learning?.enabled ? "Plan baseline runs" : "Generate new plan";
   byId("run-now").disabled = byId("new-plan").disabled || !next.plan_ready;
   byId("dashboard-tab").disabled = !next.dashboard_ready;
   field(schedule, "enabled").disabled = !next.plan_ready;
   connectionHints();
+  drawBaseline(next.hr_learning, busy);
   updateDashboard();
 }
+
+function drawBaseline(learning, busy) {
+  baseline.hidden = !learning?.enabled;
+  if (!learning?.enabled) return;
+  const candidates = learning.candidates || [];
+  byId("baseline-inputs").hidden = candidates.length === 0;
+  let detail = "Plan your baseline runs, then sync a completed run from Garmin.";
+  if (candidates.length) {
+    const count = learning.feedback_count;
+    detail = count
+      ? count + (count === 1 ? " baseline observation recorded. " : " baseline observations recorded. ")
+        + "Run a review to share your observations with the coach."
+      : "Choose a completed run and record how it felt.";
+  } else if (state.config?.source === "offline") {
+    detail = "The coach can plan effort-based baseline runs. Select Garmin sync to attach observations to recorded runs here.";
+  }
+  byId("baseline-status").textContent = detail;
+  byId("baseline-review").hidden = !learning.review?.summary;
+  byId("baseline-review-summary").textContent = learning.review?.summary
+    ? (learning.review.completed_at || "").slice(0, 10) + " · " + learning.review.summary
+    : "";
+  baseline.querySelector("button[type=submit]").disabled = busy;
+  const select = field(baseline, "activity_id");
+  const signature = JSON.stringify(candidates);
+  if (signature === candidateSignature) return;
+  candidateSignature = signature;
+  const selected = select.value;
+  select.replaceChildren(new Option("Select a run", ""));
+  for (const run of candidates) {
+    const metrics = [];
+    if (run.moving_minutes != null) metrics.push(run.moving_minutes + " min");
+    if (run.average_hr_bpm != null) metrics.push(run.average_hr_bpm + " bpm avg");
+    if (run.feedback) metrics.push("observation saved");
+    const label = run.date + (metrics.length ? " · " + metrics.join(" · ") : "");
+    select.add(new Option(label, String(run.activity_id)));
+  }
+  if (candidates.some(run => String(run.activity_id) === selected)) select.value = selected;
+}
+
+field(baseline, "activity_id").addEventListener("change", () => {
+  const run = state.hr_learning?.candidates?.find(item => String(item.activity_id) === field(baseline, "activity_id").value);
+  const saved = run?.feedback;
+  field(baseline, "rpe").value = saved?.rpe ?? "";
+  field(baseline, "talk_test").value = saved?.talk_test || "unknown";
+  field(baseline, "sensor").value = saved?.sensor || "unknown";
+});
 
 async function refresh() {
   if (working) return;
@@ -141,16 +247,28 @@ async function refresh() {
       field(schedule, "enabled").checked = Boolean(next.schedule?.enabled);
       field(schedule, "time").value = next.schedule?.time || "03:00";
       field(schedule, "timezone").value = next.schedule?.timezone || "UTC";
-      for (const key of ["name", "goal", "experience", "injuries", "event", "race_date", "target_time"]) {
+      for (const key of ["name", "goal", "experience", "injuries"]) {
         field(profile, key).value = saved[key] || "";
+      }
+      for (const [priority] of goals) {
+        const savedGoal = saved.goals?.[priority] || {};
+        const kind = field(profile, "goal_" + priority + "_kind");
+        kind.value = savedGoal.kind || "training";
+        kind.dispatchEvent(new Event("change"));
+        for (const [key] of goalFields) {
+          field(profile, "goal_" + priority + "_" + key).value = savedGoal[key] || "";
+        }
+        for (const [key] of outcomeFields) {
+          field(profile, "goal_" + priority + "_outcome_" + key).value = savedGoal.outcomes?.[key] || "";
+        }
       }
       for (const input of byId("days").querySelectorAll("input")) input.checked = (saved.days || []).includes(input.value);
       for (const [zone, bounds] of Object.entries(saved.zones || {})) {
         field(profile, "zone_" + zone + "_low").value = bounds[0];
         field(profile, "zone_" + zone + "_high").value = bounds[1];
       }
-      field(profile, "zone_mode").value = Object.keys(saved.zones || {}).length ? "known" : "unknown";
-      byId("zones").hidden = field(profile, "zone_mode").value !== "known";
+      field(profile, "zone_mode").value = saved.zone_mode || "unknown";
+      updateZoneMode();
       initialized = true;
       connectionHints();
       if (next.setup_ready && next.profile_ready && next.dashboard_ready) selectView(true);
@@ -196,7 +314,12 @@ field(connection, "provider").addEventListener("change", () => {
   connectionHints();
 });
 field(connection, "source").addEventListener("change", connectionHints);
-field(profile, "zone_mode").addEventListener("change", () => { byId("zones").hidden = field(profile, "zone_mode").value !== "known"; });
+function updateZoneMode() {
+  const mode = field(profile, "zone_mode").value;
+  byId("zones").hidden = mode !== "known";
+  byId("zone-learn-hint").hidden = mode !== "learn";
+}
+field(profile, "zone_mode").addEventListener("change", updateZoneMode);
 
 formAction(connection, "config", () => {
   const get = key => field(connection, key).value;
@@ -209,8 +332,22 @@ formAction(connection, "config", () => {
 });
 formAction(profile, "profile", () => {
   const payload = {};
-  for (const key of ["name", "goal", "experience", "injuries", "event", "race_date", "target_time"]) payload[key] = field(profile, key).value;
+  for (const key of ["name", "goal", "experience", "injuries"]) payload[key] = field(profile, key).value;
+  payload.goals = {};
+  for (const [priority] of goals) {
+    const kind = field(profile, "goal_" + priority + "_kind").value;
+    payload.goals[priority] = {kind, outcomes: {}};
+    for (const [key] of goalFields) {
+      payload.goals[priority][key] = field(profile, "goal_" + priority + "_" + key).value;
+    }
+    if (kind === "race") {
+      for (const [key] of outcomeFields) {
+        payload.goals[priority].outcomes[key] = field(profile, "goal_" + priority + "_outcome_" + key).value;
+      }
+    }
+  }
   payload.days = Array.from(byId("days").querySelectorAll("input:checked"), input => input.value);
+  payload.zone_mode = field(profile, "zone_mode").value;
   payload.zones = {};
   if (field(profile, "zone_mode").value === "known") {
     for (let zone = 1; zone <= 5; zone += 1) {
@@ -226,6 +363,12 @@ formAction(schedule, "schedule", () => ({
   enabled: field(schedule, "enabled").checked,
   time: field(schedule, "time").value,
   timezone: field(schedule, "timezone").value,
+}));
+formAction(baseline, "baseline-feedback", () => ({
+  activity_id: Number(field(baseline, "activity_id").value),
+  rpe: Number(field(baseline, "rpe").value),
+  talk_test: field(baseline, "talk_test").value,
+  sensor: field(baseline, "sensor").value,
 }));
 
 async function run(action) {
@@ -246,7 +389,15 @@ async function run(action) {
 }
 byId("run-now").addEventListener("click", () => run("run_now"));
 const confirm = byId("new-plan-confirm");
-byId("new-plan").addEventListener("click", () => { confirm.returnValue = ""; confirm.showModal(); });
+byId("new-plan").addEventListener("click", () => {
+  const learning = state.hr_learning?.enabled;
+  byId("plan-confirm-title").textContent = learning ? "Plan baseline runs?" : "Generate a new training plan?";
+  byId("plan-confirm-detail").textContent = learning
+    ? "This uses your selected model API to plan easy baseline runs guided by effort. A valid plan replaces the upcoming block and preserves your past sessions and saved ranges."
+    : "This uses your selected model API. A valid response replaces the upcoming block and preserves your past sessions.";
+  confirm.returnValue = "";
+  confirm.showModal();
+});
 confirm.addEventListener("close", () => { if (confirm.returnValue === "confirm") run("new_plan"); });
 
 function updateDashboard() {

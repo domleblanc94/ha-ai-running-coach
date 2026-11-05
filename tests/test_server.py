@@ -94,13 +94,79 @@ class ServerTests(unittest.TestCase):
 **Date:** 2027-05-16
 """
         fields = profile_fields(old)
-        self.assertEqual(fields["race_date"], "")
+        self.assertEqual(fields["goals"]["A"]["race_date"], "")
         fields["goal"] = "Build consistency"
         updated = profile_markdown(fields, old)
         self.assertIn("Direct and brief. Training goal: Build consistency", updated)
         self.assertIn("**Preferred Rest Days:** Tuesday", updated)
         self.assertIn("**Zone 5 (Max):** >= 190 bpm", updated)
         self.assertIn("**B-Race:** Second event\n**Date:** 2027-05-16", updated)
+
+    def test_three_goals_keep_dates_and_targets_with_their_priorities(self):
+        old = """**Athlete Name:** Test runner
+**Heart Rate Zones:** Not configured
+**A-Race:** Main event
+**Date:** November 21, 2027
+**Target Time:** Finish
+**B-Race:** Secondary event
+**Date:** 2027-05-16
+**Target Time:** Sub 2 hours
+**C-Race:** Run consistently
+**Preferred Rest Days:** Thursday
+"""
+        fields = profile_fields(old)
+        self.assertEqual(fields["goals"]["A"]["race_date"], "2027-11-21")
+        self.assertEqual(fields["goals"]["C"]["race_date"], "")
+        fields["goals"]["A"] = {}
+        updated = profile_markdown(fields, old)
+        self.assertNotIn("Main event", updated)
+        self.assertNotIn("2027-11-21", updated)
+        self.assertIn("**Preferred Rest Days:** Thursday", updated)
+        result = profile_fields(updated)["goals"]
+        self.assertEqual(result["B"]["target_time"], "Sub 2 hours")
+        self.assertEqual(result["B"]["race_date"], "2027-05-16")
+        self.assertEqual(result["C"]["event"], "Run consistently")
+
+    def test_learning_mode_keeps_saved_ranges_and_leaves_new_ranges_unknown(self):
+        previous = "**Athlete Name:** Test runner\n**Zone 2 (Endurance):** 140 - 155 bpm\n**Zone 5 (Max):** >= 190 bpm\n"
+        draft = {"name": "Test runner", "zone_mode": "learn"}
+        saved = profile_markdown(draft, previous)
+        self.assertIn("**Zone 2 (Endurance):** 140 - 155 bpm", saved)
+        self.assertIn("**Zone 5 (Max):** >= 190 bpm", saved)
+        self.assertEqual(profile_fields(saved)["zone_mode"], "learn")
+        fresh = profile_markdown(draft)
+        self.assertIn("**Heart Rate Zones:** Not configured", fresh)
+        self.assertEqual(profile_fields(fresh)["zones"], {})
+
+    def test_race_outcomes_roundtrip_as_one_goal_and_default_to_finish(self):
+        draft = {
+            "name": "Synthetic runner",
+            "goals": {
+                "A": {"event": "Marathon", "kind": "race", "race_date": "2027-05-15",
+                      "outcomes": {"A": "Sub 3:45", "B": "Sub 4", "C": "Finish steadily"}},
+                "B": {"event": "Trail event", "kind": "race"},
+                "C": {"event": "Build consistency", "kind": "training", "race_date": "2027-06-01"},
+            },
+        }
+        result = profile_markdown(draft)
+        self.assertEqual(result.count("**A-Race:**"), 1)
+        self.assertIn("**Target Time:** A (ideal): Sub 3:45 | B (main): Sub 4 | C (fallback): Finish steadily", result)
+        self.assertIn("**B-Race:** Trail event\n**Target Time:** Just finish", result)
+        fields = profile_fields(result)
+        self.assertEqual(fields["goals"]["A"]["outcomes"], draft["goals"]["A"]["outcomes"])
+        self.assertEqual(fields["goals"]["B"]["target_time"], "")
+        self.assertEqual(fields["goals"]["C"]["kind"], "training")
+        self.assertEqual(fields["goals"]["C"]["event"], "Build consistency")
+        self.assertEqual(profile_markdown(fields, result), result)
+        # The wrapper metadata is private to the UI. Confirm that the actual
+        # pinned coaching parser receives the training intent in its goal text.
+        core = Path(__file__).resolve().parents[1] / "ai_running_coach" / "core"
+        with patch.object(sys, "path", [str(core), *sys.path]):
+            from planning_engine import parse_profile
+        parsed = parse_profile(result)
+        self.assertEqual(parsed["goals"][2], {
+            "priority": "C-Race", "event": "Training milestone: Build consistency", "date": "2027-06-01",
+        })
 
 
 if __name__ == "__main__":

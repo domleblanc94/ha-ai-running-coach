@@ -1,7 +1,7 @@
 """Home Assistant ingress UI for the private coach runtime."""
 
 import argparse
-from datetime import date
+from datetime import date, datetime
 import hashlib
 import hmac
 from http.cookies import CookieError, SimpleCookie
@@ -26,8 +26,13 @@ ASSETS = {
 WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 PROFILE_FIELDS = {
     "name": "Athlete Name", "experience": "Sporting Background", "goal": "Coaching Style",
-    "event": "A-Race", "race_date": "Date", "target_time": "Target Time", "injuries": "Active Injuries",
+    "injuries": "Active Injuries",
 }
+GOAL_FIELDS = {"event": None, "race_date": "Date", "target_time": "Target Time"}
+PRIORITIES = ("A", "B", "C")
+GOAL_METADATA = "<!-- coach-goal "
+TRAINING_GOAL_PREFIX = "Training milestone: "
+OUTCOME_LABELS = {"A": "A (ideal)", "B": "B (main)", "C": "C (fallback)"}
 ZONE_NAMES = ("Recovery", "Endurance", "Tempo", "Hard", "Max")
 
 
@@ -38,21 +43,48 @@ def profile_fields(markdown):
         match = re.search(r"^\*\*" + re.escape(label) + r":\*\*[ \t]*(.*)$", markdown, re.M)
         fields[key] = match[1] if match else ""
     fields["goal"] = fields["goal"].partition("Training goal: ")[2]
-    race = re.search(r"^\*\*A-Race:\*\*.*(?:\n(?!\*\*[ABC]-Race:\*\*).*)*", markdown, re.M)
-    for key in ("race_date", "target_time"):
-        label = PROFILE_FIELDS[key]
-        match = re.search(r"^\*\*" + label + r":\*\*[ \t]*(.*)$", race[0], re.M) if race else None
-        fields[key] = match[1] if match else ""
+    fields["goals"] = {}
+    for priority in PRIORITIES:
+        race = re.search(r"^\*\*" + priority + r"-Race:\*\*[ \t]*(.*)(?:\n(?!\*\*[ABC]-Race:\*\*).*)*", markdown, re.M | re.I)
+        goal = {"event": race[1] if race else ""}
+        for key in ("race_date", "target_time"):
+            match = re.search(r"^\*\*" + GOAL_FIELDS[key] + r":\*\*[ \t]*(.*)$", race[0], re.M) if race else None
+            goal[key] = match[1] if match else ""
+        goal["kind"] = "race" if goal["race_date"] or goal["target_time"] else "training"
+        goal["outcomes"] = {}
+        if race:
+            metadata = next((line for line in race[0].splitlines() if line.startswith(GOAL_METADATA) and line.endswith(" -->")), None)
+            if metadata:
+                try:
+                    stored = json.loads(metadata[len(GOAL_METADATA):-4])
+                    if stored["kind"] in ("race", "training") and isinstance(stored["target_time"], str) and isinstance(stored["outcomes"], dict):
+                        goal["kind"] = stored["kind"]
+                        if goal["kind"] == "training":
+                            goal["event"] = goal["event"].removeprefix(TRAINING_GOAL_PREFIX)
+                        goal["target_time"] = stored["target_time"]
+                        goal["outcomes"] = {
+                            key: value for key, value in stored["outcomes"].items()
+                            if key in PRIORITIES and isinstance(value, str)
+                        }
+                except (ValueError, KeyError, TypeError):
+                    pass
+        try:
+            goal["race_date"] = datetime.strptime(goal["race_date"], "%B %d, %Y").date().isoformat()
+        except ValueError:
+            pass
+        fields["goals"][priority] = goal
     availability = re.search(r"^\*\*Weekly Availability:\*\*[ \t]*(.*)$", markdown, re.M)
     fields["days"] = [day for day in WEEKDAYS if availability and day in availability[1]]
     fields["zones"] = {}
     for match in re.finditer(r"^\*\*Zone ([1-5]) \([^\n]+\):\*\*\s*(\d+)\s*-\s*(\d+) bpm$", markdown, re.M):
         fields["zones"][match[1]] = [int(match[2]), int(match[3])]
+    learning = re.search(r"^\*\*HR Zone Learning:\*\*\s*Enabled\s*$", markdown, re.M)
+    fields["zone_mode"] = "learn" if learning else "known" if fields["zones"] else "unknown"
     return fields
 
 
 def profile_markdown(data, existing=""):
-    if set(data) - {*PROFILE_FIELDS, "days", "zones"}:
+    if set(data) - {*PROFILE_FIELDS, *GOAL_FIELDS, "goals", "days", "zones", "zone_mode"}:
         raise ValueError("Unknown athlete profile field.")
     fields = {}
     for key in PROFILE_FIELDS:
@@ -62,17 +94,60 @@ def profile_markdown(data, existing=""):
         fields[key] = " ".join(value.replace("*", "").split())
     if not fields["name"]:
         raise ValueError("Enter an athlete name.")
-    if fields["race_date"]:
-        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", fields["race_date"]):
-            raise ValueError("Use a valid race date.")
-        date.fromisoformat(fields["race_date"])
-    if (fields["race_date"] or fields["target_time"]) and not fields["event"]:
-        raise ValueError("Enter an event name for the race date or target.")
+    saved = profile_fields(existing)
+    goal_updates = data.get("goals", {})
+    if not isinstance(goal_updates, dict) or set(goal_updates) - set(PRIORITIES):
+        raise ValueError("Choose A, B or C for each goal.")
+    if set(data) & GOAL_FIELDS.keys():
+        if "goals" in data:
+            raise ValueError("Submit each goal once.")
+        goal_updates = {"A": {key: data.get(key, "") for key in GOAL_FIELDS}}
+    goals = saved["goals"]
+    for priority, updates in goal_updates.items():
+        if not isinstance(updates, dict) or set(updates) - {*GOAL_FIELDS, "kind", "outcomes"}:
+            raise ValueError("Enter a goal name, optional date and target.")
+        goal = {}
+        for key in GOAL_FIELDS:
+            value = updates.get(key, "")
+            if not isinstance(value, str) or len(value) > 500:
+                raise ValueError("Keep goal fields under 500 characters.")
+            goal[key] = " ".join(value.replace("*", "").split())
+        if goal["race_date"]:
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", goal["race_date"]):
+                raise ValueError("Use a valid goal date.")
+            date.fromisoformat(goal["race_date"])
+        goal["kind"] = updates.get("kind", "race" if goal["race_date"] or goal["target_time"] else "training")
+        if goal["kind"] not in ("race", "training"):
+            raise ValueError("Choose race or training goal.")
+        outcomes = updates.get("outcomes", {})
+        if not isinstance(outcomes, dict) or set(outcomes) - set(PRIORITIES):
+            raise ValueError("Use A, B and C outcome fields.")
+        goal["outcomes"] = {}
+        for outcome, value in outcomes.items():
+            if not isinstance(value, str) or len(value) > 250:
+                raise ValueError("Keep race outcomes under 250 characters.")
+            cleaned = " ".join(value.replace("*", "").split())
+            if cleaned:
+                goal["outcomes"][outcome] = cleaned
+        if goal["outcomes"] and goal["kind"] != "race":
+            raise ValueError("Choose race as the goal type when entering race outcomes.")
+        if not goal["event"] and (goal["race_date"] or goal["target_time"] or goal["outcomes"]):
+            raise ValueError(f"Enter a name for goal {priority} or clear its date and target.")
+        goals[priority] = goal
     days = data.get("days", [])
     if not isinstance(days, list) or any(day not in WEEKDAYS for day in days):
         raise ValueError("Select available training days.")
     zones = data.get("zones", {})
+    zone_mode = data.get("zone_mode", "known" if zones else "unknown")
+    if zone_mode not in ("unknown", "known", "learn"):
+        raise ValueError("Choose a heart rate zone mode.")
+    if zone_mode == "learn":
+        zones = {}
+    elif zone_mode == "unknown":
+        zones = {}
     if not isinstance(zones, dict) or set(zones) - set("12345") or zones and "2" not in zones:
+        raise ValueError("Enter your configured Zone 2 or choose unknown zones.")
+    if zone_mode == "known" and "2" not in zones:
         raise ValueError("Enter your configured Zone 2 or choose unknown zones.")
     lines = ["# Athlete profile", f"**Athlete Name:** {fields['name']}"]
     style = re.search(r"^\*\*Coaching Style:\*\*[ \t]*(.*)$", existing, re.M)
@@ -87,7 +162,7 @@ def profile_markdown(data, existing=""):
         lines.append("**Coaching Style:** " + previous_style)
     if days:
         lines.append("**Weekly Availability:** " + ", ".join(day for day in WEEKDAYS if day in days))
-    if not zones:
+    if not zones and (zone_mode != "learn" or not re.search(r"^\*\*Zone [1-5] \(", existing, re.M)):
         lines.append("**Heart Rate Zones:** Not configured")
     previous = 0
     for number, bounds in sorted(zones.items()):
@@ -99,13 +174,8 @@ def profile_markdown(data, existing=""):
             raise ValueError("Enter ascending, non-overlapping heart rate ranges in bpm.")
         previous = bounds[1]
         lines.append(f"**Zone {number} ({ZONE_NAMES[int(number)-1]}):** {bounds[0]} - {bounds[1]} bpm")
-    if fields["event"]:
-        lines.append(f"**A-Race:** {fields['event']}")
-        for key in ("race_date", "target_time"):
-            if fields[key]:
-                lines.append(f"**{PROFILE_FIELDS[key]}:** {fields[key]}")
-    known = set(PROFILE_FIELDS.values()) - {"Date", "Target Time"}
-    known.update(("Weekly Availability", "Heart Rate Zones"))
+    known = set(PROFILE_FIELDS.values())
+    known.update(("Weekly Availability", "Heart Rate Zones", "HR Zone Learning"))
     race_priority = None
     zone_lines = []
     extras = []
@@ -114,9 +184,10 @@ def profile_markdown(data, existing=""):
             continue
         match = re.match(r"^\*\*([^:]+):\*\*", line)
         label = match[1] if match else None
-        if label in ("A-Race", "B-Race", "C-Race"):
+        if label and label.upper() in ("A-RACE", "B-RACE", "C-RACE"):
             race_priority = label
-        if label in known or (race_priority == "A-Race" and label in ("Date", "Target Time")):
+            continue
+        if label in known or (race_priority and (label in ("Date", "Target Time") or line.startswith(GOAL_METADATA))):
             continue
         if label and re.match(r"Zone [1-5] \(", label):
             zone_lines.append(line)
@@ -124,12 +195,33 @@ def profile_markdown(data, existing=""):
         extras.append(line)
     # Retain an open-ended range from a pre-existing profile when the form
     # otherwise keeps the configured zones unchanged.
-    if zones and zones == profile_fields(existing)["zones"]:
+    if zone_mode == "learn":
+        lines.append("**HR Zone Learning:** Enabled")
+    if zone_mode == "learn" or zones and zones == saved["zones"]:
         for line in zone_lines:
             match = re.match(r"^\*\*Zone ([1-5])", line)
             if match[1] not in zones:
                 lines.append(line)
     lines.extend(extras)
+    for priority in PRIORITIES:
+        goal = goals[priority]
+        if goal["event"]:
+            event = goal["event"]
+            if goal["kind"] == "training":
+                event = TRAINING_GOAL_PREFIX + event
+            lines.append(f"**{priority}-Race:** {event}")
+            if goal["race_date"]:
+                lines.append(f"**Date:** {goal['race_date']}")
+            targets = [f"{OUTCOME_LABELS[key]}: {goal['outcomes'][key]}" for key in PRIORITIES if key in goal["outcomes"]]
+            if goal["target_time"]:
+                targets.append(goal["target_time"])
+            if goal["kind"] == "race" and not targets:
+                targets.append("Just finish")
+            if targets:
+                lines.append("**Target Time:** " + " | ".join(targets))
+            stored = {key: goal[key] for key in ("kind", "target_time", "outcomes")}
+            metadata = json.dumps(stored, ensure_ascii=True).replace("<", "\\u003c").replace(">", "\\u003e")
+            lines.append(GOAL_METADATA + metadata + " -->")
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -266,15 +358,11 @@ class CoachHandler(BaseHTTPRequestHandler):
         if not self.permitted(path):
             self.send_json(403, {"error": "Use Home Assistant ingress to open the coach."})
             return
-        session = self.session()
-        token = self.headers.get("X-Coach-CSRF", "")
-        if not session or not re.fullmatch(r"[a-f0-9]{64}", token) or not hmac.compare_digest(token, self.csrf(session)):
-            self.send_json(403, {"error": "Your page session expired. Refresh and try again."})
-            return
         runtime = self.server.runtime
         actions = {
             "/api/config": runtime.save_config,
             "/api/profile": lambda payload: runtime.save_profile(profile_markdown(payload, runtime.profile())),
+            "/api/baseline-feedback": lambda payload: runtime.save_baseline_feedback(payload),
             "/api/action": lambda payload: self.run_action(runtime, payload),
             "/api/schedule": lambda payload: self.save_schedule(runtime, payload),
         }
@@ -293,7 +381,17 @@ class CoachHandler(BaseHTTPRequestHandler):
             self.send_json(415, {"error": "Use a JSON request."})
             return
         try:
-            payload = json.loads(self.rfile.read(length))
+            # Read the bounded body before responding. Closing with unread TCP
+            # data can discard the response, notably on Windows.
+            body = self.rfile.read(length)
+            if len(body) != length:
+                raise ValueError("Incomplete body.")
+            session = self.session()
+            token = self.headers.get("X-Coach-CSRF", "")
+            if not session or not re.fullmatch(r"[a-f0-9]{64}", token) or not hmac.compare_digest(token, self.csrf(session)):
+                self.send_json(403, {"error": "Your page session expired. Refresh and try again."})
+                return
+            payload = json.loads(body)
             if not isinstance(payload, dict):
                 raise ValueError("Expected a JSON object.")
         except (ValueError, TimeoutError, RecursionError):

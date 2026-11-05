@@ -50,13 +50,25 @@
           <label>Running experience<textarea name="experience" maxlength="500" rows="3" placeholder="Current weekly distance, recent long run, or time away from running"></textarea></label>
           <label>Current injury or training constraints<textarea name="injuries" maxlength="500" rows="3" placeholder="Optional"></textarea></label>
           <fieldset class="full"><legend>Available training days</legend><div id="days" class="days"></div></fieldset>
-          <label>Event name <span class="optional">optional</span><input name="event" maxlength="150"></label>
-          <label>Race date <span class="optional">optional</span><input name="race_date" type="date"></label>
-          <label>Race target <span class="optional">optional</span><input name="target_time" maxlength="100" placeholder="Finish comfortably"></label>
-          <label>Heart rate zones<select name="zone_mode"><option value="unknown">Unknown / use effort</option><option value="known">Enter configured ranges</option></select></label>
+          <fieldset class="full"><legend>Goal priorities</legend><p class="hint">Add a race or training goal at each priority. Dates and targets are optional.</p><div id="goal-fields" class="goal-grid"></div></fieldset>
+          <label>Heart rate zones<select name="zone_mode"><option value="unknown">Unknown / use effort</option><option value="known">Enter configured ranges</option><option value="learn">Learn HR zones from baseline runs</option></select></label>
+          <p id="zone-learn-hint" class="hint full" hidden>Start with easy runs guided by effort and the talk test. The coach can review your observations while your saved ranges stay in place.</p>
           <fieldset id="zones" class="full" hidden><legend>Configured ranges in bpm</legend><p class="hint">Enter Zone 2 and any other ranges you know. Leave unknown ranges blank.</p><div id="zone-fields" class="zone-grid"></div></fieldset>
         </div>
         <div class="actions"><button type="submit">Save athlete profile</button><span class="form-result" role="status"></span></div>
+      </form>
+      <form id="baseline-form" class="card" hidden>
+        <p class="eyebrow">HEART RATE LEARNING</p><h2>Baseline run observations</h2>
+        <p id="baseline-status" role="status"></p>
+        <div id="baseline-review" hidden><h3>Coach observations</h3><p id="baseline-review-summary"></p></div>
+        <div id="baseline-inputs" class="grid" hidden>
+          <label class="full">Completed baseline run<select name="activity_id" required></select></label>
+          <label>Effort (RPE, 1–10)<input name="rpe" type="number" min="1" max="10" step="1" required></label>
+          <label>Talk test<select name="talk_test"><option value="unknown">Unknown</option><option value="comfortable">Could speak comfortably</option><option value="broken">Short or broken sentences</option><option value="unable">Could not speak comfortably</option></select></label>
+          <label>Heart rate sensor<select name="sensor"><option value="unknown">Unknown</option><option value="wrist">Wrist sensor</option><option value="chest_strap">Chest strap</option></select></label>
+          <div class="actions"><button type="submit">Save observation</button><span class="form-result" role="status"></span></div>
+        </div>
+        <p class="hint">Use an easy run you completed for this baseline. The coach reviews trends and gaps. Enter ranges in the profile yourself when you have values you want to use.</p>
       </form>
       <form id="schedule-form" class="card">
         <p class="eyebrow">03 / SCHEDULE</p><h2>Daily review</h2>
@@ -68,6 +80,11 @@
         </div>
         <div class="actions"><button type="submit">Save schedule</button><span class="form-result" role="status"></span></div>
       </form>
+      <section class="card">
+        <p class="eyebrow">QUICK ACCESS</p><h2>Add to Home Assistant sidebar</h2>
+        <p>Open this app’s Info page in Home Assistant and turn on <strong>Show in sidebar</strong>.</p>
+        <a href="https://my.home-assistant.io/redirect/supervisor_app/?app=ce7ba695_ai_running_coach" target="_blank" rel="noopener noreferrer">Open app info in Home Assistant</a>
+      </section>
     </div>
     <section id="dashboard-panel" hidden>
       <p class="hint">The coach status above reflects current runs. The dashboard shows the last saved plan.</p>
@@ -75,8 +92,8 @@
     </section>
     <dialog id="new-plan-confirm">
       <form method="dialog">
-        <h2>Generate a new training plan?</h2>
-        <p>This uses your selected model API. A valid response replaces the upcoming block and preserves your past sessions.</p>
+        <h2 id="plan-confirm-title">Generate a new training plan?</h2>
+        <p id="plan-confirm-detail">This uses your selected model API. A valid response replaces the upcoming block and preserves your past sessions.</p>
         <div class="actions"><button value="cancel" class="secondary" autofocus>Cancel</button><button value="confirm">Generate plan</button></div>
       </form>
     </dialog>

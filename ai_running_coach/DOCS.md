@@ -1,16 +1,28 @@
 # AI Running Coach
 
-AI Running Coach is an experimental community app for one athlete. It uses Home Assistant ingress to open the setup and dashboard. Start it from the app page and select **Open Web UI**. You can add it to the sidebar from the same page.
+AI Running Coach is an experimental community app for one athlete. It uses Home Assistant ingress to open the setup and dashboard. Start it from the app page and select **Open Web UI**.
+
+## Add to the Home Assistant sidebar
+
+In Home Assistant, go to **Settings → Apps → AI Running Coach → Info** and turn on **Show in sidebar**. The menu entry is named **AI Running Coach** and uses the running icon. It is available to Home Assistant administrators. You can turn it off on the same page.
+
+If you installed from the documented repository URL, you can jump to the app page. [Open AI Running Coach in Home Assistant](https://my.home-assistant.io/redirect/supervisor_app/?app=ce7ba695_ai_running_coach)
 
 ## First setup
 
-1. Create your athlete profile with your goals and availability. Leave heart-rate zones unknown if you do not know your values.
+1. Create your athlete profile and set your availability. Use A for your main goal and B or C for supporting goals. Each goal can have an optional date and target. A race can also have ideal, main and fallback outcomes for the same event. With no target or outcome, the race goal defaults to **Just finish**. Existing target values carry over when you upgrade. Choose your heart-rate zone mode in the same form.
 2. Choose your activity source. Offline mode skips Garmin sync and starts with the profile as its evidence. For Garmin mode, obtain your own official Personal API key and review the permitted use of your data. Configure the key and account region in the app. [Garmin developer program](https://developer.garmin.com/gc-developer-program/overview/)
 3. Select a model provider and enter its key. Generating or reviewing a plan uses that provider, including with the offline activity source. The default budget counts up to two automatic requests per UTC day. Check your provider's account limits and pricing separately.
 4. Save your IANA timezone (for example, Europe/London) with scheduling unchecked. This controls plan dates and the daily review time. Request counts follow UTC days.
 5. Generate and review the first plan. Enable a local review time when you are ready for scheduled reviews. The app keeps the last saved dashboard if a review fails. The scheduler runs one review per local day. If it fails, use **Run now** after checking the cause. Manual runs still use the core request budget. A run interrupted by a restart pauses the schedule until you re-enable it.
 
 Local summary import is currently available through the standalone project. Use the Home Assistant app logs to diagnose startup failures. Keep credentials, athlete data and model response snapshots out of support reports.
+
+## Learn HR zones from baseline runs
+
+Choose **Learn HR zones from baseline runs** in the athlete profile to ask the coach to include conversational baseline runs in the normal training plan. After Garmin sync, use **Baseline run observations** to select one of up to 12 eligible runs from the past 21 days. Add your perceived effort, talk-test result and sensor type. The coach can review those observations during the next normal review under the existing request budget.
+
+Learn mode preserves any saved ranges. If you have no saved ranges, they stay unknown. If you have ranges you want to use, switch to **Enter configured ranges** and save them yourself. Baseline check-ins are stored privately and can form part of the coaching context sent to your selected provider.
 
 ## Data and backups
 

@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 
 from dotenv import dotenv_values
 
+from . import hr_learning
 from .scheduler import due_date, validate_schedule
 from .storage import (
     LockBusy, atomic_json, atomic_write, check_tree, checked, checked_root, file_lock,
@@ -138,6 +139,8 @@ class Runtime:
             issues.append('Choose an activity source.')
         if config['source'] == 'garmin' and (not config['has_garmin_api_key'] or not config['garmin_region']):
             issues.append('Add a Garmin Personal API key and region.')
+        learning = hr_learning.learning_enabled(self.profile())
+        local_day = utc_now().astimezone(ZoneInfo(state['schedule']['timezone'])).date()
         return {
             'config': config, 'profile_ready': profile_ready, 'plan_ready': plan_ready,
             'dashboard_ready': checked(self.public / 'dashboard.html').is_file(),
@@ -145,6 +148,7 @@ class Runtime:
             'schedule': state['schedule'], 'last_run': state['last_run'],
             'queued': state['queued'], 'running': state['running'],
             'worker_ok': self.worker_error is None, 'worker_error': self.worker_error,
+            'hr_learning': hr_learning.status(learning, self.workspace / 'ai_coach_master.sqlite', local_day),
         }
 
     def status(self):
@@ -198,6 +202,30 @@ class Runtime:
             if self._command('validate_profile', input_text=markdown, timeout=15):
                 raise ValueError('Profile validation failed. Check the heart-rate zones or leave them explicitly unknown.')
             atomic_write(self.workspace / 'athlete.md', markdown.encode())
+            return self._status(state)
+
+    def save_baseline_feedback(self, payload):
+        payload = hr_learning.validate_feedback(payload)
+        with file_lock(self.state_lock):
+            state = self._state()
+            self._idle(state)
+            if not hr_learning.learning_enabled(self.profile()):
+                raise ValueError('Enable Learn heart-rate zones before saving baseline observations.')
+            timezone_name = state['schedule']['timezone']
+            today = utc_now().astimezone(ZoneInfo(timezone_name)).date()
+            database = self.workspace / 'ai_coach_master.sqlite'
+            try:
+                rows = hr_learning.candidates(database, today)
+            except sqlite3.Error:
+                raise RuntimeError('Baseline activities could not be read. Try after the next successful sync.') from None
+            activity = next((row for row in rows if row['activity_id'] == payload['activity_id']), None)
+            if activity is None:
+                raise ValueError('Choose a recent official Garmin running activity from the list.')
+            feedback = {name: payload[name] for name in ('rpe', 'talk_test', 'sensor')}
+            if activity['feedback'] != feedback:
+                checkin = hr_learning.checkin(payload, activity, today)
+                if self._command('baseline_feedback', input_text=json.dumps(checkin), timeout=15, timezone_name=timezone_name):
+                    raise RuntimeError('The baseline observation could not be saved.')
             return self._status(state)
 
     def enqueue(self, action):
@@ -272,7 +300,7 @@ class Runtime:
         check_tree(self.workspace)
         allowed = {'PATH', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP', 'TMPDIR', 'LANG', 'SSL_CERT_FILE', 'SSL_CERT_DIR'}
         env = {key: value for key, value in os.environ.items() if key.upper() in allowed}
-        if action != 'validate_profile':
+        if action not in ('validate_profile', 'baseline_feedback'):
             env.update(self._env())
         env.update(COACH_PUBLISH_ENABLED='false', PYTHONIOENCODING='utf-8', TZ=timezone_name)
         # The isolated interpreter ignores PYTHONIOENCODING; UTF-8 mode also covers stdin.
@@ -383,7 +411,12 @@ class Runtime:
                 if not action:
                     return False
                 try:
-                    success = self._command(action['action'], timezone_name=action['timezone']) == 0 and self._publish(started)
+                    operation = action['action']
+                    options = {'timezone_name': action['timezone']}
+                    if hr_learning.learning_enabled(self.profile()):
+                        operation = 'learn_' + operation
+                        options['input_text'] = hr_learning.LEARNING_QUESTION
+                    success = self._command(operation, **options) == 0 and self._publish(started)
                     if success:
                         code, message = 'complete', 'Dashboard updated.'
                     else:

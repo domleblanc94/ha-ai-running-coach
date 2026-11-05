@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0-beta.4
+
+- Add editable A, B and C goals and optional outcomes within each race. Untargeted races default to **Just finish**, and existing targets carry over.
+- Add a baseline learning mode and activity-linked heart-rate check-ins.
+- Show how to add the app to the Home Assistant sidebar.
+
 ## 0.1.0-beta.3
 
 - Install from prebuilt amd64 and arm64 images in GitHub Container Registry.

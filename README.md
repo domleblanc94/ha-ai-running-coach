@@ -1,6 +1,6 @@
 # AI Running Coach for Home Assistant
 
-**Experimental community app, version 0.1.0-beta.3.** It brings the standalone AI Running Coach into Home Assistant's app UI. The app packages a pinned copy of the upstream engine and keeps its own athlete profile, activity history, request ledger and plans.
+**Experimental community app, version 0.1.0-beta.4.** It brings the standalone AI Running Coach into Home Assistant's app UI. The app packages a pinned copy of the upstream engine and keeps its own athlete profile, activity history, request ledger and plans.
 
 - Install on Home Assistant OS on amd64 or aarch64. Supervisor pulls the prebuilt image for your architecture from GitHub Container Registry.
 - Open setup and the running dashboard through Home Assistant ingress. The app stores its data privately and needs no exposed host port.
@@ -16,11 +16,11 @@ This community project is independently maintained. [Standalone AI Running Coach
 1. In Home Assistant, open **Settings → Apps → Install app**. Older interfaces use **Add-ons** and **Add-on Store**.
 2. Open the store menu and select **Repositories**. Add `https://github.com/domleblanc94/ha-ai-running-coach`.
 3. Install **AI Running Coach**, start it, then select **Open Web UI**. Installation downloads the versioned image from `ghcr.io`.
-4. Use the in-app setup and review the profile and request budget before enabling scheduled reviews. Turn on **Start on boot** on the app page if Home Assistant should restart it after a reboot.
+4. Use the in-app setup and review the profile and request budget before enabling scheduled reviews. Turn on **Start on boot** on the app page if Home Assistant should restart it after a reboot. Turn on **Show in sidebar** on the same page to add AI Running Coach to the main menu.
 
 [Setup, privacy, backups and standalone migration](ai_running_coach/DOCS.md)
 
-If an earlier installation failed while fetching a Debian package, refresh the app store and check that it offers **0.1.0-beta.3**, then retry installation. The new installation downloads the prebuilt image. Home Assistant needs HTTPS access to GitHub and GitHub Container Registry.
+If an earlier installation failed while fetching a Debian package, refresh the app store and check that it offers **0.1.0-beta.4**, then retry installation. The new installation downloads the prebuilt image. Home Assistant needs HTTPS access to GitHub and GitHub Container Registry.
 
 ## Development
 
