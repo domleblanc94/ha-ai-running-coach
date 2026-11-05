@@ -1,5 +1,6 @@
 name: AI Running Coach
-version: "0.1.0-beta.1"
+version: "0.1.0-beta.3"
+image: ghcr.io/domleblanc94/ha-ai-running-coach
 slug: ai_running_coach
 description: "Personal AI running coach with a private dashboard in Home Assistant"
 url: https://github.com/domleblanc94/ha-ai-running-coach/tree/main/ai_running_coach
