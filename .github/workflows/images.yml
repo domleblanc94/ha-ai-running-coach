@@ -1,0 +1,78 @@
+name: Publish tested app images
+on:
+  push:
+    tags:
+      - 'image-v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-image-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/domleblanc94/ha-ai-running-coach
+
+jobs:
+  build:
+    if: github.repository == 'domleblanc94/ha-ai-running-coach'
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify pinned coach engine
+        run: python3 scripts/vendor_core.py
+      - name: Build and smoke test the release image
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          version=${GITHUB_REF_NAME#image-v}
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]
+          docker build --platform "linux/$ARCH" -t coach-app:release \
+            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --label "org.opencontainers.image.version=$version" ai_running_coach
+          python3 scripts/smoke_container.py coach-app:release --platform "linux/$ARCH"
+      - name: Push the tested architecture image
+        env:
+          ARCH: ${{ matrix.arch }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=${GITHUB_REF_NAME#image-v}
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker tag coach-app:release "$IMAGE:$version-$ARCH"
+          docker push "$IMAGE:$version-$ARCH"
+
+  manifest:
+    if: github.repository == 'domleblanc94/ha-ai-running-coach'
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Publish the versioned multi-architecture manifest
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=${GITHUB_REF_NAME#image-v}
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          if docker buildx imagetools inspect "$IMAGE:$version" >/dev/null 2>&1; then
+            echo "Release image already exists. Use a new version."
+            exit 1
+          fi
+          docker buildx imagetools create -t "$IMAGE:$version" \
+            "$IMAGE:$version-amd64" "$IMAGE:$version-arm64"
+          docker buildx imagetools inspect "$IMAGE:$version"
