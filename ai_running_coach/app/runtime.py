@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 
 from dotenv import dotenv_values
 
-from . import hr_learning
+from . import diagnostics, hr_learning
 from .scheduler import due_date, validate_schedule
 from .storage import (
     LockBusy, atomic_json, atomic_write, check_tree, checked, checked_root, file_lock,
@@ -83,6 +83,7 @@ class Runtime:
         self.state_lock = self.data / '.state.lock'
         self.run_lock = self.data / '.run.lock'
         self.worker_error = None
+        self.command_failure = None
         core = Path(core_dir) if core_dir else Path(__file__).resolve().parent.parent / 'core'
         with file_lock(self.state_lock):
             # Install only when no wrapper subprocess is using the workspace.
@@ -94,6 +95,11 @@ class Runtime:
                     'last_run': None, 'last_success_at': None,
                     'schedule': {'enabled': False, 'time': '03:00', 'timezone': 'UTC', 'last_date': None},
                 })
+            state = self._state()
+            previous = self._last_run(state)
+        print('AI Coach [startup/ready] App workspace is ready.', flush=True)
+        if previous and previous.get('status') == 'failed':
+            self._log_run(previous, previous=True)
 
     def _state(self):
         state = read_json(self.state_file)
@@ -145,7 +151,7 @@ class Runtime:
             'config': config, 'profile_ready': profile_ready, 'plan_ready': plan_ready,
             'dashboard_ready': checked(self.public / 'dashboard.html').is_file(),
             'setup_ready': not issues, 'setup_issues': issues,
-            'schedule': state['schedule'], 'last_run': state['last_run'],
+            'schedule': state['schedule'], 'last_run': self._last_run(state),
             'queued': state['queued'], 'running': state['running'],
             'worker_ok': self.worker_error is None, 'worker_error': self.worker_error,
             'hr_learning': hr_learning.status(learning, self.workspace / 'ai_coach_master.sqlite', local_day),
@@ -278,12 +284,12 @@ class Runtime:
         except (OSError, RuntimeError, ValueError):
             return {'schema_version': 1, 'status': 'error', 'updated_at': utc_now().isoformat(),
                     'issues': ['Saved app state is unavailable. Check the app storage and restart.']}
-        last = state['last_run'] or {}
+        last = self._last_run(state) or {}
         running = state['running']
         result = last.get('status')
         success = state['last_success_at']
         status = 'running' if running else {'success': 'ok', 'failed': 'error', 'interrupted': 'warning'}.get(result, 'unknown')
-        if not running and last.get('code') in {'provider_auth', 'garmin_auth'}:
+        if not running and last.get('code') in {'provider_auth', 'provider_config', 'garmin_auth'}:
             status = 'input_required'
         if self.worker_error:
             status = 'error'
@@ -300,7 +306,8 @@ class Runtime:
         check_tree(self.workspace)
         allowed = {'PATH', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP', 'TMPDIR', 'LANG', 'SSL_CERT_FILE', 'SSL_CERT_DIR'}
         env = {key: value for key, value in os.environ.items() if key.upper() in allowed}
-        if action not in ('validate_profile', 'baseline_feedback'):
+        coaching = action not in ('validate_profile', 'baseline_feedback')
+        if coaching:
             env.update(self._env())
         env.update(COACH_PUBLISH_ENABLED='false', PYTHONIOENCODING='utf-8', TZ=timezone_name)
         # The isolated interpreter ignores PYTHONIOENCODING; UTF-8 mode also covers stdin.
@@ -309,10 +316,10 @@ class Runtime:
         try:
             with subprocess.Popen(command, cwd=self.workspace, env=env,
                                   stdin=subprocess.PIPE if input_text is not None else subprocess.DEVNULL,
-                                  text=True, encoding='utf-8', stdout=subprocess.DEVNULL,
-                                  stderr=subprocess.DEVNULL, **options) as process:
+                                  text=True, encoding='utf-8', errors='replace', stdout=subprocess.DEVNULL,
+                                  stderr=subprocess.PIPE if coaching else subprocess.DEVNULL, **options) as process:
                 try:
-                    process.communicate(input_text, timeout=timeout)
+                    _, stderr = process.communicate(input_text, timeout=timeout)
                 except subprocess.TimeoutExpired:
                     if os.name == 'nt':
                         try:
@@ -329,9 +336,15 @@ class Runtime:
                     if process.poll() is None:
                         process.kill()
                     process.communicate()
+                    if coaching:
+                        self.command_failure = 'command_timeout'
                     return 1
+                if coaching and process.returncode:
+                    self.command_failure = diagnostics.command_failure(stderr)
                 return process.returncode
-        except OSError:
+        except OSError as error:
+            if coaching:
+                self.command_failure = 'workspace_permissions' if isinstance(error, PermissionError) else 'core_startup_failed'
             return 1
 
     def _publish(self, started):
@@ -355,26 +368,102 @@ class Runtime:
         atomic_write(self.public / 'dashboard.html', data)
         return True
 
-    def _failure(self, started):
-        try:
-            auth = read_json(self.workspace / 'garmin_auth_status.json')
-            if self._config(self._env())['source'] == 'garmin' and auth.get('code') in GARMIN_ISSUES:
-                return ('garmin_auth' if auth.get('state') == 'action_required' else 'garmin_sync', GARMIN_ISSUES[auth['code']])
-        except (OSError, ValueError, TypeError, AttributeError):
-            pass
+    def _request_details(self, started, finished=None):
         try:
             db = checked(self.workspace / 'ai_coach_master.sqlite').resolve()
+            if not db.is_file():
+                return None, 0
             with closing(sqlite3.connect(db.as_uri() + '?mode=ro', uri=True)) as conn:
-                request = conn.execute('SELECT started_at, error FROM coach_api_requests ORDER BY id DESC LIMIT 1').fetchone()
-            if request and datetime.fromisoformat(request[0]) >= started:
-                error = request[1] or ''
-                if re.search(r'\bHTTP (401|403)\b', error):
-                    return 'provider_auth', 'The AI provider rejected access. Check the selected model and key in Settings.'
-                if re.search(r'\bHTTP 429\b', error):
-                    return 'provider_quota', 'The AI provider limited this request. Check your quota before trying again.'
-        except (OSError, ValueError, TypeError, sqlite3.Error):
+                if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='coach_api_requests'").fetchone():
+                    return None, 0
+                rows = conn.execute('''
+                    SELECT started_at, status, error FROM coach_api_requests
+                    WHERE request_kind IN ('daily', 'operator_recovery') ORDER BY id DESC LIMIT 20
+                ''').fetchall()
+            current = [row for row in rows if diagnostics.current_timestamp(row[0], started, finished)]
+            return (current[0] if current else None), len(current)
+        except (OSError, RuntimeError, sqlite3.Error):
+            return None, None
+
+    def _failure(self, started, request, *, finished=None, command_failure=None):
+        report = None
+        try:
+            candidate = read_json(self.workspace / 'pipeline_status.json')
+            if isinstance(candidate, dict) and diagnostics.current_timestamp(candidate.get('attempted_at'), started, finished):
+                report = candidate
+        except (OSError, ValueError, TypeError):
             pass
-        return 'pipeline_failed', 'Coach run did not complete. The last successful dashboard is retained.'
+        errors = report.get('errors') if report else None
+        if not isinstance(errors, list):
+            errors = []
+        if 'Activity sync failed; showing saved data' in errors:
+            auth = report.get('garmin_auth')
+            if (isinstance(auth, dict) and isinstance(auth.get('code'), str) and auth['code'] in GARMIN_ISSUES
+                    and diagnostics.current_timestamp(auth.get('checked_at'), started, finished)):
+                return ('garmin_auth' if auth.get('state') == 'action_required' else 'garmin_sync', GARMIN_ISSUES[auth['code']])
+            return 'activity_sync_failed', diagnostics.MESSAGES['activity_sync_failed']
+        if 'Activity processing failed' in errors:
+            return 'activity_processing_failed', diagnostics.MESSAGES['activity_processing_failed']
+        if request:
+            code = diagnostics.request_failure(request[1], request[2])
+            if code:
+                return code, diagnostics.MESSAGES[code]
+        if 'Coach review pending; previous review retained' in errors:
+            code = command_failure or 'pipeline_failed'
+            return code, diagnostics.MESSAGES[code]
+        if 'Dashboard generation failed; previous HTML retained' in errors:
+            return 'dashboard_render_failed', diagnostics.MESSAGES['dashboard_render_failed']
+        if command_failure:
+            return command_failure, diagnostics.MESSAGES[command_failure]
+        if finished is not None and report and report.get('errors') == []:
+            return 'publication_failed', diagnostics.MESSAGES['publication_failed']
+        code = 'pipeline_failed' if report or finished is not None else 'core_startup_failed'
+        return code, diagnostics.MESSAGES[code]
+
+    def _with_dashboard_context(self, message):
+        if (self.public / 'dashboard.html').is_file():
+            return message + ' The last successful dashboard remains available.'
+        return message + ' A dashboard has not been published yet.'
+
+    def _last_run(self, state):
+        last = state['last_run']
+        if not last or last.get('status') != 'failed' or last.get('code') != 'pipeline_failed' or last.get('stage'):
+            return last
+        try:
+            started = datetime.fromisoformat(last['started_at'])
+            finished = datetime.fromisoformat(last['finished_at'])
+            if started.tzinfo is None or finished.tzinfo is None or finished < started:
+                return last
+        except (ValueError, KeyError, TypeError):
+            return last
+        request, attempts = self._request_details(started, finished)
+        code, message = self._failure(started, request, finished=finished)
+        return dict(last, code=code, stage=diagnostics.failure_stage(code),
+                    message=self._with_dashboard_context(message), request_attempts=attempts)
+
+    @staticmethod
+    def _log_run(run, *, previous=False):
+        attempts = run.get('request_attempts')
+        count = str(attempts) if type(attempts) is int and 0 <= attempts <= 20 else 'unknown'
+        code = run.get('code')
+        stage = run.get('stage')
+        allowed_stages = {'sync', 'activities', 'coaching', 'render', 'publication', 'startup', 'unknown'}
+        allowed_codes = set(diagnostics.MESSAGES) | {'complete', 'garmin_sync', 'garmin_auth'}
+        if not isinstance(code, str) or not isinstance(stage, str) or code not in allowed_codes or stage not in allowed_stages:
+            return
+        guidance = diagnostics.MESSAGES.get(code, {
+            'complete': 'Dashboard updated.',
+            'garmin_auth': 'Check Garmin Personal API access in Settings.',
+            'garmin_sync': 'Check Garmin sync status in the app.',
+        }.get(code, ''))
+        context = 'Previous run' if previous else 'Run'
+        try:
+            finished = datetime.fromisoformat(run.get('finished_at'))
+            if finished.tzinfo is not None:
+                context += ' at ' + finished.astimezone(timezone.utc).isoformat()
+        except (ValueError, TypeError):
+            pass
+        print(f'AI Coach [{stage}/{code}] {context}: {guidance} Request attempts: {count}.', flush=True)
 
     def _claim(self, now):
         with file_lock(self.state_lock):
@@ -410,29 +499,43 @@ class Runtime:
                 action = self._claim(started)
                 if not action:
                     return False
+                attempts = None
                 try:
+                    self.command_failure = None
                     operation = action['action']
                     options = {'timezone_name': action['timezone']}
                     if hr_learning.learning_enabled(self.profile()):
                         operation = 'learn_' + operation
                         options['input_text'] = hr_learning.LEARNING_QUESTION
-                    success = self._command(operation, **options) == 0 and self._publish(started)
-                    if success:
-                        code, message = 'complete', 'Dashboard updated.'
+                    result = self._command(operation, **options)
+                    request, attempts = self._request_details(started)
+                    if result == 0:
+                        try:
+                            success = self._publish(started)
+                        except (OSError, RuntimeError, ValueError, TypeError, KeyError):
+                            success = False
+                        code = 'complete' if success else 'publication_failed'
+                        message = 'Dashboard updated.' if success else diagnostics.MESSAGES[code]
                     else:
-                        code, message = self._failure(started)
+                        success = False
+                        code, message = self._failure(started, request, command_failure=self.command_failure)
                 except (OSError, RuntimeError, ValueError, TypeError, KeyError):
                     success = False
-                    code, message = 'pipeline_failed', 'Coach run did not complete. The last successful dashboard is retained.'
+                    code, message = 'core_startup_failed', diagnostics.MESSAGES['core_startup_failed']
+                stage = 'publication' if success else diagnostics.failure_stage(code)
+                if not success:
+                    message = self._with_dashboard_context(message)
                 finished = utc_now().isoformat()
                 with file_lock(self.state_lock):
                     state = self._state()
                     state['running'] = None
                     state['last_run'] = dict(action, status='success' if success else 'failed',
-                                             finished_at=finished, code=code, message=message)
+                                             finished_at=finished, stage=stage, code=code, message=message,
+                                             request_attempts=attempts)
                     if success:
                         state['last_success_at'] = finished
                     self._write_state(state)
+                self._log_run(state['last_run'])
                 return True
         except LockBusy:
             return False
@@ -443,5 +546,6 @@ class Runtime:
                 self.tick()
             except (OSError, RuntimeError, ValueError, TypeError, KeyError):
                 self.worker_error = 'The coach worker stopped. Check app storage and restart the app.'
+                print('AI Coach [worker/stopped] ' + self.worker_error, flush=True)
                 return
             stop_event.wait(2)

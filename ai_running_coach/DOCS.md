@@ -24,6 +24,20 @@ Choose **Learn HR zones from baseline runs** in the athlete profile to ask the c
 
 Learn mode preserves any saved ranges. If you have no saved ranges, they stay unknown. If you have ranges you want to use, switch to **Enter configured ranges** and save them yourself. Baseline check-ins are stored privately and can form part of the coaching context sent to your selected provider.
 
+## Troubleshoot a failed run
+
+Start with **Coach Status** in the app. A failed run shows its time, stage, reason code and recorded model request count when available. Home Assistant also shows a short diagnostic under **Settings → Apps → AI Running Coach → Log**. After upgrading from an earlier beta, check Coach Status before retrying. The app can recover a more specific explanation from records already saved for that run. If those records are incomplete, the reason can still be unknown.
+
+- **Garmin or activity sync:** check the selected activity source and Garmin access. If Garmin is limiting requests, wait before trying again.
+- **Provider authentication or request:** check the selected provider and model in Settings, and confirm the key and model access with that provider.
+- **Provider quota or daily budget:** check the provider account or wait for the next UTC day if the app's daily allowance is spent.
+- **Truncated or invalid response:** the app keeps the last valid plan. Check the reason and request allowance before retrying.
+- **Rendering, publication or storage:** check the app logs and storage. Back up the app before reinstalling or restoring it.
+
+For support, share the app version, failure time, stage, reason code and recorded model request count. If the code points to the provider, include its name and the model identifier. Keep keys, raw provider responses, prompts, profiles and activity records private.
+
+If the app has no saved plan yet, select **Generate new plan**, or **Plan baseline runs** in learn mode. **Run now** is available after the first plan is saved.
+
 ## Data and backups
 
 The app stores its data under `/data/app` in Supervisor's private app volume. Home Assistant controls access through ingress. The profile, activity summaries, notes and other coaching context can be sent to the configured model provider during reviews. Check its data handling terms before enabling live reviews.

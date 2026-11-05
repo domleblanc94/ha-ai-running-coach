@@ -103,6 +103,7 @@ class RuntimeTests(unittest.TestCase):
         process = MagicMock()
         process.__enter__.return_value = process
         process.returncode = 1
+        process.communicate.return_value = (None, '')
         with patch('ai_running_coach.app.runtime.subprocess.Popen', return_value=process) as launch:
             self.assertTrue(Runtime(self.data).tick())
         environment = launch.call_args.kwargs['env']

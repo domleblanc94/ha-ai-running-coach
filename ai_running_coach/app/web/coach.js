@@ -10,6 +10,11 @@ const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Satur
 const goals = [["A", "Primary"], ["B", "Secondary"], ["C", "Supporting"]];
 const goalFields = [["event", "Goal name", "text", 150], ["race_date", "Date", "date", 0], ["target_time", "Existing or general target", "text", 500]];
 const outcomeFields = [["A", "A outcome · Ideal"], ["B", "B outcome · Main"], ["C", "C outcome · Fallback"]];
+const runStages = {
+  sync: "Garmin sync", activities: "Activity processing", coaching: "Coaching",
+  render: "Dashboard rendering", publication: "Dashboard publication", startup: "Startup",
+  unknown: "Stage not identified",
+};
 let state = {};
 let csrf = "";
 let working = false;
@@ -157,9 +162,9 @@ function draw(next) {
     title = "Setup needs attention";
     detail = "Save your connection and athlete profile to continue.";
   } else if (["failed", "error", "input_required", "interrupted"].includes(lastStatus)) {
-    title = ["provider_auth", "garmin_auth"].includes(last.code) || lastStatus === "input_required"
-      ? "Input required" : "Last run failed";
-    detail = last.message || last.error || "Check your connection and try again.";
+    title = ["provider_auth", "provider_config", "garmin_auth"].includes(last.code) || lastStatus === "input_required"
+      ? "Input required" : next.plan_ready ? "Last run failed" : "First plan could not be generated";
+    detail = last.message || "Check the app logs for the run status before trying again.";
   } else if (next.plan_ready) {
     title = "Your plan is ready";
     detail = next.schedule?.enabled
@@ -168,7 +173,26 @@ function draw(next) {
   }
   byId("run-title").textContent = title;
   byId("run-detail").textContent = detail;
-  byId("run-detail").classList.remove("error");
+  const failed = !busy && ["failed", "error", "input_required", "interrupted"].includes(lastStatus);
+  byId("run-detail").classList.toggle("error", failed || next.worker_ok === false);
+  const diagnostic = byId("run-diagnostic");
+  const timestamp = new Date(last.finished_at || last.started_at || "");
+  const parts = [];
+  if (runStages[last.stage]) parts.push(runStages[last.stage]);
+  if (typeof last.code === "string" && /^[a-z0-9_]+$/.test(last.code)) parts.push(last.code);
+  if (!Number.isNaN(timestamp.valueOf())) parts.push(timestamp.toLocaleString());
+  if (Number.isSafeInteger(last.request_attempts) && last.request_attempts >= 0) {
+    parts.push("AI request attempts this run: " + last.request_attempts);
+  } else {
+    parts.push("AI request attempts this run: unknown");
+  }
+  diagnostic.hidden = !failed || parts.length === 0;
+  diagnostic.textContent = parts.join(" · ");
+  const firstPlan = byId("first-plan-hint");
+  firstPlan.hidden = busy || !next.setup_ready || !next.profile_ready || next.plan_ready;
+  firstPlan.textContent = next.hr_learning?.enabled
+    ? "Plan baseline runs to create your first plan and enable Run now."
+    : "Generate a new plan to create your first schedule and enable Run now.";
   const issues = byId("issues");
   issues.replaceChildren();
   for (const issue of next.setup_issues || []) {
@@ -277,6 +301,8 @@ async function refresh() {
     byId("run-title").textContent = "Coach connection unavailable";
     byId("run-detail").textContent = "Check Home Assistant and refresh the page. This page will retry.";
     byId("run-detail").classList.add("error");
+    byId("run-diagnostic").hidden = true;
+    byId("first-plan-hint").hidden = true;
     byId("new-plan").disabled = true;
     byId("run-now").disabled = true;
   }
