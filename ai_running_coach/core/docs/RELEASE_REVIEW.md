@@ -1,6 +1,6 @@
 # Public source release review
 
-Status: **public beta 0.2.3b3**, intended for technical self-hosters running one personal source-checkout installation. It is not a stable, universally validated provider/device integration. Repository pushes and GitHub Release publication are separate maintainer operations. A separate personal Linux installation was backed up, migrated and checked against the official Garmin Personal API. Provider validation scope is recorded below.
+Status: **public beta 0.2.3b4**, intended for technical self-hosters running one personal source-checkout installation. It is not a stable, universally validated provider/device integration. Repository pushes and GitHub Release publication are separate maintainer operations. A separate personal Linux installation was backed up, migrated and checked against the official Garmin Personal API. Provider validation scope is recorded below.
 
 ## Findings corrected
 
@@ -20,7 +20,7 @@ Status: **public beta 0.2.3b3**, intended for technical self-hosters running one
 
 ## Verified scope
 
-Local verification uses Windows and CPython 3.13. The clean-source flow installs only base HTTP/dotenv dependencies in a new virtual environment, initializes without an existing profile/database/plan, runs an offline new-plan preview, imports synthetic summaries, and renders a synthetic dashboard. The latest network-blocked suite ran **175 tests: 171 passed and four optional checks skipped**. Seven FIT checks separately passed with Garmin's official decoder available. Provider protocol and failure-path tests use mocked HTTP responses; these establish request handling and validation behavior, not coaching quality.
+Local verification uses Windows and CPython 3.13. The clean-source flow installs only base HTTP/dotenv dependencies in a new virtual environment, initializes without an existing profile/database/plan, runs an offline new-plan preview, imports synthetic summaries, and renders a synthetic dashboard. The latest network-blocked suite ran **187 tests: 183 passed and four optional checks skipped**. Seven FIT checks separately passed with Garmin's official decoder available. Provider protocol and failure-path tests use mocked HTTP responses; these establish request handling and validation behavior, not coaching quality.
 
 During beta 1, one separately authorized live evaluation request to `gemini-3.5-flash-lite` succeeded with a 4096-token output cap. Provider-reported usage was 2861 input and 875 output tokens. The synthetic response contained three future calendar entries: a 30-minute easy running workout with an open/conversational target and two rest days, plus an `insufficient_evidence` trajectory. The same saved response then passed normal validation, journaled SQLite/file plan application and HTML rendering offline, without another API call. Production configuration, profile, plan and database were unchanged. This checks one account/model and a small synthetic end-to-end plan path; it does not establish free-tier eligibility, actual billed cost or coaching suitability for a real athlete.
 
@@ -35,6 +35,10 @@ First-plan generation and explicit plan replacement now ask for a compact seven-
 ### Beta 3
 
 Explicit weekly training days are validated before new coaching changes are committed. The coach still chooses the sessions; it must produce a plan that fits the athlete's saved availability. Existing historical sessions remain unchanged. The training dashboard no longer offers Table view.
+
+### Beta 4
+
+The normal daily coaching allowance remains two requests and can be configured from 1 to 20. A separate, explicitly confirmed manual exception permits one extra request per UTC day after that allowance is exhausted. The exception is dated, recorded in the request ledger and unavailable to scheduled runs. Failed provider attempts still count; changing an app allowance does not change a provider's quota, account access or pricing.
 
 ## Beta tester path
 

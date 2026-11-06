@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from ai_running_coach.app import diagnostics
+from ai_running_coach.app import diagnostics, hr_learning
 from ai_running_coach.app.runtime import Runtime
 from ai_running_coach.app.storage import atomic_json
 
@@ -115,6 +115,8 @@ def _fixture_post(self, path, payload, headers):
                         'amount': '20 minutes', 'target': 'Comfortable conversational effort'},
             'reason': 'Synthetic starter run'}],
     }
+    if mode == 'review':
+        review['plan_changes'] = []
     return {'candidates': [{'content': {'parts': [{'text': _fixture_json.dumps(review)}]},
                            'finishReason': 'MAX_TOKENS' if mode == 'truncated' else 'STOP'}]}
 ProviderClient._post = _fixture_post
@@ -161,6 +163,87 @@ ProviderClient._post = _fixture_post
             self.assertIn('Request attempts: ' + str(attempts), log.getvalue())
         with closing(sqlite3.connect(self.app.workspace / 'ai_coach_master.sqlite')) as conn:
             self.assertEqual(conn.execute('SELECT COUNT(*) FROM coach_api_requests').fetchone()[0], 2)
+
+    def test_actual_manual_extra_first_plan_keeps_learning_and_normal_limit(self):
+        self.fixture_provider('transport')
+        self.app.save_profile(PROFILE + '**HR Zone Learning:** Enabled\n')
+        for _ in range(2):
+            self.app.enqueue('new_plan')
+            self.assertTrue(self.app.tick())
+            self.assertEqual(self.app.status()['last_run']['code'], 'provider_transport')
+        allowance = self.app.status()['request_budget']
+        self.assertEqual(allowance['used'], 2)
+        self.assertTrue(allowance['extra_available'])
+        (self.app.workspace / 'provider_fixture.json').write_text('success', encoding='utf-8')
+        approval = {'date': datetime.now(timezone.utc).date().isoformat(), 'confirmed': True}
+        self.app.enqueue('new_plan', manual_extra=approval)
+        self.assertTrue(self.app.tick())
+        status = self.app.status()
+        self.assertEqual(status['last_run']['status'], 'success', status['last_run'])
+        self.assertEqual(status['last_run']['request_attempts'], 1)
+        self.assertEqual(status['config']['daily_request_limit'], 2)
+        self.assertEqual(status['request_budget']['used'], 3)
+        self.assertTrue(status['request_budget']['extra_used'])
+        self.assertTrue(status['hr_learning']['enabled'])
+        self.assertGreater(len(self.app.dashboard()), 1000)
+        with closing(sqlite3.connect(self.app.workspace / 'ai_coach_master.sqlite')) as conn:
+            kinds = conn.execute('SELECT request_kind FROM coach_api_requests ORDER BY id').fetchall()
+            snapshot = json.loads(conn.execute('SELECT input_snapshot_json FROM coach_api_requests ORDER BY id DESC LIMIT 1').fetchone()[0])
+        self.assertEqual(kinds, [('daily',), ('daily',), ('manual_override',)])
+        self.assertEqual(snapshot['question'], hr_learning.LEARNING_QUESTION)
+        self.assertEqual(snapshot['manual_approval']['date'], approval['date'])
+        self.assertEqual(snapshot['manual_approval']['normal_daily_limit'], 2)
+        with self.assertRaises(ValueError):
+            self.app.enqueue('new_plan', manual_extra=approval)
+        self.assertFalse(self.app.tick())
+
+    def test_actual_failed_extra_is_one_request_and_keeps_last_good_dashboard(self):
+        self.fixture_provider('success')
+        self.app.enqueue('new_plan')
+        self.assertTrue(self.app.tick())
+        dashboard = self.app.dashboard()
+        (self.app.workspace / 'provider_fixture.json').write_text('transport', encoding='utf-8')
+        self.app.enqueue('new_plan')
+        self.assertTrue(self.app.tick())
+        self.app.enqueue('new_plan', manual_extra={'date': datetime.now(timezone.utc).date().isoformat(), 'confirmed': True})
+        self.assertTrue(self.app.tick())
+        last = self.app.status()['last_run']
+        self.assertEqual(last['code'], 'provider_transport', last)
+        self.assertEqual(last['request_attempts'], 1)
+        self.assertEqual(self.app.dashboard(), dashboard)
+        self.assertFalse(self.app.tick())
+        self.assertEqual(self.app.status()['request_budget']['used'], 3)
+        self.assertFalse(self.app.status()['request_budget']['extra_available'])
+
+    def test_actual_manual_extra_reviews_existing_plan_with_learning(self):
+        self.fixture_provider('success')
+        self.app.save_profile(PROFILE + '**HR Zone Learning:** Enabled\n')
+        self.app.enqueue('new_plan')
+        self.assertTrue(self.app.tick())
+        self.assertEqual(self.app.status()['last_run']['status'], 'success')
+        plan_path = self.app.workspace / 'training_plan.json'
+        sessions = json.loads(plan_path.read_text(encoding='utf-8'))['sessions']
+        self.app.save_profile(self.app.profile() + '**Recent Report:** A synthetic fresh observation.\n')
+        (self.app.workspace / 'provider_fixture.json').write_text('transport', encoding='utf-8')
+        self.app.enqueue('run_now')
+        self.assertTrue(self.app.tick())
+        self.assertEqual(self.app.status()['last_run']['code'], 'provider_transport')
+        (self.app.workspace / 'provider_fixture.json').write_text('review', encoding='utf-8')
+        self.app.enqueue('run_now', manual_extra={'date': datetime.now(timezone.utc).date().isoformat(), 'confirmed': True})
+        self.assertTrue(self.app.tick())
+        last = self.app.status()['last_run']
+        self.assertEqual(last['status'], 'success', last)
+        self.assertEqual(last['action'], 'run_now')
+        self.assertEqual(last['request_attempts'], 1)
+        self.assertEqual(json.loads(plan_path.read_text(encoding='utf-8'))['sessions'], sessions)
+        with closing(sqlite3.connect(self.app.workspace / 'ai_coach_master.sqlite')) as conn:
+            kinds = conn.execute('SELECT request_kind,status FROM coach_api_requests ORDER BY id').fetchall()
+            snapshot = json.loads(conn.execute('SELECT input_snapshot_json FROM coach_api_requests ORDER BY id DESC LIMIT 1').fetchone()[0])
+        self.assertEqual(kinds, [('daily', 'complete'), ('daily', 'failed'), ('manual_override', 'complete')])
+        self.assertEqual(snapshot['question'], hr_learning.LEARNING_QUESTION)
+        self.assertFalse(snapshot['plan'].get('new_plan_requested'))
+        self.assertTrue(self.app.status()['request_budget']['extra_used'])
+        self.assertFalse(self.app.tick())
 
     def test_actual_off_day_plan_reports_availability_without_publishing(self):
         self.fixture_provider('success')

@@ -27,7 +27,7 @@ def build_release(source,output,create_archive=True):
             raise ValueError("Release sources must be regular files within the checkout: "+name)
         if not origin.is_file():raise ValueError("Required release source missing: "+name)
         target=output/name;target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(origin,target)
-    manifest={"format":1,"release":"0.2.3-beta.3","license_status":"selected" if (output/"LICENSE").exists() else "pending maintainer decision","files":[{"path":name,"sha256":hashlib.sha256((output/name).read_bytes()).hexdigest()} for name in sorted(set(paths))]}
+    manifest={"format":1,"release":"0.2.3-beta.4","license_status":"selected" if (output/"LICENSE").exists() else "pending maintainer decision","files":[{"path":name,"sha256":hashlib.sha256((output/name).read_bytes()).hexdigest()} for name in sorted(set(paths))]}
     (output/"release-manifest.json").write_text(json.dumps(manifest,indent=2)+"\n",encoding="utf-8")
     if not create_archive:return output
     with zipfile.ZipFile(archive,"w",zipfile.ZIP_DEFLATED) as z:

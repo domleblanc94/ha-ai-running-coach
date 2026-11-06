@@ -87,7 +87,7 @@ def coach_failure_message(project, attempted_at):
         with contextlib.closing(sqlite3.connect(uri, uri=True)) as conn:
             request = conn.execute(
                 "SELECT status,error,started_at FROM coach_api_requests "
-                "WHERE request_kind IN ('daily','operator_recovery') ORDER BY id DESC LIMIT 1"
+                "WHERE request_kind IN ('daily','operator_recovery','manual_override') ORDER BY id DESC LIMIT 1"
             ).fetchone()
         if not request or datetime.fromisoformat(request[2]) < datetime.fromisoformat(attempted_at):
             return None
@@ -183,12 +183,12 @@ def deferred_retry_eligible(project, now=None):
             return False, "No pending run from today"
         conn = sqlite3.connect((project / "ai_coach_master.sqlite").resolve().as_uri() + "?mode=ro", uri=True)
         try:
-            row = conn.execute("SELECT job_fingerprint,status,error,started_at FROM coach_api_requests WHERE request_kind='daily' ORDER BY id DESC LIMIT 1").fetchone()
-            count = conn.execute("SELECT count(*) FROM coach_api_requests WHERE request_kind IN ('daily','operator_recovery') AND substr(started_at,1,10)=?", (now.date().isoformat(),)).fetchone()[0]
+            row = conn.execute("SELECT job_fingerprint,status,error,started_at,request_kind FROM coach_api_requests WHERE request_kind IN ('daily','operator_recovery','manual_override') ORDER BY id DESC LIMIT 1").fetchone()
+            count = conn.execute("SELECT count(*) FROM coach_api_requests WHERE request_kind IN ('daily','operator_recovery','manual_override') AND substr(started_at,1,10)=?", (now.date().isoformat(),)).fetchone()[0]
             job = conn.execute("SELECT status FROM coach_review_jobs WHERE fingerprint=?", (row[0],)).fetchone() if row else None
         finally:
             conn.close()
-        if not row or row[1] != "failed" or not job or job[0] != "pending":
+        if not row or row[4] != "daily" or row[1] != "failed" or not job or job[0] != "pending":
             return False, "No transient pending request"
         if not re.search(r"(?:^|HTTP )(500|502|503|504|529)\b", row[2] or ""):
             return False, "Failure is not an eligible temporary server error"
@@ -196,7 +196,8 @@ def deferred_retry_eligible(project, now=None):
         if started.tzinfo is None or started.date() != now.date() or (now-started).total_seconds() < 3600:
             return False, "Retry must wait at least one hour on the same UTC day"
         # Core independently enforces configured request budgets under its lock.
-        if count >= 2:
+        from ai_coach import daily_request_limit
+        if count >= daily_request_limit():
             return False, "Daily automatic request allowance spent"
         return True, "Retrying temporary server failure after a cooling-off interval"
     except (OSError, ValueError, KeyError, TypeError, sqlite3.Error):
@@ -207,7 +208,17 @@ def main(argv=()):
     parser.add_argument("--retry-pending", action="store_true")
     parser.add_argument("--operator-extra-attempt", metavar="UTC_DATE")
     parser.add_argument("--operator-reason")
+    parser.add_argument("--manual-extra-attempt", metavar="UTC_DATE")
+    parser.add_argument("--manual-reason")
     args = parser.parse_args(argv)
+    if args.retry_pending and (args.operator_extra_attempt or args.operator_reason or args.manual_extra_attempt or args.manual_reason):
+        parser.error("Scheduled retries cannot use an extra request approval")
+    if args.operator_extra_attempt and args.manual_extra_attempt:
+        parser.error("Choose only one extra request approval method")
+    if bool(args.operator_extra_attempt)!=bool(args.operator_reason):
+        parser.error("Operator exception requires a date and an approval reason")
+    if bool(args.manual_extra_attempt)!=bool(args.manual_reason):
+        parser.error("Manual extra request requires a date and an approval reason")
     try:
         from dotenv import load_dotenv
         load_dotenv(SCRIPT_DIR / ".env", override=False)
@@ -224,13 +235,13 @@ def main(argv=()):
                     logging.info("Deferred retry: %s", reason)
                     if not eligible:
                         return 0
-                if args.retry_pending and args.operator_extra_attempt:
-                    raise ValueError("Scheduled retries cannot use an operator exception")
                 coach_args = ()
                 if args.operator_extra_attempt:
                     if not args.operator_reason:
                         raise ValueError("Operator exception requires an approval reason")
                     coach_args = ("--operator-extra-attempt", args.operator_extra_attempt, "--operator-reason", args.operator_reason)
+                elif args.manual_extra_attempt:
+                    coach_args = ("--manual-extra-attempt", args.manual_extra_attempt, "--manual-reason", args.manual_reason)
                 return run_pipeline(coach_args)
             except Exception:
                 logging.exception("Pipeline aborted unexpectedly")

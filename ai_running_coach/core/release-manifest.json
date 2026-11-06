@@ -1,11 +1,11 @@
 {
   "format": 1,
-  "release": "0.2.3-beta.3",
+  "release": "0.2.3-beta.4",
   "license_status": "selected",
   "files": [
     {
       "path": ".env.example",
-      "sha256": "e97e7fbdf133a3cbccde7f385eb82584837a7c0a09ad29ec58ad1deb7db98da1"
+      "sha256": "1ec401ee09e17a65da9b707799b5a87280f3e5c715a35c5f6aa36038b5932d50"
     },
     {
       "path": ".github/workflows/offline-tests.yml",
@@ -21,11 +21,11 @@
     },
     {
       "path": "README.md",
-      "sha256": "73bd76380b056eb2e99112db880c2bd8be78375699bb2628030e16c8744352b4"
+      "sha256": "5a153af0289c7ca5003d4e2c316accec27ba693dc9dbfaf8353f9d5ef06fa0b7"
     },
     {
       "path": "ai_coach.py",
-      "sha256": "4adb39adbd47352ac52d29b8d66d207d18b012fdc426350433ec031f8ac000f4"
+      "sha256": "a4f6987182b332818e53c06cca8635afedff3d439cd943d2ac65197c330061ed"
     },
     {
       "path": "coach_checkin.py",
@@ -37,7 +37,7 @@
     },
     {
       "path": "cron_daily_update.py",
-      "sha256": "38ec294b2dd86fc05bd5c66c67a76c548b154eab4dbba2e9f3262ce401fc4f9d"
+      "sha256": "25e2c0e72745322083cd4daf3667259e49122a3e29623be5d9727a2ddcbed247"
     },
     {
       "path": "dashboard_assets/chart-LICENSE.md",
@@ -117,7 +117,7 @@
     },
     {
       "path": "docs/RELEASE_REVIEW.md",
-      "sha256": "895d5ee54b4372f80ba35cc4bf3633aafeca8d95a66b4b4a429f4bdd3c8a279e"
+      "sha256": "17dd885979b7b553ea1941a277bfa50cdb09e961d6dcc0211c9781d84d282140"
     },
     {
       "path": "docs/THIRD_PARTY.md",
@@ -177,7 +177,7 @@
     },
     {
       "path": "prepare_release.py",
-      "sha256": "40e47c6d47c716ddce7011b151f0d86144172571a71bc9fc9e3ce141d774e110"
+      "sha256": "722e44b645f308b259a16ffcb377a45b03763bcdf23a74a2e34cf7c177b32535"
     },
     {
       "path": "publish_if_ready.py",
@@ -185,7 +185,7 @@
     },
     {
       "path": "pyproject.toml",
-      "sha256": "e027f49fb72659ba1215d011ee328d0bea0e73b2cf9fa70c34706519c2125a4b"
+      "sha256": "45ca2242efed098e52d9d1f14aa8a235443e49fd652682c83e6b1ac93d22f3d7"
     },
     {
       "path": "requirements.txt",
@@ -225,7 +225,7 @@
     },
     {
       "path": "tests/test_deferred_retry.py",
-      "sha256": "778607693f1ce016505b7dd343bdfdb39c50ec4b5e8a7a30beaed0f51ac4d184"
+      "sha256": "99105087c45210c88b5093cb5e0e53b82f7a8c563342978c313c25b114b10742"
     },
     {
       "path": "tests/test_feedback_workflow.py",
@@ -250,6 +250,10 @@
     {
       "path": "tests/test_health_status.py",
       "sha256": "675ea408c5df49ded96ec7b72b7c8f89360b182a587dbd80e625254e3758d998"
+    },
+    {
+      "path": "tests/test_manual_request_budget.py",
+      "sha256": "fe0bec9508a1aad7572c7c8a4c558a5abd74513da81169663f3e245ef76e88e3"
     },
     {
       "path": "tests/test_model_providers.py",

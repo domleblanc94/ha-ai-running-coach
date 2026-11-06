@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0-beta.7
+
+- Make the normal daily coaching allowance editable in Setup & settings, from 1 to 20 requests, with a default of 2.
+- Add a confirmed **Run once anyway** action for one extra request per UTC day after the normal allowance is spent.
+- Show request usage and the UTC reset time without making a provider request. Scheduled reviews keep their normal allowance.
+
 ## 0.1.0-beta.6
 
 - Add an Athlete profile page and open the training dashboard after initial setup.

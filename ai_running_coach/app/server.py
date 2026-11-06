@@ -428,8 +428,12 @@ class CoachHandler(BaseHTTPRequestHandler):
 
     @staticmethod
     def run_action(runtime, payload):
-        if set(payload) != {"action"} or payload["action"] not in ("new_plan", "run_now"):
+        if set(payload) not in ({"action"}, {"action", "manual_extra"}) or payload["action"] not in ("new_plan", "run_now"):
             raise ValueError("Choose a supported coach action.")
+        if "manual_extra" in payload:
+            if payload["manual_extra"] is None:
+                raise ValueError("Confirm one extra AI request before continuing.")
+            return runtime.enqueue(payload["action"], manual_extra=payload["manual_extra"])
         return runtime.enqueue(payload["action"])
 
     @staticmethod

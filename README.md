@@ -1,11 +1,12 @@
 # AI Running Coach for Home Assistant
 
-**Experimental community app, version 0.1.0-beta.6.** It brings the standalone AI Running Coach into Home Assistant's app UI. The app packages a pinned copy of the upstream engine and keeps its own athlete profile, activity history, request ledger and plans.
+**Experimental community app, version 0.1.0-beta.7.** It brings the standalone AI Running Coach into Home Assistant's app UI. The app packages a pinned copy of the upstream engine and keeps its own athlete profile, activity history, request ledger and plans.
 
 - Install on Home Assistant OS on amd64 or aarch64. Supervisor pulls the prebuilt image for your architecture from GitHub Container Registry.
 - Open setup and the running dashboard through Home Assistant ingress. The app stores its data privately and needs no exposed host port.
 - Start from your athlete profile, or add activity evidence through the official Garmin Personal API. Review the generated plan before using it for training.
 - View your saved athlete profile and export the training calendar as PDF, or download the athlete and training plan Markdown files.
+- Set a daily coaching request allowance and confirm one extra request when needed; scheduled reviews stay within the normal allowance.
 - The standalone installation remains available for people who run the scripts directly. The two installations maintain separate state.
 
 This community project is independently maintained. [Standalone AI Running Coach](https://github.com/domleblanc94/ai-running-coach)
@@ -21,7 +22,7 @@ This community project is independently maintained. [Standalone AI Running Coach
 
 [Setup, privacy, backups and standalone migration](ai_running_coach/DOCS.md)
 
-If an earlier installation failed while fetching a Debian package, refresh the app store and check that it offers **0.1.0-beta.6**, then retry installation. The new installation downloads the prebuilt image. Home Assistant needs HTTPS access to GitHub and GitHub Container Registry.
+If an earlier installation failed while fetching a Debian package, refresh the app store and check that it offers **0.1.0-beta.7**, then retry installation. The new installation downloads the prebuilt image. Home Assistant needs HTTPS access to GitHub and GitHub Container Registry.
 
 ## Development
 

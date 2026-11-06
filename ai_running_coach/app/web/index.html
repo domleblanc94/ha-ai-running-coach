@@ -19,7 +19,8 @@
     </section>
     <section class="card run-card" aria-labelledby="run-title">
       <div><p class="eyebrow">COACH STATUS</p><h2 id="run-title">Checking setup</h2><p id="run-detail" role="status" aria-live="polite">Connecting to the coach…</p><p id="run-diagnostic" class="hint" hidden></p><p id="first-plan-hint" class="hint" hidden></p><ul id="issues" hidden></ul></div>
-      <div class="actions"><button id="new-plan" type="button" disabled>Generate new plan</button><button id="run-now" type="button" class="secondary" disabled>Run now</button></div>
+      <div class="actions"><button id="new-plan" type="button" disabled>Generate new plan</button><button id="run-now" type="button" class="secondary" disabled>Run now</button><button id="run-extra" type="button" class="secondary" hidden disabled>Run once anyway</button></div>
+      <div class="request-budget"><p id="request-budget" class="hint"></p><p id="extra-availability" class="hint"></p></div>
     </section>
     <nav aria-label="Coach views" class="tabs">
       <button id="dashboard-tab" type="button" aria-pressed="false" disabled>Training dashboard</button>
@@ -45,6 +46,7 @@
         <div class="grid">
           <label>Model provider<select name="provider"><option value="gemini">Google Gemini</option><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option></select></label>
           <label>Model identifier<input name="model" maxlength="120" required placeholder="gemini-3.5-flash-lite"></label>
+          <label>Daily AI request limit<input name="daily_request_limit" type="number" min="1" max="20" step="1" value="2" required><small>Normal allowance, 1–20 requests per UTC day. Failed requests count. Raising it may increase costs.</small></label>
           <label id="provider-key-label">Provider API key<input name="provider_key" type="password" maxlength="1024" autocomplete="new-password"><small id="provider-key-hint"></small></label>
           <label>Activity source<select name="source"><option value="offline">Offline / no activity sync</option><option value="garmin">Garmin Personal API</option></select></label>
           <div id="garmin-fields" class="grid full" hidden>
@@ -115,6 +117,16 @@
         <h2 id="plan-confirm-title">Generate a new training plan?</h2>
         <p id="plan-confirm-detail">This uses your selected model API. A valid response replaces the upcoming block and preserves your past sessions.</p>
         <div class="actions"><button value="cancel" class="secondary" autofocus>Cancel</button><button value="confirm">Generate plan</button></div>
+      </form>
+    </dialog>
+    <dialog id="extra-confirm" aria-labelledby="extra-confirm-title">
+      <form method="dialog">
+        <h2 id="extra-confirm-title">Use one extra AI request?</h2>
+        <p>This authorises one additional request today, with no automatic retry. It may incur charges according to your AI account. Your normal daily limit stays unchanged, and provider quotas still apply.</p>
+        <label>Coach action<select id="extra-action"><option value="run_now">Review current plan</option><option value="new_plan">Generate new plan</option></select></label>
+        <p id="extra-action-detail" class="hint"></p>
+        <p id="extra-date" class="hint"></p>
+        <div class="actions"><button value="cancel" class="secondary" autofocus>Cancel</button><button value="confirm">Confirm one extra request</button></div>
       </form>
     </dialog>
   </main>

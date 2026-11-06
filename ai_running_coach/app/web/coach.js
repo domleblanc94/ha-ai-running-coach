@@ -161,6 +161,7 @@ function savedSetup() {
     ["Model", config.model], ["Activity source", config.source === "garmin" ? "Garmin Personal API" : "Offline"],
     ["Daily review", state.schedule?.enabled ? state.schedule.time + " (" + state.schedule.timezone + ")" : "Paused"],
     ["Time zone", state.schedule?.timezone],
+    ["Daily AI request limit", config.daily_request_limit == null ? "Needs a valid setting" : config.daily_request_limit + " requests (UTC day)"],
   ], byId("setup-summary"));
 }
 
@@ -274,6 +275,22 @@ function draw(next) {
   byId("new-plan").disabled = busy || working || next.worker_ok === false || !next.setup_ready || !next.profile_ready;
   byId("new-plan").textContent = next.hr_learning?.enabled ? "Plan baseline runs" : "Generate new plan";
   byId("run-now").disabled = byId("new-plan").disabled || !next.plan_ready;
+  const budget = next.request_budget;
+  const used = Number.isSafeInteger(budget?.used) ? String(budget.used) : "Unknown";
+  const reset = budget?.resets_at ? budget.resets_at.slice(0, 10) + " at 00:00 UTC" : "00:00 UTC";
+  byId("request-budget").textContent = "AI requests today: " + used + " / " + (budget?.limit ?? "unknown")
+    + " normal allowance · Resets " + reset + ". Includes failed requests and any extra request.";
+  const extraMessages = {
+    available: "One extra request is available with your confirmation. Provider quotas still apply.",
+    used: "Today's extra request has been used or reserved. It cannot be retried automatically.",
+    allowance_remaining: "Your normal allowance is still available. One confirmed extra request is available after it is used.",
+    busy: "Wait for the current action before confirming an extra request.",
+    ledger_unavailable: "Request usage could not be read. Extra requests are disabled until it can be checked.",
+    invalid_limit: "Set a valid daily AI request limit in Settings before running the coach.",
+  };
+  byId("extra-availability").textContent = extraMessages[budget?.extra_status] || "Checking request allowance…";
+  byId("run-extra").hidden = !budget?.extra_available;
+  byId("run-extra").disabled = byId("new-plan").disabled || !budget?.extra_available;
   const ready = Boolean(next.setup_ready && next.profile_ready);
   byId("dashboard-tab").disabled = !ready && !next.dashboard_ready;
   byId("athlete-tab").disabled = !next.profile_ready;
@@ -352,7 +369,7 @@ async function refresh() {
     if (!initialized) {
       const saved = await api("profile");
       for (const [key, value] of Object.entries(next.config || {})) {
-        if (["provider", "model", "source", "garmin_region"].includes(key)) field(connection, key).value = value;
+        if (["provider", "model", "source", "garmin_region", "daily_request_limit"].includes(key)) field(connection, key).value = value;
       }
       field(schedule, "enabled").checked = Boolean(next.schedule?.enabled);
       field(schedule, "time").value = next.schedule?.time || "03:00";
@@ -391,6 +408,7 @@ async function refresh() {
     byId("first-plan-hint").hidden = true;
     byId("new-plan").disabled = true;
     byId("run-now").disabled = true;
+    byId("run-extra").disabled = true;
   }
 }
 
@@ -436,6 +454,7 @@ field(profile, "zone_mode").addEventListener("change", updateZoneMode);
 formAction(connection, "config", () => {
   const get = key => field(connection, key).value;
   return {provider: get("provider"), model: get("model"), source: get("source"),
+    daily_request_limit: get("daily_request_limit"),
     garmin_region: get("garmin_region"), garmin_api_key: get("garmin_api_key"),
     [get("provider") + "_api_key"]: get("provider_key")};
 }, () => {
@@ -483,13 +502,16 @@ formAction(baseline, "baseline-feedback", () => ({
   sensor: field(baseline, "sensor").value,
 }));
 
-async function run(action) {
+async function run(action, manualExtra) {
   if (working) return;
   working = true;
   byId("new-plan").disabled = true;
   byId("run-now").disabled = true;
+  byId("run-extra").disabled = true;
   try {
-    const result = await api("action", {action});
+    const payload = {action};
+    if (manualExtra) payload.manual_extra = manualExtra;
+    const result = await api("action", payload);
     working = false;
     draw(result);
   } catch (error) {
@@ -511,6 +533,28 @@ byId("new-plan").addEventListener("click", () => {
   confirm.showModal();
 });
 confirm.addEventListener("close", () => { if (confirm.returnValue === "confirm") run("new_plan"); });
+const extraConfirm = byId("extra-confirm");
+let extraDay = "";
+function extraActionDetail() {
+  byId("extra-action-detail").textContent = byId("extra-action").value === "run_now"
+    ? "Review and adapt your saved plan using the current profile and activity data."
+    : "Generate a new upcoming block using your saved profile and training days. A valid plan preserves past sessions.";
+  if (state.hr_learning?.enabled) byId("extra-action-detail").textContent += " The coach will include your HR baseline learning request.";
+}
+byId("extra-action").addEventListener("change", extraActionDetail);
+byId("run-extra").addEventListener("click", () => {
+  if (working || !state.request_budget?.extra_available) return;
+  extraDay = state.request_budget.utc_date;
+  byId("extra-action").options[0].disabled = !state.plan_ready;
+  byId("extra-action").value = state.plan_ready ? "run_now" : "new_plan";
+  extraActionDetail();
+  byId("extra-date").textContent = "Approval applies only to " + extraDay + " (UTC). Once the AI request is reserved, it counts even if it fails.";
+  extraConfirm.returnValue = "";
+  extraConfirm.showModal();
+});
+extraConfirm.addEventListener("close", () => {
+  if (extraConfirm.returnValue === "confirm") run(byId("extra-action").value, {date: extraDay, confirmed: true});
+});
 
 function updateDashboard() {
   if (byId("dashboard-panel").hidden || !state.dashboard_ready || displayedRevision === dashboardRevision) return;

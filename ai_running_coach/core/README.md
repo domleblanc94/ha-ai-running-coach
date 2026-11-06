@@ -1,6 +1,6 @@
 # AI Coach
 
-**Public beta 0.2.3b3** for technical self-hosters running their own installation. Expect to use a terminal, edit a private `.env` and profile, and review generated plans. This is a source-checkout application, with optional Home Assistant publishing. It is not a hosted service or a turnkey watch-sync app.
+**Public beta 0.2.3b4** for technical self-hosters running their own installation. Expect to use a terminal, edit a private `.env` and profile, and review generated plans. This is a source-checkout application, with optional Home Assistant publishing. It is not a hosted service or a turnkey watch-sync app.
 
 A self-hosted running coach that combines AI-authored training plans with local activity analysis and a mobile-friendly HTML dashboard. Run it manually or on a schedule; optionally publish the page to Home Assistant using your existing SSH transport.
 
@@ -89,8 +89,8 @@ Check that your goals, availability, activity source and missing-data labels are
 | `COACH_ALLOW_KEYLESS` | Explicitly permit keyless access to a custom OpenAI-compatible endpoint; default false |
 | `COACH_HTTP_TIMEOUT_SECONDS` | Bounded provider request timeout, default 60 seconds |
 | `COACH_MAX_OUTPUT_TOKENS` | Output limit, default 4096; 8192 may help an initial longer block |
-| `COACH_MAX_ATTEMPTS` | Per-evidence attempt limit, at most two |
-| `COACH_MAX_DAILY_REQUESTS` | Total actual unattended coaching requests per UTC day, default two |
+| `COACH_MAX_ATTEMPTS` | Maximum attempts per direct coaching invocation, at most two; the scheduled pipeline uses at most one |
+| `COACH_MAX_DAILY_REQUESTS` | Normal coaching request allowance per UTC day, default 2; configurable from 1 to 20 |
 | `COACH_ACTIVITY_SOURCE` | `garmin` for the official Personal API, or `offline` for local/manual imports |
 | `GARMIN_PERSONAL_API_KEY` | Your official Garmin Personal API key; never a Garmin account password |
 | `GARMIN_PERSONAL_REGION` | Official endpoint region, `global` (default) or `china` |
@@ -239,7 +239,9 @@ python coaching_eval.py
 python coaching_eval.py --db ai_coach_master.sqlite --request-id REQUEST_ID --output eval-report.json
 ```
 
-Evaluation is offline unless explicitly invoked with its documented `--live` option. It presents structural checks and a qualitative rubric, not a guarantee of coaching quality. Actual API requests/usage are stored separately from cached reviews. Saved-response replay is an operator recovery tool for a corrected validator: `python ai_coach.py --replay-request-id REQUEST_ID --dry-run` previews it without calls, and replay without `--dry-run` requires identical current inputs and records an audit. Never reset request counters or alter the question to evade budgets. A dated one-use operator exception requires explicit approval and is intentionally restricted to the same pending review after two 503 failures.
+Evaluation is offline unless explicitly invoked with its documented `--live` option. It presents structural checks and a qualitative rubric, not a guarantee of coaching quality. Actual API requests/usage are stored separately from cached reviews. Saved-response replay is an operator recovery tool for a corrected validator: `python ai_coach.py --replay-request-id REQUEST_ID --dry-run` previews it without calls, and replay without `--dry-run` requires identical current inputs and records an audit. Never reset request counters or alter the question to evade budgets. The older `--operator-extra-attempt` recovery path remains restricted to the same pending review after two 503 failures.
+
+For a deliberate manual exception after the normal daily allowance is exhausted, run `python ai_coach.py --manual-extra-attempt YYYY-MM-DD --manual-reason "I confirm one extra coaching request today"`, using today's UTC date. This permits one additional provider request per UTC day and records it as `manual_override`; failed or invalid replies still use that exception. The manual and older operator-recovery paths share this single daily exception. Add `--new-plan` only when you intend to replace the future plan. The extra request has no automatic retry or fallback, keeps the normal limit unchanged, and cannot be requested by a scheduled run. A stale date is rejected. Provider quotas, account access and any charges still apply; the app cannot override them.
 
 | Symptom | Action |
 | --- | --- |

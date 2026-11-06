@@ -59,7 +59,29 @@ def review_identity(plan=None, today=None):
 
 def daily_coaching_requests(conn,utc_day=None):
     utc_day=utc_day or datetime.now(timezone.utc).date().isoformat()
-    return conn.execute("SELECT id,job_fingerprint,model,status,error,request_kind FROM coach_api_requests WHERE date(started_at)=? AND request_kind IN ('daily','operator_recovery') ORDER BY id",(utc_day,)).fetchall()
+    return conn.execute("SELECT id,job_fingerprint,model,status,error,request_kind FROM coach_api_requests WHERE date(started_at)=? AND request_kind IN ('daily','operator_recovery','manual_override') ORDER BY id",(utc_day,)).fetchall()
+
+
+def daily_request_limit():
+    """The persistent normal allowance; a manual request never changes it."""
+    load_environment()
+    return max(1,min(20,int(os.getenv('COACH_MAX_DAILY_REQUESTS','2'))))
+
+
+def validate_manual_approval(approved_day, reason, utc_day=None):
+    utc_day=utc_day or datetime.now(timezone.utc).date().isoformat()
+    if approved_day!=utc_day:
+        raise ValueError('Manual extra request approval must name the current UTC date.')
+    if not isinstance(reason,str) or not 10<=len(reason.strip())<=500:
+        raise ValueError('An explicit manual extra request approval reason is required.')
+
+
+def manual_override_eligibility(rows, approved_day, reason, daily_limit, utc_day=None):
+    validate_manual_approval(approved_day,reason,utc_day)
+    if any(row[5] in ('manual_override','operator_recovery') for row in rows):
+        raise ValueError('The manual extra request allowance has already been used for this UTC day.')
+    if len(rows)<daily_limit:
+        raise ValueError('Manual extra request requires the normal daily coaching allowance to be exhausted.')
 
 
 def operator_recovery_eligibility(rows,approved_day,reason,digest,prior):
@@ -255,18 +277,23 @@ def replay_saved_request(request_id,dry_run=False):
     with pipeline_lock(CANONICAL_FILE.parent/'.pipeline.lock'),coach_lock():return replay()
 
 
-def run_daily_coach_check(user_question=None, dry_run=False, today=None, build_plan=False,max_attempts_this_run=None,operator_extra_attempt=None,operator_reason=None,new_plan=False):
+def run_daily_coach_check(user_question=None, dry_run=False, today=None, build_plan=False,max_attempts_this_run=None,operator_extra_attempt=None,operator_reason=None,new_plan=False,manual_extra_attempt=None,manual_reason=None):
     if dry_run:
-        return _run_daily_coach_check(user_question,True,today,build_plan,max_attempts_this_run,operator_extra_attempt,operator_reason,new_plan)
+        return _run_daily_coach_check(user_question,True,today,build_plan,max_attempts_this_run,operator_extra_attempt,operator_reason,new_plan,manual_extra_attempt,manual_reason)
     with coach_lock():
-        return _run_daily_coach_check(user_question,dry_run,today,build_plan,max_attempts_this_run,operator_extra_attempt,operator_reason,new_plan)
+        return _run_daily_coach_check(user_question,dry_run,today,build_plan,max_attempts_this_run,operator_extra_attempt,operator_reason,new_plan,manual_extra_attempt,manual_reason)
 
 
-def _run_daily_coach_check(user_question=None, dry_run=False, today=None, build_plan=False,max_attempts_this_run=None,operator_extra_attempt=None,operator_reason=None,new_plan=False):
+def _run_daily_coach_check(user_question=None, dry_run=False, today=None, build_plan=False,max_attempts_this_run=None,operator_extra_attempt=None,operator_reason=None,new_plan=False,manual_extra_attempt=None,manual_reason=None):
     load_environment()
     activity_source_mode()
     if max_attempts_this_run is not None and (type(max_attempts_this_run) is not int or max_attempts_this_run not in (1,2)):
         raise ValueError('max_attempts_this_run must be one or two.')
+    if operator_extra_attempt and manual_extra_attempt:raise ValueError('Choose only one extra request approval method.')
+    if manual_reason and not manual_extra_attempt:raise ValueError('Manual reason requires a date-scoped approval.')
+    if manual_extra_attempt:
+        validate_manual_approval(manual_extra_attempt,manual_reason)
+        if max_attempts_this_run not in (None,1):raise ValueError('Manual extra approval permits exactly one request, without fallback.')
     if operator_reason and not operator_extra_attempt:raise ValueError('Operator reason requires a date-scoped approval.')
     if operator_extra_attempt:
         if operator_extra_attempt!=datetime.now(timezone.utc).date().isoformat():raise ValueError('Operator approval must name the current UTC date.')
@@ -321,42 +348,60 @@ def _run_daily_coach_check(user_question=None, dry_run=False, today=None, build_
             print('Evidence unchanged; completed review reused.'); return {'status':'unchanged','fingerprint':digest}
         models, max_tokens, attempts_limit = limits()
         rows=daily_coaching_requests(conn)
-        daily_limit=max(1,min(20,int(os.getenv('COACH_MAX_DAILY_REQUESTS','2'))))
+        daily_limit=daily_request_limit()
         recovery_model=None
+        extra_attempt=operator_extra_attempt or manual_extra_attempt
         if operator_extra_attempt:
             recovery_model=operator_recovery_eligibility(rows,operator_extra_attempt,operator_reason,digest,prior)
             if max_attempts_this_run not in (None,1):raise ValueError('Operator recovery permits exactly one request, without fallback.')
+        elif manual_extra_attempt:
+            manual_override_eligibility(rows,manual_extra_attempt,manual_reason,daily_limit)
         elif len(rows)>=daily_limit:
             raise RuntimeError('Daily coaching API request budget exhausted; pending review retained for a later UTC day.')
         maximum_input=max(8000,min(120000,int(os.getenv('COACH_MAX_INPUT_CHARS','60000'))))
         if len(prompt)>maximum_input:
             raise RuntimeError('Coaching input exceeds COACH_MAX_INPUT_CHARS; retained last-good plan. Inspect oversized notes/schedule before retrying.')
         attempts = prior[1] if prior and str(prior[2])[:10] == datetime.now(timezone.utc).date().isoformat() else 0
-        if attempts >= attempts_limit and not operator_extra_attempt:
+        # The daily cap also bounds a pending evidence job. The invocation cap
+        # only limits retries in this process, so raising today's allowance can
+        # permit a deliberate retry without rewriting the request ledger.
+        if attempts >= daily_limit and not extra_attempt:
             raise RuntimeError('Pending review attempt budget exhausted for this evidence; inspect before explicit retry/reset.')
-        attempt_ceiling=attempts+1 if operator_extra_attempt else attempts_limit
-        run_limit=1 if operator_extra_attempt else (max_attempts_this_run or attempts_limit)
+        attempt_ceiling=attempts+1 if extra_attempt else daily_limit
+        run_limit=1 if extra_attempt else (max_attempts_this_run or attempts_limit)
         requests_this_run=0
         client = api_client()
         last_error = None
         while attempts < attempt_ceiling and requests_this_run<run_limit:
-            if not operator_extra_attempt and len(daily_coaching_requests(conn))>=daily_limit:
+            if not extra_attempt and len(daily_coaching_requests(conn))>=daily_limit:
                 break
-            model = recovery_model or (models[min(attempts,len(models)-1)] if models else None)
+            # A fresh manual action starts with the configured primary model.
+            model = recovery_model or (models[0 if manual_extra_attempt else min(attempts,len(models)-1)] if models else None)
             if not model: raise ValueError('COACH_MODELS must include an enabled model.')
             attempts += 1
             requests_this_run+=1
-            stamp = datetime.now(timezone.utc).isoformat()
-            conn.execute('INSERT INTO coach_review_jobs(fingerprint,status,attempts,updated_at,model,prompt_version) VALUES(?,?,?,?,?,?) ON CONFLICT(fingerprint) DO UPDATE SET status=excluded.status,attempts=excluded.attempts,updated_at=excluded.updated_at,model=excluded.model', (digest,'pending',attempts,stamp,model,prompt_version))
-            conn.commit()
-            request_id=None
-            try:
-                config={'response_mime_type':'application/json','temperature':0.2,'max_output_tokens':max_tokens}
-                snapshot={'profile':profile,'plan':plan,'evidence':evidence,'question':question,'provider':identity['provider'],'generation_identity':identity}
-                if operator_extra_attempt:snapshot['operator_approval']={'date':operator_extra_attempt,'reason':operator_reason.strip()}
+            config={'response_mime_type':'application/json','temperature':0.2,'max_output_tokens':max_tokens}
+            snapshot={'profile':profile,'plan':plan,'evidence':evidence,'question':question,'provider':identity['provider'],'generation_identity':identity}
+            if operator_extra_attempt:snapshot['operator_approval']={'date':operator_extra_attempt,'reason':operator_reason.strip()}
+            if manual_extra_attempt:snapshot['manual_approval']={'date':manual_extra_attempt,'reason':manual_reason.strip(),'normal_daily_limit':daily_limit}
+            # Admission and durable reservation are atomic. A killed process leaves
+            # its started request counted, even if no provider response was saved.
+            with conn:
+                conn.execute('BEGIN IMMEDIATE')
+                admitted_at=datetime.now(timezone.utc)
+                stamp=admitted_at.isoformat()
+                utc_day=admitted_at.date().isoformat()
+                rows=daily_coaching_requests(conn,utc_day)
+                if manual_extra_attempt:
+                    manual_override_eligibility(rows,manual_extra_attempt,manual_reason,daily_limit,utc_day)
+                elif operator_extra_attempt:
+                    operator_recovery_eligibility(rows,operator_extra_attempt,operator_reason,digest,prior)
+                elif len(rows)>=daily_limit:
+                    raise RuntimeError('Daily coaching API request budget exhausted; pending review retained for a later UTC day.')
+                conn.execute('INSERT INTO coach_review_jobs(fingerprint,status,attempts,updated_at,model,prompt_version) VALUES(?,?,?,?,?,?) ON CONFLICT(fingerprint) DO UPDATE SET status=excluded.status,attempts=excluded.attempts,updated_at=excluded.updated_at,model=excluded.model', (digest,'pending',attempts,stamp,model,prompt_version))
                 request_id=conn.execute('''INSERT INTO coach_api_requests(job_fingerprint,model,prompt_version,request_kind,started_at,status,input_chars,input_snapshot_json,prompt_text,provider)
-                    VALUES(?,?,?,?,?,?,?,?,?,?)''',(digest,model,prompt_version,'operator_recovery' if operator_extra_attempt else 'daily',stamp,'started',len(prompt),json.dumps(snapshot,ensure_ascii=False),prompt,identity['provider'])).lastrowid
-                conn.commit()
+                    VALUES(?,?,?,?,?,?,?,?,?,?)''',(digest,model,prompt_version,'manual_override' if manual_extra_attempt else ('operator_recovery' if operator_extra_attempt else 'daily'),stamp,'started',len(prompt),json.dumps(snapshot,ensure_ascii=False),prompt,identity['provider'])).lastrowid
+            try:
                 response = client.models.generate_content(model=model, contents=prompt, config=config)
                 usage = getattr(response,'usage_metadata',None)
                 usage_json = json.dumps(usage.model_dump(mode='json') if usage and hasattr(usage,'model_dump') else {})
@@ -386,7 +431,7 @@ def _run_daily_coach_check(user_question=None, dry_run=False, today=None, build_
                 next_model=models[min(attempts,len(models)-1)] if models else None
                 # High demand on the same model needs a delayed run, not a second
                 # request one second later. Preserve the remaining daily allowance.
-                if operator_extra_attempt or next_model==model:break
+                if extra_attempt or next_model==model:break
                 if attempts < attempt_ceiling and requests_this_run<run_limit:time.sleep(1)
         raise RuntimeError('Review remains pending; last-good plan retained: ' + str(last_error))
     finally:
@@ -434,6 +479,8 @@ if __name__ == '__main__':
     parser.add_argument('--attempts-this-run',type=int,choices=(1,2),help='Limit this invocation without resetting the daily or pending-job budget')
     parser.add_argument('--operator-extra-attempt',metavar='YYYY-MM-DD',help='Explicit one-off recovery approval for today after two HTTP 503 failures')
     parser.add_argument('--operator-reason',help='Audit reason for the one-off operator-approved request')
+    parser.add_argument('--manual-extra-attempt',metavar='YYYY-MM-DD',help='Explicit approval for one extra request today after the normal daily allowance is spent')
+    parser.add_argument('--manual-reason',help='Audit reason confirming the single extra request; does not change normal limits')
     parser.add_argument('--replay-request-id',type=int,help='Revalidate a saved failed response against identical current inputs, with no API call')
     parser.add_argument('--update-profile','-p',action='store_true')
     parser.add_argument('--build-plan','-b',action='store_true')
@@ -441,12 +488,15 @@ if __name__ == '__main__':
     parser.add_argument('question',nargs='*')
     args = parser.parse_args()
     try:
+        approved_extra=args.operator_extra_attempt or args.operator_reason or args.manual_extra_attempt or args.manual_reason
+        if args.operator_extra_attempt and args.manual_extra_attempt:parser.error('Choose only one extra request approval method.')
+        if approved_extra and (args.replay_request_id is not None or args.update_profile):parser.error('Extra request approval cannot be combined with replay or profile editing.')
         if args.replay_request_id is not None:
             if args.today or args.question or args.update_profile or args.build_plan or args.new_plan:parser.error('Replay cannot override the saved date/request/profile.')
             print(json.dumps(replay_saved_request(args.replay_request_id,args.dry_run)))
         elif args.new_plan and (args.update_profile or args.build_plan):parser.error('--new-plan cannot be combined with profile editing or --build-plan.')
         elif args.update_profile:interactive('profile')
-        elif args.build_plan and not args.question and not args.dry_run:interactive('plan')
-        else: run_daily_coach_check(' '.join(args.question) or None,args.dry_run,args.today,build_plan=args.build_plan,max_attempts_this_run=args.attempts_this_run,operator_extra_attempt=args.operator_extra_attempt,operator_reason=args.operator_reason,new_plan=args.new_plan)
+        elif args.build_plan and not args.question and not args.dry_run and not approved_extra:interactive('plan')
+        else: run_daily_coach_check(' '.join(args.question) or None,args.dry_run,args.today,build_plan=args.build_plan,max_attempts_this_run=args.attempts_this_run,operator_extra_attempt=args.operator_extra_attempt,operator_reason=args.operator_reason,new_plan=args.new_plan,manual_extra_attempt=args.manual_extra_attempt,manual_reason=args.manual_reason)
     except Exception as exc:
         print(str(exc),file=sys.stderr); sys.exit(1)

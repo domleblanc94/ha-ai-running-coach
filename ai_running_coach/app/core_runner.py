@@ -9,6 +9,9 @@ import sys
 def main():
     workspace = Path(sys.argv[1]).resolve()
     operation = sys.argv[2]
+    approval = tuple(sys.argv[3:])
+    if approval and (len(approval) != 4 or approval[0] != '--manual-extra-attempt' or approval[2] != '--manual-reason'):
+        raise ValueError('Invalid internal coach approval.')
     sys.path.insert(0, str(workspace))
     os.chdir(workspace)
     if operation == 'validate_profile':
@@ -22,14 +25,15 @@ def main():
         report = json.load(sys.stdin)
         record_checkin(workspace / 'ai_coach_master.sqlite', **report)
         return 0
-    if operation == 'run_now':
+    if operation == 'run_now' and not approval:
         from cron_daily_update import main as daily
 
         return daily(())
-    if operation in ('new_plan', 'learn_new_plan', 'learn_run_now'):
+    if operation in ('new_plan', 'learn_new_plan', 'learn_run_now', 'run_now'):
         from cron_daily_update import pipeline_lock, run_pipeline
 
         arguments = ('--new-plan',) if operation in ('new_plan', 'learn_new_plan') else ()
+        arguments += approval
         if operation.startswith('learn_'):
             arguments += (sys.stdin.read(),)
         with pipeline_lock(workspace / '.pipeline.lock'):

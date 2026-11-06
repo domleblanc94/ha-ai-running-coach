@@ -12,11 +12,19 @@ If you installed from the documented repository URL, you can jump to the app pag
 
 1. Create your athlete profile and set your availability. Use A for your main goal and B or C for supporting goals. Each goal can have an optional date and target. A race can also have ideal, main and fallback outcomes for the same event. With no target or outcome, the race goal defaults to **Just finish**. Existing target values carry over when you upgrade. Choose your heart-rate zone mode in the same form.
 2. Choose your activity source. Offline mode skips Garmin sync and starts with the profile as its evidence. For Garmin mode, obtain your own official Personal API key and review the permitted use of your data. Configure the key and account region in the app. [Garmin developer program](https://developer.garmin.com/gc-developer-program/overview/)
-3. Select a model provider and enter its key. Generating or reviewing a plan uses that provider, including with the offline activity source. The default budget counts up to two automatic requests per UTC day. Check your provider's account limits and pricing separately.
+3. Select a model provider and enter its key. Generating or reviewing a plan uses that provider, including with the offline activity source. The default allowance is two coaching requests per UTC day, shared by manual and scheduled runs. Check your provider's account limits and pricing separately.
 4. Save your IANA timezone (for example, Europe/London) with scheduling unchecked. This controls plan dates and the daily review time. Request counts follow UTC days.
 5. Generate and review the first plan. Enable a local review time when you are ready for scheduled reviews. The app keeps the last saved dashboard if a review fails. The scheduler runs one review per local day. If it fails, use **Run now** after checking the cause. Manual runs still use the core request budget. A run interrupted by a restart pauses the schedule until you re-enable it.
 
 Local summary import is currently available through the standalone project. Use the Home Assistant app logs to diagnose startup failures. Keep credentials, athlete data and model response snapshots out of support reports.
+
+## Coaching request allowance
+
+In **Setup & settings**, set **Daily AI request limit** from **1 to 20** requests. The default is **2**. Saving a different allowance does not start a coaching run or clear the requests already recorded today. Each app run still makes at most one coaching request; raising the daily limit does not add automatic retries. Coach Status shows **AI requests today** and the next reset at **00:00 UTC**, which may differ from midnight in your selected timezone. Failed provider attempts count towards the allowance; offline previews and reading the dashboard do not.
+
+When the normal allowance is spent, **Run once anyway** lets you explicitly confirm one extra coaching request for that UTC day. Choose **Review current plan** or **Generate new plan**; with no saved plan, the action generates the first plan. The extra request leaves the normal allowance unchanged. It is spent when the AI request is reserved in the saved ledger, including an attempt that is interrupted or fails. A sync or preflight failure before that reservation, or reuse of a cached review without a new request, leaves the extra available for another explicit confirmation. There is no automatic retry. Restarting the app does not restore a spent extra, and a confirmation for a previous UTC day cannot spend a request on the new day. Scheduled runs cannot use this exception.
+
+The allowance is an app limit, not a monetary spending cap. Increasing it or confirming an extra request does not override Gemini/Google or any other provider's quota, rate limits, account permissions or pricing. If the provider itself reports a quota error, wait for its reset or review the provider account before requesting more work.
 
 ## Profile, training days and downloads
 
@@ -38,7 +46,8 @@ Start with **Coach Status** in the app. A failed run shows its time, stage, reas
 
 - **Garmin or activity sync:** check the selected activity source and Garmin access. If Garmin is limiting requests, wait before trying again.
 - **Provider authentication or request:** check the selected provider and model in Settings, and confirm the key and model access with that provider.
-- **Provider quota or daily budget:** check the provider account or wait for the next UTC day if the app's daily allowance is spent.
+- **Daily budget:** wait until 00:00 UTC, change the normal allowance in **Setup & settings**, or confirm **Run once anyway** if today's extra request is still available.
+- **Provider quota:** check the provider account or wait for its reset. The app's extra request cannot bypass a provider quota.
 - **Truncated or invalid response:** the app keeps the last valid plan. Check the reason and request allowance before retrying.
 - **Training-day conflict:** the proposed plan used a day outside your saved availability and was not applied. Review your saved days, then request a new plan when your allowance permits. Any previous plan stays visible until it is replaced successfully.
 - **Rendering, publication or storage:** check the app logs and storage. Back up the app before reinstalling or restoring it.

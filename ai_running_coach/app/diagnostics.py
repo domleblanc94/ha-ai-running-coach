@@ -16,7 +16,9 @@ MESSAGES = {
     'provider_truncated': 'The AI response reached its output limit and could not be applied.',
     'response_invalid': 'The AI response did not pass validation. The app kept the saved plan state.',
     'availability_conflict': 'The AI plan scheduled training outside your selected days, so it was not applied. Review your saved training days and generate a new plan when your request allowance permits.',
-    'daily_budget': 'The app has used its coaching request allowance for this UTC day. Wait for the next UTC day.',
+    'daily_budget': 'The app has used its coaching request allowance for this UTC day. Wait for the reset, adjust the daily limit in Settings, or confirm an extra request if available.',
+    'manual_extra_expired': 'The extra request approval expired at midnight UTC. Refresh and confirm again if an extra request is still available.',
+    'manual_extra_unavailable': 'The extra request could not be used. Refresh to check today’s allowance and extra request availability.',
     'review_budget': 'The review has used its attempts for this UTC day. Wait for the next UTC day.',
     'input_too_large': 'The coaching input is too large. Shorten oversized profile notes before trying again.',
     'profile_invalid': 'The saved profile could not be used. Review the profile and its heart-rate zone entries.',
@@ -41,7 +43,7 @@ def failure_stage(code):
     if code == 'activity_processing_failed':
         return 'activities'
     if code.startswith('provider_') or code in {
-        'daily_budget', 'review_budget', 'input_too_large', 'response_invalid',
+        'daily_budget', 'review_budget', 'input_too_large', 'response_invalid', 'manual_extra_expired', 'manual_extra_unavailable',
         'profile_invalid', 'source_provenance', 'availability_conflict',
     }:
         return 'coaching'
@@ -67,6 +69,9 @@ def command_failure(stderr):
     if not isinstance(stderr, str):
         return None
     known = {
+        'Manual extra request approval must name the current UTC date.': 'manual_extra_expired',
+        'The manual extra request allowance has already been used for this UTC day.': 'manual_extra_unavailable',
+        'Manual extra request requires the normal daily coaching allowance to be exhausted.': 'manual_extra_unavailable',
         'Daily coaching API request budget exhausted; pending review retained for a later UTC day.': 'daily_budget',
         'Pending review attempt budget exhausted for this evidence; inspect before explicit retry/reset.': 'review_budget',
         'Coaching input exceeds COACH_MAX_INPUT_CHARS; retained last-good plan. Inspect oversized notes/schedule before retrying.': 'input_too_large',

@@ -1,7 +1,7 @@
 """Persistent action queue and local dashboard publication for the HA app."""
 
 from contextlib import closing
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 import importlib.util
 import os
@@ -28,6 +28,7 @@ SETTINGS = {
     'model': 'COACH_MODELS',
     'source': 'COACH_ACTIVITY_SOURCE',
     'garmin_region': 'GARMIN_PERSONAL_REGION',
+    'daily_request_limit': 'COACH_MAX_DAILY_REQUESTS',
 }
 SECRETS = {
     'gemini_api_key': 'GEMINI_API_KEY',
@@ -56,6 +57,7 @@ GARMIN_ISSUES = {
     'rate_limited': 'Garmin is limiting requests. Wait before running again.',
     'temporary_error': 'Garmin is temporarily unavailable. Try a later run.',
 }
+MANUAL_EXTRA_REASON = 'Confirmed Run once anyway in Home Assistant.'
 
 
 def utc_now():
@@ -127,11 +129,16 @@ class Runtime:
         model = env.get('COACH_MODELS', 'gemini-3.5-flash-lite' if provider == 'gemini' else '')
         source = env.get('COACH_ACTIVITY_SOURCE', 'offline')
         region = env.get('GARMIN_PERSONAL_REGION', 'global')
+        try:
+            request_limit = max(1, min(20, int(env.get('COACH_MAX_DAILY_REQUESTS', '2'))))
+        except ValueError:
+            request_limit = None
         config = {
             'provider': provider if provider in CHOICES['provider'] else '',
             'model': model if valid_model(model) else '',
             'source': source if source in CHOICES['source'] else '',
             'garmin_region': region if region in CHOICES['garmin_region'] else '',
+            'daily_request_limit': request_limit,
         }
         config.update({f'has_{field}': bool(env.get(key, '').strip()) for field, key in SECRETS.items()})
         return config
@@ -141,6 +148,8 @@ class Runtime:
         profile_ready = checked(self.workspace / 'athlete.md').is_file()
         plan_ready = checked(self.workspace / 'training_plan.json').is_file()
         issues = []
+        if config['daily_request_limit'] is None:
+            issues.append('Set a daily AI request limit from 1 to 20 in Settings.')
         if not profile_ready:
             issues.append('Save an athlete profile.')
         if not config['provider'] or not config['model']:
@@ -162,7 +171,31 @@ class Runtime:
             'worker_ok': self.worker_error is None, 'worker_error': self.worker_error,
             'hr_learning': hr_learning.status(learning, self.workspace / 'ai_coach_master.sqlite', local_day),
             'training_day_conflicts': self._training_day_conflicts(local_day),
+            'request_budget': self._request_budget(config['daily_request_limit'], state),
         }
+
+    def _request_budget(self, limit, state, now=None):
+        """Read the request ledger without creating a database or reserving calls."""
+        now = (now or utc_now()).astimezone(timezone.utc)
+        day = now.date().isoformat()
+        reset = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        used, extra_used = 0, False
+        try:
+            db = checked(self.workspace / 'ai_coach_master.sqlite').resolve()
+            if db.is_file():
+                with closing(sqlite3.connect(db.as_uri() + '?mode=ro', uri=True)) as conn:
+                    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='coach_api_requests'").fetchone():
+                        rows = conn.execute('''SELECT request_kind, COUNT(*) FROM coach_api_requests
+                            WHERE date(started_at)=? AND request_kind IN ('daily','operator_recovery','manual_override')
+                            GROUP BY request_kind''', (day,)).fetchall()
+                        used = sum(count for _, count in rows)
+                        extra_used = any(kind in ('manual_override', 'operator_recovery') and count for kind, count in rows)
+        except (OSError, RuntimeError, sqlite3.Error):
+            used, extra_used = None, None
+        reason = ('invalid_limit' if limit is None else 'ledger_unavailable' if used is None else 'used' if extra_used else
+                  'allowance_remaining' if used < limit else 'busy' if state['queued'] or state['running'] else 'available')
+        return {'utc_date': day, 'used': used, 'limit': limit, 'resets_at': reset.isoformat(),
+                'extra_used': extra_used, 'extra_available': reason == 'available', 'extra_status': reason}
 
     def status(self):
         with file_lock(self.state_lock):
@@ -228,6 +261,8 @@ class Runtime:
                 raise ValueError(f'Choose a supported {field.replace("_", " ")}.')
             if field == 'model' and not valid_model(value):
                 raise ValueError('Enter a supported model identifier.')
+            if field == 'daily_request_limit' and (not re.fullmatch(r'[0-9]{1,2}', value) or not 1 <= int(value) <= 20):
+                raise ValueError('Choose a daily AI request limit from 1 to 20.')
             if field in SECRETS and value and not re.fullmatch(r'[A-Za-z0-9._~+/=\-]{1,4096}', value):
                 raise ValueError('A key contains unsupported characters.')
         with file_lock(self.state_lock):
@@ -281,7 +316,7 @@ class Runtime:
                     raise RuntimeError('The baseline observation could not be saved.')
             return self._status(state)
 
-    def enqueue(self, action):
+    def enqueue(self, action, manual_extra=None):
         if action not in ('new_plan', 'run_now'):
             raise ValueError('Choose a supported coach action.')
         with file_lock(self.state_lock):
@@ -295,6 +330,16 @@ class Runtime:
             if action == 'run_now' and not status['plan_ready']:
                 raise ValueError('Generate the first plan before running a review.')
             state['queued'] = {'action': action, 'trigger': 'manual', 'queued_at': utc_now().isoformat()}
+            if manual_extra is not None:
+                if (not isinstance(manual_extra, dict) or set(manual_extra) != {'date', 'confirmed'}
+                        or manual_extra['confirmed'] is not True):
+                    raise ValueError('Confirm one extra AI request before continuing.')
+                budget = status['request_budget']
+                if manual_extra['date'] != budget['utc_date']:
+                    raise ValueError('The UTC day changed. Refresh and confirm the extra request again.')
+                if not budget['extra_available']:
+                    raise ValueError('An extra request is available only after the normal allowance is used, once per UTC day.')
+                state['queued']['manual_extra'] = {'approved_day': budget['utc_date'], 'reason': MANUAL_EXTRA_REASON}
             self._write_state(state)
             return self._status(state)
 
@@ -349,7 +394,7 @@ class Runtime:
             'last_pipeline_success_at': success, 'last_publish_success_at': success,
         }
 
-    def _command(self, action, *, input_text=None, timeout=2500, timezone_name='UTC'):
+    def _command(self, action, *, input_text=None, timeout=2500, timezone_name='UTC', manual_extra=None):
         check_tree(self.workspace)
         allowed = {'PATH', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP', 'TMPDIR', 'LANG', 'SSL_CERT_FILE', 'SSL_CERT_DIR'}
         env = {key: value for key, value in os.environ.items() if key.upper() in allowed}
@@ -359,6 +404,8 @@ class Runtime:
         env.update(COACH_PUBLISH_ENABLED='false', PYTHONIOENCODING='utf-8', TZ=timezone_name)
         # The isolated interpreter ignores PYTHONIOENCODING; UTF-8 mode also covers stdin.
         command = [sys.executable, '-I', '-X', 'utf8', str(Path(__file__).with_name('core_runner.py').resolve()), str(self.workspace.resolve()), action]
+        if manual_extra is not None:
+            command += ['--manual-extra-attempt', manual_extra['approved_day'], '--manual-reason', manual_extra['reason']]
         options = {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == 'nt' else {'start_new_session': True}
         try:
             with subprocess.Popen(command, cwd=self.workspace, env=env,
@@ -425,7 +472,7 @@ class Runtime:
                     return None, 0
                 rows = conn.execute('''
                     SELECT started_at, status, error FROM coach_api_requests
-                    WHERE request_kind IN ('daily', 'operator_recovery') ORDER BY id DESC LIMIT 20
+                    WHERE request_kind IN ('daily', 'operator_recovery', 'manual_override') ORDER BY id DESC LIMIT 20
                 ''').fetchall()
             current = [row for row in rows if diagnostics.current_timestamp(row[0], started, finished)]
             return (current[0] if current else None), len(current)
@@ -536,6 +583,10 @@ class Runtime:
                 state['schedule']['last_date'] = day
             state['queued'] = None
             state['running'] = dict(action, started_at=now.isoformat(), timezone=state['schedule']['timezone'])
+            if action.get('manual_extra', {}).get('approved_day') == now.astimezone(timezone.utc).date().isoformat():
+                # Audit the explicit action. Only the core's durable request
+                # reservation consumes its allowance; preflight can fail first.
+                state['last_manual_extra'] = dict(action['manual_extra'], action=action['action'], claimed_at=now.isoformat())
             self._write_state(state)
             return state['running']
 
@@ -551,10 +602,17 @@ class Runtime:
                     self.command_failure = None
                     operation = action['action']
                     options = {'timezone_name': action['timezone']}
+                    extra = action.get('manual_extra')
+                    if extra is not None:
+                        options['manual_extra'] = extra
                     if hr_learning.learning_enabled(self.profile()):
                         operation = 'learn_' + operation
                         options['input_text'] = hr_learning.LEARNING_QUESTION
-                    result = self._command(operation, **options)
+                    if extra is not None and extra['approved_day'] != utc_now().date().isoformat():
+                        self.command_failure = 'manual_extra_expired'
+                        result = 1
+                    else:
+                        result = self._command(operation, **options)
                     request, attempts = self._request_details(started)
                     if result == 0:
                         try:
