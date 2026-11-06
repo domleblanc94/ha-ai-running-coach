@@ -151,7 +151,7 @@ class NewPlanTests(unittest.TestCase):
     def test_actual_new_plan_cli_is_noninteractive_and_offline(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);source=Path(ai_coach.__file__).parent
-            for name in ('ai_coach.py','planning_engine.py','model_provider.py','migrate_plan.py','coach_checkin.py','source_policy.py','workout_schema.py'):
+            for name in ('ai_coach.py','planning_engine.py','training_calendar.py','model_provider.py','migrate_plan.py','coach_checkin.py','source_policy.py','workout_schema.py'):
                 shutil.copy2(source/name,root/name)
             (root/'athlete.md').write_text('**Heart Rate Zones:** Unknown\n',encoding='utf-8')
             env=dict(os.environ,COACH_PROVIDER='gemini',COACH_MODELS='gemini-2.5-flash')

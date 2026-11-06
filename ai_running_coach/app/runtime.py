@@ -3,6 +3,7 @@
 from contextlib import closing
 from datetime import datetime, timezone
 import json
+import importlib.util
 import os
 from pathlib import Path
 import re
@@ -85,10 +86,15 @@ class Runtime:
         self.worker_error = None
         self.command_failure = None
         core = Path(core_dir) if core_dir else Path(__file__).resolve().parent.parent / 'core'
+        self.calendar_rules = None
+        self.calendar_cache = None
         with file_lock(self.state_lock):
             # Install only when no wrapper subprocess is using the workspace.
             with file_lock(self.run_lock, blocking=False):
                 install_core(core, self.workspace)
+            specification = importlib.util.spec_from_file_location('coach_calendar_rules', core / 'training_calendar.py')
+            self.calendar_rules = importlib.util.module_from_spec(specification)
+            specification.loader.exec_module(self.calendar_rules)
             if not checked(self.state_file).exists():
                 self._write_state({
                     'schema_version': 1, 'queued': None, 'running': None,
@@ -155,6 +161,7 @@ class Runtime:
             'queued': state['queued'], 'running': state['running'],
             'worker_ok': self.worker_error is None, 'worker_error': self.worker_error,
             'hr_learning': hr_learning.status(learning, self.workspace / 'ai_coach_master.sqlite', local_day),
+            'training_day_conflicts': self._training_day_conflicts(local_day),
         }
 
     def status(self):
@@ -166,6 +173,45 @@ class Runtime:
             return checked(self.workspace / 'athlete.md').read_text(encoding='utf-8')
         except FileNotFoundError:
             return ''
+
+    def _training_day_conflicts(self, today, plan=None, profile=None):
+        try:
+            if plan is None:
+                path = checked(self.workspace / 'training_plan.json')
+                athlete = checked(self.workspace / 'athlete.md')
+                key = (path.stat().st_mtime_ns, path.stat().st_size, athlete.stat().st_mtime_ns, today)
+                if self.calendar_cache and self.calendar_cache[0] == key:
+                    return self.calendar_cache[1]
+                plan, profile = read_json(path), self.profile()
+            else:
+                key = None
+            parsed = self.calendar_rules.calendar_profile(profile)
+            conflicts = self.calendar_rules.training_day_conflicts(plan, parsed, today)
+            if key is not None:
+                self.calendar_cache = (key, conflicts)
+            return conflicts
+        except (OSError, ValueError, TypeError, KeyError):
+            return []
+
+    def export(self, kind):
+        """Read one saved revision while the worker cannot commit another."""
+        if kind not in {'athlete.md', 'training_plan.md', 'training_calendar.pdf'}:
+            raise ValueError('Unknown export.')
+        with file_lock(self.run_lock, blocking=False), file_lock(self.state_lock):
+            if kind == 'athlete.md':
+                return checked(self.workspace / kind).read_bytes()
+            if checked(self.workspace / '.plan-commit.json').exists():
+                raise RuntimeError('The saved plan is being committed. Try again when the run finishes.')
+            plan = read_json(self.workspace / 'training_plan.json')
+            if kind == 'training_plan.md':
+                return checked(self.workspace / kind).read_bytes()
+            from .exports import calendar_pdf
+
+            profile = self.profile()
+            match = re.search(r'^\*\*Athlete Name:\*\*[ \t]*(.*)$', profile, re.M)
+            today = utc_now().astimezone(ZoneInfo(self._state()['schedule']['timezone'])).date()
+            conflicts = self._training_day_conflicts(today, plan, profile)
+            return calendar_pdf(plan, match[1] if match else '', conflicts=conflicts)
 
     @staticmethod
     def _idle(state):
@@ -208,6 +254,7 @@ class Runtime:
             if self._command('validate_profile', input_text=markdown, timeout=15):
                 raise ValueError('Profile validation failed. Check the heart-rate zones or leave them explicitly unknown.')
             atomic_write(self.workspace / 'athlete.md', markdown.encode())
+            self.calendar_cache = None
             return self._status(state)
 
     def save_baseline_feedback(self, payload):

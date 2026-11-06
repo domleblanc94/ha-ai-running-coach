@@ -11,7 +11,8 @@ import sqlite3
 import sys
 import time
 from planning_engine import (parse_profile, parse_plan, validate_plan, build_evidence,
-                             fingerprint, validate_review, plan_conflicts, apply_plan_changes, apply_coach_changes, render_plan, race_calendar_conflicts)
+                             fingerprint, validate_review, plan_conflicts, apply_plan_changes, apply_coach_changes, render_plan, race_calendar_conflicts,
+                             training_days, training_day_conflicts)
 from migrate_plan import atomic_write
 from model_provider import ProviderClient, configured_models, provider_identity, provider_name
 from source_policy import activity_source_mode, assert_coaching_sources
@@ -21,8 +22,8 @@ DB_PATH = SCRIPT_DIR / 'ai_coach_master.sqlite'
 ATHLETE_FILE = SCRIPT_DIR / 'athlete.md'
 PLAN_FILE = SCRIPT_DIR / 'training_plan.md'
 CANONICAL_FILE = SCRIPT_DIR / 'training_plan.json'
-PROMPT_VERSION = 'autonomous-coach-v3'
-STARTER_PROMPT_VERSION = 'autonomous-coach-v4-starter-week'
+PROMPT_VERSION = 'autonomous-coach-v5-availability'
+STARTER_PROMPT_VERSION = 'autonomous-coach-v5-availability-starter-week'
 
 
 def load_environment():
@@ -75,9 +76,21 @@ def make_prompt(profile, plan, evidence, question):
     future = [s for s in plan['sessions'] if evidence['today'] <= s['date']]
     recent_schedule=[s for s in plan['sessions'] if (date.fromisoformat(evidence['today'])-timedelta(days=6)).isoformat() <= s['date'] < evidence['today']]
     data = {'profile': profile, 'upcoming_sessions': future, 'recent_scheduled_sessions':recent_schedule, 'legacy_requires_reconciliation':plan.get('requires_coach_reconciliation',False), 'new_plan_requested':plan.get('new_plan_requested',False), 'race_calendar_conflicts':race_calendar_conflicts(plan,profile,evidence['today']), 'evidence': evidence}
+    data['allowed_training_days'] = training_days(profile)
+    data['training_day_conflicts'] = training_day_conflicts(plan, profile, evidence['today'])
     new_plan_instruction=''
     if plan.get('new_plan_requested'):
         new_plan_instruction='The athlete explicitly requests a NEW plan, replacing the upcoming block. Return ONLY add operations for a complete new future block with fresh unique IDs (not old or retired IDs). Existing future sessions are reference only and will be archived after your replacement validates. Past sessions are preserved. '
+    new_plan_instruction += (
+        'When allowed_training_days is a list, schedule all training only on those weekdays. '
+        'Correct every supplied training_day_conflicts entry by moving or removing that future session; '
+        'do not retain an unavailable-day session even when making no other changes. '
+        'Rest or Off entries without a structured workout may fall on other days. '
+        'An actual race on its configured goal date is the only active-session exception; '
+        'training milestones and race-pace workouts are training. '
+        'When allowed_training_days is null, no weekdays have been explicitly selected; '
+        'choose suitable days from the other preferences and evidence, without treating this as zero availability. '
+    )
     starter = starter_block(plan, evidence['today'])
     if starter:
         end = (date.fromisoformat(evidence['today']) + timedelta(days=6)).isoformat()
@@ -279,7 +292,8 @@ def _run_daily_coach_check(user_question=None, dry_run=False, today=None, build_
     else:
         plan={'schema_version':1,'revision':0,'profile_hash':profile['source_hash'],'goals':profile['goals'],'sessions':[],'requires_coach_reconciliation':True}
     validate_plan(plan, profile)
-    if race_calendar_conflicts(plan,profile,today):plan['requires_coach_reconciliation']=True
+    if race_calendar_conflicts(plan,profile,today) or training_day_conflicts(plan,profile,today):
+        plan['requires_coach_reconciliation']=True
     if DB_PATH.exists():
         conn=sqlite3.connect(DB_PATH.resolve().as_uri()+'?mode=ro',uri=True)
     else:

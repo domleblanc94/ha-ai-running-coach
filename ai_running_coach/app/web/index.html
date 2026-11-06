@@ -22,9 +22,22 @@
       <div class="actions"><button id="new-plan" type="button" disabled>Generate new plan</button><button id="run-now" type="button" class="secondary" disabled>Run now</button></div>
     </section>
     <nav aria-label="Coach views" class="tabs">
-      <button id="settings-tab" type="button" aria-pressed="true">Setup &amp; settings</button>
       <button id="dashboard-tab" type="button" aria-pressed="false" disabled>Training dashboard</button>
+      <button id="athlete-tab" type="button" aria-pressed="false" disabled>Athlete profile</button>
+      <button id="settings-tab" type="button" aria-pressed="true">Setup &amp; settings</button>
     </nav>
+    <p id="download-result" class="hint" role="status" hidden></p>
+    <section id="athlete-panel" hidden>
+      <div class="card">
+        <p class="eyebrow">YOUR SAVED PROFILE</p><h2 id="athlete-name">Athlete profile</h2>
+        <p>These are the saved details your coach uses. Changes made in the editor appear here after you save them.</p>
+        <div class="actions"><button id="edit-athlete" type="button">Edit athlete profile</button><a class="download-link" href="./exports/athlete.md" download="athlete.md">Download athlete.md</a></div>
+      </div>
+      <div id="athlete-summary"></div>
+      <section class="card"><h2>Saved setup</h2><dl id="setup-summary" class="profile-facts"></dl></section>
+      <details class="card"><summary>Full saved athlete profile</summary><pre id="athlete-source" class="profile-source"></pre></details>
+      <p id="athlete-result" class="hint" role="status"></p>
+    </section>
     <div id="settings">
       <form id="connection-form" class="card">
         <p class="eyebrow">01 / CONNECTION</p><h2>Connect your coach</h2>
@@ -49,7 +62,7 @@
           <label>Training goal<input name="goal" maxlength="500" placeholder="Build consistency or prepare for a race"></label>
           <label>Running experience<textarea name="experience" maxlength="500" rows="3" placeholder="Current weekly distance, recent long run, or time away from running"></textarea></label>
           <label>Current injury or training constraints<textarea name="injuries" maxlength="500" rows="3" placeholder="Optional"></textarea></label>
-          <fieldset class="full"><legend>Available training days</legend><div id="days" class="days"></div></fieldset>
+          <fieldset class="full"><legend>Available training days</legend><div id="days" class="days"></div><p class="hint">Choose the days you can train. Leaving every day blank means availability is not set and the coach may choose days.</p></fieldset>
           <fieldset class="full"><legend>Goal priorities</legend><p class="hint">Add a race or training goal at each priority. Dates and targets are optional.</p><div id="goal-fields" class="goal-grid"></div></fieldset>
           <label>Heart rate zones<select name="zone_mode"><option value="unknown">Unknown / use effort</option><option value="known">Enter configured ranges</option><option value="learn">Learn HR zones from baseline runs</option></select></label>
           <p id="zone-learn-hint" class="hint full" hidden>Start with easy runs guided by effort and the talk test. The coach can review your observations while your saved ranges stay in place.</p>
@@ -87,6 +100,13 @@
       </section>
     </div>
     <section id="dashboard-panel" hidden>
+      <section id="availability-warning" class="card attention" hidden><h2>Training days have changed</h2><p id="availability-detail"></p><p>The saved plan stays in place until the coach produces a valid replacement. Generate a new plan to apply your saved availability.</p></section>
+      <section id="dashboard-empty" class="card" hidden><h2>Your training dashboard starts here</h2><p>Your setup is saved. Generate your first plan to see your calendar and download workouts.</p><button id="first-dashboard-plan" type="button">Generate new plan</button></section>
+      <section id="plan-downloads" class="card" hidden>
+        <h2>Download your saved plan</h2>
+        <div class="actions"><a class="download-link" href="./exports/training_calendar.pdf" download="training_calendar.pdf">Download PDF calendar</a><a class="download-link" href="./exports/training_plan.md" download="training_plan.md">Download training_plan.md</a></div>
+        <p class="hint">Exports use the current saved plan. If dashboard publication failed, the dashboard below may show an older version. The PDF includes a weekly calendar and full session details.</p>
+      </section>
       <p class="hint">The coach status above reflects current runs. The dashboard shows the last saved plan.</p>
       <iframe id="dashboard" title="Saved running plan and workout downloads" sandbox="allow-scripts allow-downloads"></iframe>
     </section>

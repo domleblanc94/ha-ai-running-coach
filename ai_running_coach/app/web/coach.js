@@ -22,6 +22,9 @@ let initialized = false;
 let dashboardRevision = "";
 let displayedRevision = null;
 let candidateSignature = "";
+let setupWasReady = false;
+let profileRequest = 0;
+let downloading = false;
 
 for (const day of weekdays) {
   const label = document.createElement("label");
@@ -140,6 +143,73 @@ function connectionHints() {
   byId("garmin-fields").hidden = field(connection, "source").value !== "garmin";
 }
 
+function factsList(entries, target) {
+  target.replaceChildren();
+  for (const [label, value] of entries) {
+    const term = document.createElement("dt");
+    const detail = document.createElement("dd");
+    term.textContent = label;
+    detail.textContent = value || "Not supplied";
+    target.append(term, detail);
+  }
+}
+
+function savedSetup() {
+  const config = state.config || {};
+  factsList([
+    ["AI provider", {gemini: "Google Gemini", openai: "OpenAI", anthropic: "Anthropic"}[config.provider] || config.provider],
+    ["Model", config.model], ["Activity source", config.source === "garmin" ? "Garmin Personal API" : "Offline"],
+    ["Daily review", state.schedule?.enabled ? state.schedule.time + " (" + state.schedule.timezone + ")" : "Paused"],
+    ["Time zone", state.schedule?.timezone],
+  ], byId("setup-summary"));
+}
+
+async function showAthlete() {
+  const request = ++profileRequest;
+  byId("athlete-result").textContent = "Loading saved profile…";
+  try {
+    const saved = await api("profile-summary");
+    if (request !== profileRequest) return;
+    const data = saved.profile;
+    byId("athlete-name").textContent = data.name || "Athlete profile";
+    const container = byId("athlete-summary");
+    container.replaceChildren();
+    const card = (title, rows) => {
+      const section = document.createElement("section");
+      section.className = "card";
+      const heading = document.createElement("h2");
+      heading.textContent = title;
+      const list = document.createElement("dl");
+      list.className = "profile-facts";
+      factsList(rows, list);
+      section.append(heading, list);
+      container.append(section);
+    };
+    const availability = saved.markdown.match(/^\*\*Weekly Availability:\*\*\s*(.*)$/m)?.[1];
+    card("Your running", [["Training goal", data.goal], ["Experience", data.experience],
+      ["Training days", data.days.length ? data.days.join(", ") : availability || "Not specified - coach may choose days"],
+      ["Injuries and constraints", data.injuries]]);
+    for (const [priority, label] of goals) {
+      const goal = data.goals?.[priority];
+      if (!goal?.event) continue;
+      const rows = [["Goal", goal.event], ["Type", goal.kind === "race" ? "Race" : "Training milestone"]];
+      if (goal.race_date) rows.push(["Date", goal.race_date]);
+      if (goal.target_time) rows.push(["Target", goal.target_time]);
+      for (const [key, title] of outcomeFields) if (goal.outcomes?.[key]) rows.push([title, goal.outcomes[key]]);
+      if (goal.kind === "race" && !goal.target_time && !Object.keys(goal.outcomes || {}).length) rows.push(["Target", "Just finish"]);
+      card(priority + " goal · " + label, rows);
+    }
+    const zoneRows = [["Mode", {learn: "Learning from baseline runs", known: "Configured ranges", unknown: "Unknown / use effort"}[data.zone_mode]]];
+    for (const match of saved.markdown.matchAll(/^\*\*(Zone [1-5] \([^\n]+\)):\*\*[ \t]*(.*)$/gm)) zoneRows.push([match[1], match[2]]);
+    card("Heart rate", zoneRows);
+    byId("athlete-source").textContent = saved.markdown;
+    savedSetup();
+    byId("athlete-result").textContent = "";
+  } catch {
+    byId("athlete-result").textContent = "The saved profile could not be loaded. Select Athlete profile to try again.";
+  }
+}
+
 function draw(next) {
   state = next;
   csrf = next.csrf || csrf;
@@ -204,10 +274,26 @@ function draw(next) {
   byId("new-plan").disabled = busy || working || next.worker_ok === false || !next.setup_ready || !next.profile_ready;
   byId("new-plan").textContent = next.hr_learning?.enabled ? "Plan baseline runs" : "Generate new plan";
   byId("run-now").disabled = byId("new-plan").disabled || !next.plan_ready;
-  byId("dashboard-tab").disabled = !next.dashboard_ready;
+  const ready = Boolean(next.setup_ready && next.profile_ready);
+  byId("dashboard-tab").disabled = !ready && !next.dashboard_ready;
+  byId("athlete-tab").disabled = !next.profile_ready;
+  byId("dashboard-empty").hidden = Boolean(next.dashboard_ready);
+  byId("dashboard").hidden = !next.dashboard_ready;
+  byId("plan-downloads").hidden = !next.plan_ready;
+  byId("first-dashboard-plan").disabled = byId("new-plan").disabled;
+  byId("first-dashboard-plan").textContent = byId("new-plan").textContent;
+  const conflicts = next.training_day_conflicts || [];
+  byId("availability-warning").hidden = conflicts.length === 0;
+  byId("availability-detail").textContent = conflicts.length ? "The saved plan includes " + conflicts.length
+    + (conflicts.length === 1 ? " session" : " sessions") + " outside your selected training days: "
+    + conflicts.slice(0, 5).map(item => item.weekday + " " + item.date).join(", ")
+    + (conflicts.length > 5 ? ", and more." : ".") : "";
   field(schedule, "enabled").disabled = !next.plan_ready;
   connectionHints();
+  if (!byId("athlete-panel").hidden) savedSetup();
   drawBaseline(next.hr_learning, busy);
+  if (initialized && ready && !setupWasReady) selectView("dashboard");
+  setupWasReady = ready;
   updateDashboard();
 }
 
@@ -295,7 +381,7 @@ async function refresh() {
       updateZoneMode();
       initialized = true;
       connectionHints();
-      if (next.setup_ready && next.profile_ready && next.dashboard_ready) selectView(true);
+      if (next.setup_ready && next.profile_ready) selectView("dashboard");
     }
   } catch {
     byId("run-title").textContent = "Coach connection unavailable";
@@ -432,15 +518,49 @@ function updateDashboard() {
   displayedRevision = dashboardRevision;
 }
 
-function selectView(dashboard) {
-  byId("setup-hero").hidden = dashboard;
-  byId("settings").hidden = dashboard;
-  byId("dashboard-panel").hidden = !dashboard;
-  byId("dashboard-tab").setAttribute("aria-pressed", String(dashboard));
-  byId("settings-tab").setAttribute("aria-pressed", String(!dashboard));
+function selectView(view) {
+  byId("setup-hero").hidden = view !== "settings";
+  byId("settings").hidden = view !== "settings";
+  byId("dashboard-panel").hidden = view !== "dashboard";
+  byId("athlete-panel").hidden = view !== "athlete";
+  for (const name of ["dashboard", "settings", "athlete"]) byId(name + "-tab").setAttribute("aria-pressed", String(view === name));
+  if (view === "athlete") showAthlete();
   updateDashboard();
 }
-byId("dashboard-tab").addEventListener("click", () => selectView(true));
-byId("settings-tab").addEventListener("click", () => selectView(false));
+byId("dashboard-tab").addEventListener("click", () => selectView("dashboard"));
+byId("settings-tab").addEventListener("click", () => selectView("settings"));
+byId("athlete-tab").addEventListener("click", () => selectView("athlete"));
+byId("edit-athlete").addEventListener("click", () => { selectView("settings"); profile.scrollIntoView({behavior: "smooth"}); });
+byId("first-dashboard-plan").addEventListener("click", () => byId("new-plan").click());
+for (const link of document.querySelectorAll("a.download-link[download]")) {
+  link.addEventListener("click", async event => {
+    event.preventDefault();
+    if (downloading) return;
+    downloading = true;
+    const result = byId("download-result");
+    result.hidden = false;
+    result.textContent = "Preparing your download…";
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
+    try {
+      const response = await fetch(link.href, {credentials: "same-origin", cache: "no-store", signal: controller.signal});
+      if (!response.ok) throw new Error((await response.json()).error || "The download is unavailable.");
+      const url = URL.createObjectURL(await response.blob());
+      const download = document.createElement("a");
+      download.href = url;
+      download.download = link.download;
+      document.body.append(download);
+      download.click();
+      download.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      result.textContent = "Download prepared: " + link.download;
+    } catch (error) {
+      result.textContent = error.message || "The download could not be prepared. Try again when the coach is idle.";
+    } finally {
+      clearTimeout(timer);
+      downloading = false;
+    }
+  });
+}
 refresh();
 setInterval(refresh, 3500);

@@ -259,13 +259,15 @@ class CoachHandler(BaseHTTPRequestHandler):
             return peer == "127.0.0.1"
         return peer == INGRESS_PEER or (path == "/healthz" and peer == "127.0.0.1")
 
-    def respond(self, status, content, kind, *, cookie=None, dashboard=False):
+    def respond(self, status, content, kind, *, cookie=None, dashboard=False, download=None):
         self.send_response(status)
         self.send_header("Content-Type", kind)
         self.send_header("Content-Length", str(len(content)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
+        if download:
+            self.send_header("Content-Disposition", f'attachment; filename="{download}"')
         if dashboard:
             policy = (
                 "sandbox allow-scripts allow-downloads; default-src 'none'; "
@@ -335,6 +337,21 @@ class CoachHandler(BaseHTTPRequestHandler):
             self.send_json(200, {**runtime.status(), "csrf": self.csrf(session or new_cookie)}, cookie=new_cookie)
         elif path == "/api/profile":
             self.send_json(200, profile_fields(runtime.profile()))
+        elif path == "/api/profile-summary":
+            markdown = runtime.profile()
+            visible = '\n'.join(line for line in markdown.splitlines() if not line.startswith(GOAL_METADATA))
+            self.send_json(200, {"profile": profile_fields(markdown), "markdown": visible})
+        elif path in ("/exports/athlete.md", "/exports/training_plan.md", "/exports/training_calendar.pdf"):
+            filename = path.rsplit('/', 1)[1]
+            try:
+                content = runtime.export(filename)
+            except FileNotFoundError:
+                self.send_json(404, {"error": "Save an athlete profile and generate a plan before downloading this file."})
+            except (RuntimeError, ValueError):
+                self.send_json(409, {"error": "The saved export is unavailable. Wait for the current run to finish and check the saved plan."})
+            else:
+                kind = "application/pdf" if filename.endswith('.pdf') else "text/markdown; charset=utf-8"
+                self.respond(200, content, kind, download=filename)
         elif path == "/dashboard":
             content = runtime.dashboard()
             if content is None:
@@ -347,6 +364,9 @@ class CoachHandler(BaseHTTPRequestHandler):
                     b"if (true) {",
                     1,
                 )
+                # Old saved dashboards retain their DOM for legacy Today links,
+                # while the removed view stays inaccessible without a new AI run.
+                content += b'<style>#toggleViewBtn,#tableView{display:none!important}</style>'
                 self.respond(200, content, "text/html; charset=utf-8", dashboard=True)
         elif path == "/coach-status.json":
             self.send_json(200, runtime.health())

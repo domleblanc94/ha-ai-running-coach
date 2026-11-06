@@ -87,3 +87,40 @@ jobs:
           docker buildx imagetools create -t "$IMAGE:$version" \
             "$IMAGE:$version-amd64" "$IMAGE:$version-arm64"
           docker buildx imagetools inspect "$IMAGE:$version"
+      - name: Verify anonymous pulls for both architectures
+        run: |
+          export IMAGE_VERSION=${GITHUB_REF_NAME#image-v}
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+          import tempfile
+
+          image = os.environ['IMAGE']
+          version = os.environ['IMAGE_VERSION']
+          revision = os.environ['GITHUB_SHA']
+          with tempfile.TemporaryDirectory(prefix='anonymous-registry-') as config:
+              docker = ['docker', '--config', config]
+              index = json.loads(subprocess.check_output(docker + ['manifest', 'inspect', image + ':' + version]))
+              platforms = {}
+              for entry in index['manifests']:
+                  platform = entry['platform']
+                  if platform['os'] != 'linux':
+                      continue
+                  arch = platform['architecture']
+                  assert arch in ('amd64', 'arm64') and arch not in platforms
+                  reference = image + '@' + entry['digest']
+                  subprocess.run(docker + ['pull', '--platform', 'linux/' + arch, reference], check=True)
+                  metadata = json.loads(subprocess.check_output(docker + ['image', 'inspect', reference]))[0]
+                  assert metadata['Architecture'] == arch and metadata['Os'] == 'linux'
+                  labels = metadata['Config']['Labels']
+                  assert labels['org.opencontainers.image.source'] == os.environ['GITHUB_SERVER_URL'] + '/' + os.environ['GITHUB_REPOSITORY']
+                  assert labels['org.opencontainers.image.revision'] == revision
+                  assert labels['org.opencontainers.image.version'] == version
+                  assert labels['io.hass.version'] == version
+                  assert labels['io.hass.type'] == 'app'
+                  assert labels['io.hass.arch'] == {'amd64': 'amd64', 'arm64': 'aarch64'}[arch]
+                  platforms[arch] = entry['digest']
+              assert set(platforms) == {'amd64', 'arm64'}
+          print('Anonymous pulls and image labels verified for linux/amd64 and linux/arm64.')
+          PY

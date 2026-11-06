@@ -6,6 +6,7 @@ import math
 import re
 from datetime import date, datetime, timedelta
 from source_policy import normalize_sport
+from training_calendar import calendar_profile, training_days, training_day_conflicts, race_calendar_conflicts
 
 POLICY_VERSION = 3
 
@@ -29,30 +30,15 @@ def parse_profile(text):
         if zone['min'] is not None and zone['max'] is not None and zone['min'] > zone['max']:
             raise ValueError('Invalid profile zone boundaries.')
     injury = re.search(r'\*\*Active Injuries:\*\*\s*([^\n]+)', text, re.I)
-    goals = []
-    current = None
-    for line in text.splitlines():
-        race = re.search(r'\*\*([ABC]-Race):\*\*\s*(.+)', line, re.I)
-        if race:
-            current = {'priority': race[1], 'event': race[2].strip()}
-            goals.append(current)
-        elif current:
-            field = re.search(r'\*\*(Date|Target Time):\*\*\s*(.+)', line)
-            if field:
-                current[field[1].lower().replace(' ', '_')] = field[2].strip()
-    preferences = {}
-    for label in ('Weekly Availability', 'Preferred Rest Days', 'Preferred Long Run Day'):
-        match = re.search(r'\*\*' + label + r':\*\*\s*([^\n]+)', text)
-        if match:
-            preferences[label] = match[1].strip()
+    calendar = calendar_profile(text)
     facts = {}
     for label in ('Age','Weight','Resting Heart Rate','Max Heart Rate (MHR)','Lactate Threshold','Sporting Background','Last 12 Months','2 years ago','Coach Name','Athlete Name','Coaching Style'):
         match = re.search(r'\*\*' + re.escape(label) + r':\*\*\s*([^\n]+)',text)
         if match: facts[label] = match[1].strip()
     tone = text.split('**Tone Rules:**',1)[-1].strip() if '**Tone Rules:**' in text else ''
     return {'schema_version': 1, 'zones': zones, 'zone_method': 'not configured' if not zones else 'profile-configured; not independently validated',
-            'goals': goals, 'active_injuries': injury[1].strip() if injury else 'unknown',
-            'preferences': preferences, 'athlete_facts': facts, 'communication_preferences': tone[:2000], 'source_hash': hashlib.sha256(text.encode()).hexdigest(),
+            'goals': calendar['goals'], 'active_injuries': injury[1].strip() if injury else 'unknown',
+            'preferences': calendar['preferences'], 'athlete_facts': facts, 'communication_preferences': tone[:2000], 'source_hash': hashlib.sha256(text.encode()).hexdigest(),
             'uncertainties': ['Zone boundaries are configured estimates, not medical validation.',
                               'Sporting background does not establish muscle-fiber composition.']}
 
@@ -296,34 +282,6 @@ def fingerprint(profile, plan, evidence, question, generation_identity=None):
     return hashlib.sha256(json.dumps(parts, sort_keys=True, allow_nan=False).encode()).hexdigest()
 
 
-def race_calendar_conflicts(plan,profile,today):
-    """Check event dates against athlete configuration, without choosing training."""
-    goals=[]
-    for goal in profile.get('goals',[]):
-        for fmt in ('%Y-%m-%d','%B %d, %Y'):
-            try:day=datetime.strptime(goal.get('date',''),fmt).date().isoformat();break
-            except ValueError:day=None
-        if day:
-            words=set(re.findall(r'[a-z]{3,}',goal.get('event','').lower()))-{'the','ascent','miles','mile','race','trail','trails'}
-            goals.append((goal,day,words))
-    errors=[]
-    for session in plan.get('sessions',[]):
-        if session['date']<str(today):continue
-        kind=session['workout_type']
-        explicit=bool(session.get('goal_priority'))
-        event=bool(re.search(r'\brace\b',kind,re.I)) and not re.search(r'race[ -]*(?:pace|effort|simulation|specific|prep)',kind,re.I)
-        if not explicit and not event:continue
-        text=' '.join(str(session.get(k,'')) for k in ('workout_type','amount','target')).lower()
-        matches=[(goal,day) for goal,day,words in goals if (explicit and goal.get('priority')==session['goal_priority']) or (not explicit and words and all(word in text for word in words))]
-        if not matches and not explicit:
-            matches=[(goal,day) for goal,day,_ in goals if day==session['date']]
-        if len(matches)!=1:
-            errors.append(session['id']+': race event needs an unambiguous configured goal_priority.')
-        elif session['date']!=matches[0][1]:
-            errors.append(session['id']+': event date must match '+matches[0][0]['priority']+' '+matches[0][1]+'.')
-    return errors
-
-
 def apply_plan_changes(plan, changes, profile, today):
     if not isinstance(changes,list) or len(changes)>60:
         raise ValueError('Invalid plan change count.')
@@ -374,6 +332,11 @@ def apply_plan_changes(plan, changes, profile, today):
     validate_plan(result,profile)
     calendar_errors=race_calendar_conflicts(result,profile,today)
     if calendar_errors:raise ValueError('Race calendar conflict: '+'; '.join(calendar_errors))
+    availability_errors = training_day_conflicts(result, profile, today)
+    if availability_errors:
+        raise ValueError('Training-day conflict: coach scheduled training outside selected days: ' +
+                         '; '.join(item['session_id'] + ' on ' + item['date'] + ' (' + item['weekday'] + ')'
+                                   for item in availability_errors))
     return result
 
 

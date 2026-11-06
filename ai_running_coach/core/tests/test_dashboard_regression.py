@@ -73,13 +73,16 @@ class RestoredDashboardTests(unittest.TestCase):
                 response = json.loads(conn.execute('SELECT response_json FROM coach_review_jobs').fetchone()[0])
                 response['weekly_priorities'] = [{'priority': 'Starter weekly priority', 'reason': 'Synthetic reason', 'evidence': ['Activity 1']}]
                 response['plan_changes'] = [{'op': 'add', 'session_id': 'starter-session', 'reason': 'Starter session rationale'}]
-                conn.execute('UPDATE coach_review_jobs SET prompt_version=?, response_json=?',
-                             ('autonomous-coach-v4-starter-week', json.dumps(response)))
-                conn.commit()
-            page = dashboard.build_dashboard(db, md, root/'dashboard.html', today=date(2026, 10, 31))
-            html = page.read_text(encoding='utf-8')
-            self.assertIn('Starter weekly priority', html)
-            self.assertIn('Starter session rationale', html)
+            for version in ('autonomous-coach-v4-starter-week', 'autonomous-coach-v5-availability',
+                            'autonomous-coach-v5-availability-starter-week'):
+                with self.subTest(version=version), closing(sqlite3.connect(db)) as conn:
+                    conn.execute('UPDATE coach_review_jobs SET prompt_version=?, response_json=?',
+                                 (version, json.dumps(response)))
+                    conn.commit()
+                page = dashboard.build_dashboard(db, md, root/'dashboard.html', today=date(2026, 10, 31))
+                html = page.read_text(encoding='utf-8')
+                self.assertIn('Starter weekly priority', html)
+                self.assertIn('Starter session rationale', html)
 
     def metric_fixture(self,root):
         db,md=self.fixture(root)
@@ -111,8 +114,10 @@ class RestoredDashboardTests(unittest.TestCase):
             before={p:p.read_bytes() for p in inputs}
             output=dashboard.build_dashboard(db,md,root/'dashboard.html',today=date(2026,10,31))
             html=output.read_text(encoding='utf-8');markup=Markup();markup.feed(html)
-            for element in ('calendarView','tableView','weekTabsContainer','calendarGridContainer','volumeChart','btnKm','btnLoad','toggleViewBtn'):
+            for element in ('calendarView','weekTabsContainer','calendarGridContainer','volumeChart','btnKm','btnLoad'):
                 self.assertIn(element,markup.ids)
+            self.assertNotIn('tableView', markup.ids)
+            self.assertNotIn('toggleViewBtn', markup.ids)
             self.assertIn('Morning trail',html);self.assertIn('Evening companion run',html)
             self.assertIn('Second distinct feedback',html)
             self.assertIn('November 21, 2026',html)

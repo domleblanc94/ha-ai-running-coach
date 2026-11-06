@@ -13,7 +13,7 @@ RUNTIME_SCRIPTS = {
     'dashboard_template.py', 'database_manager.py', 'garmin_personal_api.py',
     'garmin_sync.py', 'generate_dashboard.py', 'health_status.py',
     'migrate_plan.py', 'model_provider.py', 'planning_engine.py', 'publish_if_ready.py',
-    'source_policy.py', 'workout_schema.py',
+    'source_policy.py', 'training_calendar.py', 'workout_schema.py',
 }
 
 

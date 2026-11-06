@@ -21,8 +21,9 @@ RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.l
 
 WORKDIR /opt/ai-running-coach
 COPY core/requirements.txt /tmp/core-requirements.txt
-RUN python -m pip install --no-cache-dir -r /tmp/core-requirements.txt \
-    && rm /tmp/core-requirements.txt
+COPY app/requirements.txt /tmp/app-requirements.txt
+RUN python -m pip install --no-cache-dir -r /tmp/core-requirements.txt -r /tmp/app-requirements.txt \
+    && rm /tmp/core-requirements.txt /tmp/app-requirements.txt
 COPY core/ ./core/
 COPY core-pin.json ./
 COPY app/ ./app/

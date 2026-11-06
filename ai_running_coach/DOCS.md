@@ -18,6 +18,14 @@ If you installed from the documented repository URL, you can jump to the app pag
 
 Local summary import is currently available through the standalone project. Use the Home Assistant app logs to diagnose startup failures. Keep credentials, athlete data and model response snapshots out of support reports.
 
+## Profile, training days and downloads
+
+After initial setup, the app opens on **Training dashboard**. Use **Athlete profile** to review your saved goals, available training days, running background and heart-rate settings. Use **Setup & settings** when you want to edit them.
+
+Save changes to available training days before generating a replacement plan. With no days selected, availability is unspecified and the coach chooses the days. Once days are selected, a new plan must keep future training within them. Rest days may fall on any day, and an actual configured race can remain on its booked date. A saved profile change does not rewrite the existing plan by itself: the coach must return a valid new plan before it replaces the upcoming schedule. Completed and historical sessions remain part of your training record.
+
+Download the calendar as a PDF for printing or sharing. You can also download **athlete.md** and **training_plan.md**. These exports contain your private profile and training information; store and share them accordingly. They do not contain connection API keys. Exporting saved data does not make an AI request.
+
 ## Learn HR zones from baseline runs
 
 Choose **Learn HR zones from baseline runs** in the athlete profile to ask the coach to include conversational baseline runs in the normal training plan. After Garmin sync, use **Baseline run observations** to select one of up to 12 eligible runs from the past 21 days. Add your perceived effort, talk-test result and sensor type. The coach can review those observations during the next normal review under the existing request budget.
@@ -32,6 +40,7 @@ Start with **Coach Status** in the app. A failed run shows its time, stage, reas
 - **Provider authentication or request:** check the selected provider and model in Settings, and confirm the key and model access with that provider.
 - **Provider quota or daily budget:** check the provider account or wait for the next UTC day if the app's daily allowance is spent.
 - **Truncated or invalid response:** the app keeps the last valid plan. Check the reason and request allowance before retrying.
+- **Training-day conflict:** the proposed plan used a day outside your saved availability and was not applied. Review your saved days, then request a new plan when your allowance permits. Any previous plan stays visible until it is replaced successfully.
 - **Rendering, publication or storage:** check the app logs and storage. Back up the app before reinstalling or restoring it.
 
 For support, share the app version, failure time, stage, reason code and recorded model request count. If the code points to the provider, include its name and the model identifier. Keep keys, raw provider responses, prompts, profiles and activity records private.

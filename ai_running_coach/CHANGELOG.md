@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0-beta.6
+
+- Add an Athlete profile page and open the training dashboard after initial setup.
+- Remove the training dashboard's Table view.
+- Download the training calendar as PDF and export the saved athlete and training plan Markdown files.
+- Apply explicit training-day availability when validating new coaching plans.
+
 ## 0.1.0-beta.5
 
 - Show the failed stage, reason and time in Coach Status and write a short, redacted diagnostic to the Home Assistant app log.

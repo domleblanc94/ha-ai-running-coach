@@ -15,6 +15,7 @@ MESSAGES = {
     'provider_config': 'Check the selected AI provider, model and key in Settings.',
     'provider_truncated': 'The AI response reached its output limit and could not be applied.',
     'response_invalid': 'The AI response did not pass validation. The app kept the saved plan state.',
+    'availability_conflict': 'The AI plan scheduled training outside your selected days, so it was not applied. Review your saved training days and generate a new plan when your request allowance permits.',
     'daily_budget': 'The app has used its coaching request allowance for this UTC day. Wait for the next UTC day.',
     'review_budget': 'The review has used its attempts for this UTC day. Wait for the next UTC day.',
     'input_too_large': 'The coaching input is too large. Shorten oversized profile notes before trying again.',
@@ -41,7 +42,7 @@ def failure_stage(code):
         return 'activities'
     if code.startswith('provider_') or code in {
         'daily_budget', 'review_budget', 'input_too_large', 'response_invalid',
-        'profile_invalid', 'source_provenance',
+        'profile_invalid', 'source_provenance', 'availability_conflict',
     }:
         return 'coaching'
     if code == 'dashboard_render_failed':
@@ -96,6 +97,8 @@ def command_failure(stderr):
 
 def request_failure(status, error):
     if status == 'invalid':
+        if isinstance(error, str) and error.startswith('Training-day conflict: coach scheduled training outside selected days: '):
+            return 'availability_conflict'
         return 'provider_truncated' if error == TRUNCATION else 'response_invalid'
     if status != 'failed' or not isinstance(error, str):
         return None

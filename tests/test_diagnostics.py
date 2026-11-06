@@ -162,6 +162,26 @@ ProviderClient._post = _fixture_post
         with closing(sqlite3.connect(self.app.workspace / 'ai_coach_master.sqlite')) as conn:
             self.assertEqual(conn.execute('SELECT COUNT(*) FROM coach_api_requests').fetchone()[0], 2)
 
+    def test_actual_off_day_plan_reports_availability_without_publishing(self):
+        self.fixture_provider('success')
+        weekdays = ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')
+        tomorrow = weekdays[(datetime.now(timezone.utc).weekday() + 1) % 7]
+        self.app.save_profile(PROFILE.replace('3 days', tomorrow))
+        profile = self.app.profile()
+        self.app.enqueue('new_plan')
+        log = io.StringIO()
+        with redirect_stdout(log):
+            self.assertTrue(self.app.tick())
+        last = self.app.status()['last_run']
+        self.assertEqual(last['code'], 'availability_conflict', last)
+        self.assertEqual(last['stage'], 'coaching')
+        self.assertEqual(last['request_attempts'], 1)
+        self.assertIn('selected days', last['message'])
+        self.assertIsNone(self.app.dashboard())
+        self.assertEqual(self.app.profile(), profile)
+        self.assertNotIn(PRIVATE, json.dumps(last) + log.getvalue())
+        self.assertIn('[coaching/availability_conflict]', log.getvalue())
+
 
 if __name__ == '__main__':
     unittest.main()

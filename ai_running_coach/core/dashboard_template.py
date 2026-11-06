@@ -61,11 +61,6 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
                 </div>
             </div>
             
-            <div class="flex items-center gap-3">
-                <button id="toggleViewBtn" onclick="toggleView()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2">
-                    <i class="fa-solid fa-table-list"></i> <span id="viewModeText">Table View</span>
-                </button>
-            </div>
         </header>
 
         <section id="liveHealthBanner" role="status" class="border border-slate-700 bg-slate-800/60 rounded-xl p-3 text-xs text-slate-300">Live workflow status is loading. Saved sync and review times are shown below.</section>
@@ -139,13 +134,6 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
         {history_html}
         {feedback_html}
         {other_activities_html}
-        <!-- FULL TABLE VIEW (Hidden by default) -->
-        <div id="tableView" class="hidden bg-slate-800/60 border border-slate-800 rounded-xl p-6 shadow-lg">
-            <div id="rawMarkdownContent" class="prose prose-invert max-w-none 
-                prose-table:w-full prose-table:border-collapse prose-th:border-b prose-th:border-slate-700 
-                prose-th:text-left prose-th:p-3 prose-td:p-3 prose-td:border-b prose-td:border-slate-800/60">
-            </div>
-        </div>
 
     </div>
 
@@ -241,7 +229,6 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
             macroBanner.classList.remove('hidden');
         }}
 
-        document.getElementById('rawMarkdownContent').innerHTML = safeMarkdown(rawMarkdown);
 
         function parseAndBuildCalendar(md) {{
             const tempDiv = document.createElement('div');
@@ -452,24 +439,7 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
 
         function showCalendarToday() {{
             document.getElementById('calendarView').classList.remove('hidden');
-            document.getElementById('tableView').classList.add('hidden');
-            document.getElementById('viewModeText').textContent='Table View';
             activeWeekIndex=findCurrentWeekIndex();renderTabs();renderSelectedWeek(activeWeekIndex);
-        }}
-        function toggleView() {{
-            const calView = document.getElementById('calendarView');
-            const tableView = document.getElementById('tableView');
-            const text = document.getElementById('viewModeText');
-
-            if (calView.classList.contains('hidden')) {{
-                calView.classList.remove('hidden');
-                tableView.classList.add('hidden');
-                text.innerText = 'Table View';
-            }} else {{
-                calView.classList.add('hidden');
-                tableView.classList.remove('hidden');
-                text.innerText = 'Calendar View';
-            }}
         }}
 
         const ctx = document.getElementById('volumeChart').getContext('2d');
