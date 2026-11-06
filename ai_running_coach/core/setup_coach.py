@@ -38,38 +38,15 @@ def initialize(root, provider="gemini", model=None, source="offline"):
     (root/"ai_coach_data").mkdir(exist_ok=True)
     return root
 
-def demo(root):
-    """Only writes a dedicated folder; examples are illustrative, not training advice."""
-    root=Path(root)
-    if root.exists() and any(root.iterdir()):raise ValueError("Demo output must be an empty/new directory")
-    initialize(root)
-    today=date.today()
-    text="""# SYNTHETIC DEMO - illustrative data only
-**Athlete Name:** Fictional runner
-**Zone 1 (Recovery):** < 120 bpm
-**Zone 2 (Endurance):** 120 - 140 bpm
-**Zone 3 (Tempo):** 141 - 155 bpm
-**Zone 4 (Hard):** 156 - 170 bpm
-**Zone 5 (Max):** >= 171 bpm
-**Active Injuries:** Unknown
-"""
-    text += "\n**A-Race:** Fictional community 10km\n**Date:** "+(today+timedelta(days=56)).isoformat()+"\n**Target Time:** Enjoy participating\n"
-    (root/"athlete.md").write_text(text,encoding="utf-8")
-    profile=parse_profile(text)
-    sessions=[{"id":"demo-"+str(i),"date":(today+timedelta(days=i)).isoformat(),"workout_type":"DEMO example run" if i%2==0 else "Rest","amount":"4 km" if i%2==0 else "-","target":"Illustrative session only; replace with an individualized coach plan."} for i in range(7)]
-    plan={"schema_version":1,"revision":1,"profile_hash":profile["source_hash"],"goals":profile["goals"],"sessions":sessions}
-    (root/"training_plan.json").write_text(json.dumps(plan,indent=2),encoding="utf-8")
-    (root/"training_plan.md").write_text(render_plan(plan),encoding="utf-8")
-    with closing(sqlite3.connect(root/"ai_coach_master.sqlite")) as conn,conn:
-        conn.execute("INSERT INTO activities(id,name,type,start_date,distance_m,moving_time_s,elevation_gain_m,source,metrics_source) VALUES(?,?,?,?,?,?,?,?,?)",(1,"Synthetic example run","Run",(today-timedelta(days=1)).isoformat()+"T08:00:00Z",4000,1800,35,"local:demo","local:demo"))
+def demo(root,today=None):
+    """Only authored examples in a dedicated folder; never reads private config."""
+    from demo_data import populate_demo
+    today=today or date.today()
+    root=populate_demo(root,today)
     from generate_dashboard import build_dashboard
-    build_dashboard(root/"ai_coach_master.sqlite",root/"training_plan.md",root/"dashboard.html")
-    page=root/"dashboard.html"
-    html=page.read_text(encoding="utf-8")
-    marker='<body class="bg-slate-900 text-slate-100 font-sans min-h-screen p-4 md:p-8">'
-    html=html.replace(marker,marker+'<div role="note" style="background:#854d0e;color:white;padding:16px;text-align:center;font-weight:bold">SYNTHETIC DEMO - fictional activities and illustrative sessions, not an individualized training plan</div>',1)
-    page.write_text(html,encoding="utf-8")
-    return page
+    return build_dashboard(root/"ai_coach_master.sqlite",root/"training_plan.md",root/"dashboard.html",
+                           today=today,demo_mode=True,generated_at=today.isoformat()+" 12:00:00 UTC")
+
 
 def doctor(root,offline=False):
     root=Path(root);errors=[]

@@ -1,0 +1,52 @@
+name: Public synthetic demo
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: synthetic-demo-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    if: github.repository == 'domleblanc94/ai-running-coach' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install renderer dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Check synthetic data and publication boundary
+        run: python -m unittest tests.test_demo_site
+      - name: Build only the fictional public example
+        run: python build_demo_site.py --output "${{ runner.temp }}/coach-demo-site"
+      - name: Upload only the generated static site
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ${{ runner.temp }}/coach-demo-site
+
+  deploy:
+    if: github.repository == 'domleblanc94/ai-running-coach' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy fictional example
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -154,7 +154,7 @@ def build_overview(conn, plan, today, profile=None):
     return {'windows':windows,'planned_weeks':planned,'countdown':countdown,'next_session':upcoming[0] if upcoming else None}
 
 
-def build_dashboard(db_path=None, plan_file=None, output_html=None, today=None, status_file=None):
+def build_dashboard(db_path=None, plan_file=None, output_html=None, today=None, status_file=None, *, demo_mode=False, generated_at=None):
     db_path, plan_file = Path(db_path or DB_PATH), Path(plan_file or PLAN_FILE)
     output_html = Path(output_html or OUTPUT_HTML)
     today = today or date.today()
@@ -178,7 +178,7 @@ def build_dashboard(db_path=None, plan_file=None, output_html=None, today=None, 
     activities, review, reviewed_at = read_database(db_path, start, end)
     status_path = Path(status_file) if status_file else db_path.parent / "pipeline_status.json"
     status = {}
-    if status_path.exists():
+    if not demo_mode and status_path.exists():
         try:
             status = json.loads(status_path.read_text(encoding="utf-8"))
         except (ValueError, OSError):
@@ -236,8 +236,8 @@ def build_dashboard(db_path=None, plan_file=None, output_html=None, today=None, 
     for week in weeks:
         entry=(overview or {}).get("planned_weeks",{}).get(week.isoformat())
         planned_chart.append(entry['known_km'] if entry and (entry['known_sessions'] or not entry['unknown_sessions']) else None)
-    generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-    freshness='<div class="bg-slate-800/60 border border-slate-700 rounded-xl p-4 text-xs text-slate-400">Latest saved review (UTC): '+esc(reviewed_at or "Unavailable")+' &middot; Latest successful sync (UTC): '+esc(status.get("sync_success_at") or "Unavailable")
+    generated_at=generated_at or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    freshness='<div class="bg-slate-800/60 border border-slate-700 rounded-xl p-4 text-xs text-slate-400">'+('Frozen fictional example &middot; Sample date: '+esc(today.isoformat()) if demo_mode else 'Latest saved review (UTC): '+esc(reviewed_at or "Unavailable")+' &middot; Latest successful sync (UTC): '+esc(status.get("sync_success_at") or "Unavailable"))
     if canonical:
         freshness+=' &middot; Plan revision '+esc(canonical.get("revision"))
         if canonical.get("requires_coach_reconciliation"):freshness+='<p class="text-amber-300 mt-2">Imported schedule awaiting AI coach reconciliation.</p>'
@@ -279,7 +279,7 @@ def build_dashboard(db_path=None, plan_file=None, output_html=None, today=None, 
                 item[field] = pool.get(field)
         workout_payload[item['id']] = item
     sport_data = weekly_sport_data(activities, weeks, today)
-    document=render_layout(assets=assets,weeks_json=safe_json(['w/c '+w.strftime('%d/%m') for w in weeks]),km_json=safe_json([round(totals[w.isoformat()][0],1) for w in weeks]),load_json=safe_json([round(totals[w.isoformat()][1],1) if totals[w.isoformat()][2] else None for w in weeks]),raw_markdown_json=safe_json(markdown),activities_json=safe_json(exported),macro_review_json=safe_json(review),last_updated_str=esc(generated_at),today_json=safe_json(today.isoformat()),freshness_html=freshness,other_activities_html=other,session_ids_json=safe_json(ids),planned_json=safe_json(planned_chart),agenda_html=panels["agenda"],focus_html=panels["focus"],assessment_html=panels["assessment"],history_html=panels["history"],feedback_html=panels["feedback"],workout_sessions_json=safe_json(workout_payload),sport_weeks_json=safe_json(sport_data),training_mode_json=safe_json(training_mode(profile)))
+    document=render_layout(assets=assets,weeks_json=safe_json(['w/c '+w.strftime('%d/%m') for w in weeks]),km_json=safe_json([round(totals[w.isoformat()][0],1) for w in weeks]),load_json=safe_json([round(totals[w.isoformat()][1],1) if totals[w.isoformat()][2] else None for w in weeks]),raw_markdown_json=safe_json(markdown),activities_json=safe_json(exported),macro_review_json=safe_json(review),last_updated_str=esc(generated_at),today_json=safe_json(today.isoformat()),freshness_html=freshness,other_activities_html=other,session_ids_json=safe_json(ids),planned_json=safe_json(planned_chart),agenda_html=panels["agenda"],focus_html=panels["focus"],assessment_html=panels["assessment"],history_html=panels["history"],feedback_html=panels["feedback"],workout_sessions_json=safe_json(workout_payload),sport_weeks_json=safe_json(sport_data),training_mode_json=safe_json(training_mode(profile)),demo_mode=demo_mode)
     # Same-filesystem replacement prevents readers seeing partially written HTML.
     output_html.parent.mkdir(parents=True, exist_ok=True)
     temp_path = None

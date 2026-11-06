@@ -1,11 +1,11 @@
 """Original dashboard layout, preserved from the pre-upgrade project."""
-def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, activities_json, macro_review_json, last_updated_str, today_json, freshness_html, other_activities_html, session_ids_json, planned_json, agenda_html, focus_html, assessment_html, history_html, feedback_html, workout_sessions_json, sport_weeks_json="{}", training_mode_json='"running"'):
+def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, activities_json, macro_review_json, last_updated_str, today_json, freshness_html, other_activities_html, session_ids_json, planned_json, agenda_html, focus_html, assessment_html, history_html, feedback_html, workout_sessions_json, sport_weeks_json="{}", training_mode_json='"running"', demo_mode=False):
     return f"""<!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Multisport Coach - Calendar Dashboard</title>
+    <title>{'Synthetic demo | ' if demo_mode else ''}AI Multisport Coach - Calendar Dashboard</title>
     <script>{assets['tailwind.js']}</script>
     <script>{assets['chart.js']}</script>
     <script>{assets['marked.js']}</script>
@@ -47,6 +47,17 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
 </head>
 <body class="bg-slate-900 text-slate-100 font-sans min-h-screen p-4 md:p-8">
     <div class="max-w-7xl mx-auto space-y-8">
+        {'''<section id="syntheticDemoNotice" role="note" class="border border-amber-500/60 bg-amber-950 text-amber-100 rounded-xl p-5 space-y-3">
+            <h2 class="text-xl font-bold">SYNTHETIC DEMO · AI Multisport Coach</h2>
+            <p>All athletes, activities, plans and reviews here are fictional examples, not personalized training advice. No live AI or Garmin account is connected. “Today” is the fixed sample date shown below.</p>
+            <p class="text-sm">Try the calendar filters, charts and local FIT previews. Checkboxes stay in this browser; nothing is uploaded. Sample FIT files need manual watch transfer.</p>
+            <nav aria-label="Install AI Multisport Coach" class="flex flex-wrap gap-3 text-sm font-semibold">
+                <a class="underline underline-offset-4" href="https://github.com/domleblanc94/ha-ai-running-coach#readme">Home Assistant app</a>
+                <a class="underline underline-offset-4" href="https://github.com/domleblanc94/ai-running-coach/blob/main/docs/STANDALONE.md">Standalone setup guide</a>
+                <a class="underline underline-offset-4" href="https://github.com/domleblanc94/ai-running-coach">Source project</a>
+                <a class="underline underline-offset-4" href="#calendarView">Explore the sample week</a>
+            </nav>
+        </section>''' if demo_mode else ''}
 
         <!-- Header -->
         <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-6">
@@ -214,6 +225,9 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
             banner.append(title,details);
         }}
         async function refreshWorkflowHealth() {{
+            if ({str(bool(demo_mode)).lower()}) {{
+                displayHealth({{level:'info',label:'Static fictional example',details:'Sample date: '+todayIso+'. No coaching job, Garmin sync or status polling runs on this demo.'}});return;
+            }}
             if (!['http:','https:'].includes(location.protocol)) {{
                 displayHealth({{level:'unknown',label:'Live status is available on the Home Assistant page',details:'This offline preview shows the saved plan and timestamps.'}});return;
             }}
@@ -228,8 +242,10 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
             }} finally {{clearTimeout(timer);}}
         }}
         refreshWorkflowHealth();
-        setInterval(refreshWorkflowHealth,60000);
-        document.addEventListener('visibilitychange',()=>{{if(!document.hidden)refreshWorkflowHealth();}});
+        if (!{str(bool(demo_mode)).lower()}) {{
+            setInterval(refreshWorkflowHealth,60000);
+            document.addEventListener('visibilitychange',()=>{{if(!document.hidden)refreshWorkflowHealth();}});
+        }}
 
         let allParsedWeeks = [];
         let activeWeekIndex = 0;

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "local-ai-running-coach"
-version = "0.3.0b3"
+version = "1.0.0"
 description = "AI Multisport Coach: self-hosted running, cycling, swimming and triathlon plans with an HTML dashboard"
 requires-python = ">=3.11"
 license = "MIT"
@@ -18,4 +18,4 @@ garmin = []
 all = []
 
 [tool.setuptools]
-py-modules = ["sports","source_policy","import_activities","ai_coach", "planning_engine", "training_calendar", "model_provider", "database_manager", "garmin_sync", "garmin_personal_api", "workout_schema", "parse_coach_output", "cron_daily_update", "generate_dashboard", "dashboard_template", "dashboard_panels", "publish_if_ready", "health_status", "coach_checkin", "coaching_eval", "migrate_plan", "setup_coach"]
+py-modules = ["build_demo_site","demo_data","sports","source_policy","import_activities","ai_coach", "planning_engine", "training_calendar", "model_provider", "database_manager", "garmin_sync", "garmin_personal_api", "workout_schema", "parse_coach_output", "cron_daily_update", "generate_dashboard", "dashboard_template", "dashboard_panels", "publish_if_ready", "health_status", "coach_checkin", "coaching_eval", "migrate_plan", "setup_coach"]

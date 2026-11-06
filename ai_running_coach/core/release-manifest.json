@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "release": "0.3.0-beta.3",
+  "release": "1.0.0",
   "license_status": "selected",
   "files": [
     {
@@ -12,6 +12,10 @@
       "sha256": "ec02f84cef37858717584ea7d9a9bed5053581d1ed23cb61c50f2f295c7f9683"
     },
     {
+      "path": ".github/workflows/pages.yml",
+      "sha256": "ef6100d9611b0dea60af27e43c0bbff1989e8e72f828ab17311b606f1c19df74"
+    },
+    {
       "path": ".gitignore",
       "sha256": "b0b75f8a020bfcce65a6e3de5651ea5d5b187d20e817eaec51b7d3c94544a4dd"
     },
@@ -21,11 +25,15 @@
     },
     {
       "path": "README.md",
-      "sha256": "dacc3ea8e9f40d7f5d2db23f9a87e644feb10328236f1949a2f624e5abcd8194"
+      "sha256": "3d5db386539daabf5aa57152cd90a0ca02e754c20ea81bf603ee23b431ae3071"
     },
     {
       "path": "ai_coach.py",
       "sha256": "cc6546cf253e967c43e01e674b8f7141330c17a0ec52f7797eecaef840e3eb02"
+    },
+    {
+      "path": "build_demo_site.py",
+      "sha256": "8ae8a10765455698449b6de8d4c8b468125873090b02c3171b6095c824b3ca38"
     },
     {
       "path": "coach_checkin.py",
@@ -113,15 +121,23 @@
     },
     {
       "path": "dashboard_template.py",
-      "sha256": "8b1f9152e8036c80305d3e678105220f2025a7c5d04c5fd5d13b24de7d06b10f"
+      "sha256": "f7251799ef40835926de347c81a60b1f1ca1baa66a6709c8a26fbccd2fad4174"
     },
     {
       "path": "database_manager.py",
       "sha256": "98dceaa3dc7ce368226b7808b659cd69cb98758382e79b66f9f1c739bd667640"
     },
     {
+      "path": "demo_data.py",
+      "sha256": "626036f4bec1e4bed11e71961af5d57ed79316187ad06d2ca1b8f45382c36b77"
+    },
+    {
       "path": "docs/RELEASE_REVIEW.md",
-      "sha256": "0cdd1b122367e2dc967a2421bb5021acfd131605400d0e7053a2ff2fbed9095b"
+      "sha256": "a5b11b85ee5780a2cc6684d3ed197fc5abb104038cba4961e58e5cd380f77236"
+    },
+    {
+      "path": "docs/STANDALONE.md",
+      "sha256": "67924cca7975d340aa0bb845dd1e776da66edf746c5b2705ced673c813ec96fe"
     },
     {
       "path": "docs/THIRD_PARTY.md",
@@ -153,7 +169,7 @@
     },
     {
       "path": "generate_dashboard.py",
-      "sha256": "0afbedd31ab8e84eb117639530c897772a5e153b02b4df2905b0d769bc6b00e3"
+      "sha256": "ac54d9a30a7e8b2d84527fd1743d82535b42b959616cf987941a9b9743aaef96"
     },
     {
       "path": "health_status.py",
@@ -181,7 +197,7 @@
     },
     {
       "path": "prepare_release.py",
-      "sha256": "2c40259ee230405c971316caefaf8a4c523e724c6f227d286274512450b6c31b"
+      "sha256": "06231ebc6adda40824414bcd5f5ca302d9f62dd255184cab66849caa055de2c2"
     },
     {
       "path": "publish_if_ready.py",
@@ -189,7 +205,7 @@
     },
     {
       "path": "pyproject.toml",
-      "sha256": "a19519d294f6dc28657fb1a385bb228a8324f5f71a62c13c767f5c2c5fbfec79"
+      "sha256": "af76aa60d62963b20635f3832d7ed9291e600ce7612e78814f63ed1a3f0522ed"
     },
     {
       "path": "requirements.txt",
@@ -201,7 +217,7 @@
     },
     {
       "path": "setup_coach.py",
-      "sha256": "04b8fcf6e14e601e4e31ab805a6ebba5a6a48743a52e3d684889ccffa667227d"
+      "sha256": "19d7f5651c21499fcb1b8710e53a7c5e92ed623df477e69cafe8375573b29d5f"
     },
     {
       "path": "source_policy.py",
@@ -238,6 +254,10 @@
     {
       "path": "tests/test_deferred_retry.py",
       "sha256": "99105087c45210c88b5093cb5e0e53b82f7a8c563342978c313c25b114b10742"
+    },
+    {
+      "path": "tests/test_demo_site.py",
+      "sha256": "af79c9e90c6ceb51728149ac02264ee329cdca888c8ffa59b03bd07a7f37b70b"
     },
     {
       "path": "tests/test_feedback_workflow.py",

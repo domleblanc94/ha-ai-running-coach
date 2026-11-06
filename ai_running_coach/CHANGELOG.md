@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0
+
+- Publish the first numbered release as **AI Multisport Coach**, with clear Home Assistant and standalone installation routes and links between the projects.
+- Add a public fictional example dashboard hosted on GitHub Pages, generated without private athlete data or live service calls.
+- Preserve the existing installation identifiers, private data, schedules and request limits when upgrading. Provider and physical watch validation limits remain documented.
+
 ## 0.2.0-beta.3
 
 - Rename the visible app, setup, dashboard and PDF branding to **AI Multisport Coach** to reflect running, cycling, swimming and triathlon support.

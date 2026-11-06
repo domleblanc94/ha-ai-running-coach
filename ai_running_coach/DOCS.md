@@ -1,6 +1,16 @@
 # AI Multisport Coach
 
-AI Multisport Coach is an experimental community app for one athlete. It uses Home Assistant ingress to open the setup and dashboard. Start it from the app page and select **Open Web UI**.
+**Version 1.0.0** is the community release of AI Multisport Coach for Home Assistant. It serves one athlete and opens its setup and private dashboard through Home Assistant ingress.
+
+## Choose a route or preview the dashboard
+
+- **Home Assistant app:** use Home Assistant OS on amd64 or aarch64. Follow the [repository installation instructions](https://github.com/domleblanc94/ha-ai-running-coach#install), start the app and select **Open Web UI**. The app manages its own daily scheduler.
+- **Standalone Python:** use Windows, macOS or Linux with Python 3.11+ and a terminal. Follow the [standalone setup guide](https://github.com/domleblanc94/ai-running-coach/blob/main/docs/STANDALONE.md) in the [standalone repository](https://github.com/domleblanc94/ai-running-coach). Home Assistant is optional; you manage scheduling and dashboard hosting.
+- **Preview first:** open the [synthetic live demo](https://domleblanc94.github.io/ai-running-coach/) with a fictitious athlete and activities. It makes no AI or Garmin requests.
+
+The two installations have separate private profiles, databases, plans and request ledgers. Moving between them requires a planned migration; see [Moving from the standalone installation](#moving-from-the-standalone-installation).
+
+Review AI-generated training and check provider costs before enabling scheduled reviews. FIT export and additional provider-account compatibility retain the limitations described below.
 
 ## Add to the Home Assistant sidebar
 
@@ -16,7 +26,9 @@ If you installed from the documented repository URL, you can jump to the app pag
 4. Save your IANA timezone (for example, Europe/London) with scheduling unchecked. This controls plan dates and the daily review time. Request counts follow UTC days.
 5. Generate and review the first plan. Enable a local review time when you are ready for scheduled reviews. The app keeps the last saved dashboard if a review fails. The scheduler runs one review per local day. If it fails, use **Run now** after checking the cause. Manual runs still use the core request budget. A run interrupted by a restart pauses the schedule until you re-enable it.
 
-Local summary import is currently available through the standalone project. Use the Home Assistant app logs to diagnose startup failures. Keep credentials, athlete data and model response snapshots out of support reports.
+Provider integrations use a common request budget. Gemini remains the primary live-tested route; compatibility of other providers and models with a particular account requires verification and remains experimental. Offline transport tests do not guarantee every model supports the same request options.
+
+Local summary import is currently available through the [standalone project](https://github.com/domleblanc94/ai-running-coach/blob/main/docs/STANDALONE.md). Use the Home Assistant app logs to diagnose startup failures. Keep credentials, athlete data and model response snapshots out of support reports.
 
 ## Coaching request allowance
 
@@ -28,7 +40,7 @@ The allowance is an app limit, not a monetary spending cap. Increasing it or con
 
 ## Profile, training days and downloads
 
-After initial setup, the app opens on **Training dashboard**. Use **Athlete profile** to review your saved goals, available training days, running background and heart-rate settings. Use **Setup & settings** when you want to edit them.
+After initial setup, the app opens on **Training dashboard**. Use **Athlete profile** to review your saved goals, available training days, training background and sport-specific settings. Use **Setup & settings** when you want to edit them.
 
 The calendar keeps dates in their Monday-to-Sunday columns, including a first week that starts partway through the week. **No session planned** means the saved plan has no entry for that date; it is distinct from a prescribed rest day. Multiple sessions on one date appear together. Compact mobile layouts omit empty gaps. Updating the app corrects the display of an existing dashboard without requiring a new coaching request or changing its saved session dates.
 
@@ -66,7 +78,7 @@ Learn mode preserves any saved ranges. If you have no saved ranges, they stay un
 
 ## Troubleshoot a failed run
 
-Start with **Coach Status** in the app. A failed run shows its time, stage, reason code and recorded model request count when available. Home Assistant also shows a short diagnostic under **Settings → Apps → AI Multisport Coach → Log**. After upgrading from an earlier beta, check Coach Status before retrying. The app can recover a more specific explanation from records already saved for that run. If those records are incomplete, the reason can still be unknown.
+Start with **Coach Status** in the app. A failed run shows its time, stage, reason code and recorded model request count when available. Home Assistant also shows a short diagnostic under **Settings → Apps → AI Multisport Coach → Log**. After upgrading from an earlier release, check Coach Status before retrying. The app can recover a more specific explanation from records already saved for that run. If those records are incomplete, the reason can still be unknown.
 
 - **Garmin or activity sync:** check the selected activity source and Garmin access. If Garmin is limiting requests, wait before trying again.
 - **Provider authentication or request:** check the selected provider and model in Settings, and confirm the key and model access with that provider.
@@ -89,12 +101,12 @@ Include this app in a Home Assistant backup before updating. The Supervisor stop
 
 ## Moving from the standalone installation
 
-This beta has no guided migration from a standalone installation. The existing installation and this app have independent databases, Garmin binding and request ledgers. Treat the app as a separate trial until you have a verified migration.
+Version 1.0 has no guided migration from a standalone installation. The existing installation and this app have independent databases, Garmin binding and request ledgers. Keep the app schedule disabled until you have verified the migration.
 
 A future cutover needs a consistent source backup and one active scheduler. The migration needs to preserve the athlete profile and plans, SQLite request history for daily limits, and the exact Garmin account binding and source provenance. Copying only the athlete profile, or starting a new database against the same account on the same day, loses that continuity. Verify the restored files and review state with the schedule disabled. Keep the original installation and backup available for rollback. Stop the app schedule before resuming the standalone scheduler.
 
 ## Garmin key replacement
 
-Garmin account binding is preserved if a key changes. This beta has no in-app confirmation for key rotation. Back up the app and pause its schedule before rotating a key. Ask the maintainer for the same-account recovery procedure, and keep the sync checkpoint with its matching database. An account or region change requires a new workspace.
+Garmin account binding is preserved if a key changes. Version 1.0 has no in-app confirmation for key rotation. Back up the app and pause its schedule before rotating a key. Ask the maintainer for the same-account recovery procedure, and keep the sync checkpoint with its matching database. An account or region change requires a new workspace.
 
 FIT workout export remains experimental and requires manual transfer to a compatible watch.
