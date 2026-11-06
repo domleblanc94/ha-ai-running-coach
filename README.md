@@ -1,6 +1,6 @@
 # AI Running Coach for Home Assistant
 
-**Experimental community app, version 0.1.0-beta.7.** It brings the standalone AI Running Coach into Home Assistant's app UI. The app packages a pinned copy of the upstream engine and keeps its own athlete profile, activity history, request ledger and plans.
+**Experimental community app, version 0.1.0-beta.8.** It brings the standalone AI Running Coach into Home Assistant's app UI. The app packages a pinned copy of the upstream engine and keeps its own athlete profile, activity history, request ledger and plans.
 
 - Install on Home Assistant OS on amd64 or aarch64. Supervisor pulls the prebuilt image for your architecture from GitHub Container Registry.
 - Open setup and the running dashboard through Home Assistant ingress. The app stores its data privately and needs no exposed host port.
@@ -22,7 +22,7 @@ This community project is independently maintained. [Standalone AI Running Coach
 
 [Setup, privacy, backups and standalone migration](ai_running_coach/DOCS.md)
 
-If an earlier installation failed while fetching a Debian package, refresh the app store and check that it offers **0.1.0-beta.7**, then retry installation. The new installation downloads the prebuilt image. Home Assistant needs HTTPS access to GitHub and GitHub Container Registry.
+If an earlier installation failed while fetching a Debian package, refresh the app store and check that it offers **0.1.0-beta.8**, then retry installation. The new installation downloads the prebuilt image. Home Assistant needs HTTPS access to GitHub and GitHub Container Registry.
 
 ## Development
 

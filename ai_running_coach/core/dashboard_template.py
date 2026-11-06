@@ -12,6 +12,7 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
     <script>{assets['purify.js']}</script>
     <script>{assets['workout-fit.js']}</script>
     <script>{assets['workout-ui.js']}</script>
+    <script id="coach-calendar-layout">{assets['calendar-layout.js']}</script>
     <style>{assets['fontawesome.css']}</style>
     <script>
         tailwind.config = {{
@@ -118,7 +119,7 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
         <div id="calendarView" class="space-y-6">
             <div class="flex items-center gap-2 overflow-x-auto pb-3 border-b border-slate-800/80" id="weekTabsContainer"></div>
 
-            <div class="grid grid-cols-7 gap-2 text-center text-xs font-bold text-slate-400 uppercase tracking-wider bg-slate-800/80 p-3 rounded-lg border border-slate-800">
+            <div id="calendarWeekdayHeader" class="coach-calendar-weekdays text-center text-xs font-bold text-slate-400 uppercase tracking-wider bg-slate-800/80 p-3 rounded-lg border border-slate-800">
                 <div>Mon</div>
                 <div>Tue</div>
                 <div>Wed</div>
@@ -231,6 +232,7 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
 
 
         function parseAndBuildCalendar(md) {{
+            window.CoachCalendar.configure(document.getElementById('calendarView'));
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = safeMarkdown(md);
 
@@ -293,6 +295,7 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
                     allParsedWeeks.push(weekObj);
                 }});
 
+                allParsedWeeks = window.CoachCalendar.normalizeWeeks(allParsedWeeks);
                 activeWeekIndex = findCurrentWeekIndex();
                 renderTabs();
                 renderSelectedWeek(activeWeekIndex);
@@ -307,27 +310,9 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
 
         function findCurrentWeekIndex() {{
             if (allParsedWeeks.length === 0) return 0;
-            const todayStr = {today_json};
-
-            for (let i = 0; i < allParsedWeeks.length; i++) {{
-                if (allParsedWeeks[i].rows.some(r => r.dateStr === todayStr)) {{
-                    return i;
-                }}
-            }}
-
-            const d = new Date();
-            const day = d.getDay();
-            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-            d.setDate(diff);
-            const mondayStr = `${{d.getFullYear()}}-${{String(d.getMonth()+1).padStart(2,'0')}}-${{String(d.getDate()).padStart(2,'0')}}`;
-
-            for (let i = 0; i < allParsedWeeks.length; i++) {{
-                if (allParsedWeeks[i].title.includes(mondayStr) || allParsedWeeks[i].rows.some(r => r.dateStr === mondayStr)) {{
-                    return i;
-                }}
-            }}
-
-            return 0;
+            const mondayStr = window.CoachCalendar.weekStart(todayIso);
+            const current = allParsedWeeks.findIndex(week => week.weekStart === mondayStr);
+            return current < 0 ? 0 : current;
         }}
 
         function renderTabs() {{
@@ -361,14 +346,12 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
             if (!selectedWeek) return;
 
             const grid = document.createElement('div');
-            grid.className = 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-7 gap-3';
-
-            selectedWeek.rows.forEach(row => {{
-                renderDayCard(grid, row.cardId, row.dayName, row.dateStr, row.workoutType, row.distOrDuration, row.target);
-            }});
+            grid.className = 'coach-calendar-grid';
+            window.CoachCalendar.renderWeek(grid, selectedWeek, renderDayCard);
 
             container.appendChild(grid);
         }}
+        renderSelectedWeek.calendarAligned = true;
 
         function renderDayCard(gridContainer, cardId, dayName, dateStr, workoutType, distOrDuration, target) {{
             let badgeClass = 'bg-slate-800/80 border-slate-700/60 text-slate-300';

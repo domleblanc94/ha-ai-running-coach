@@ -65,7 +65,7 @@ def read_database(path, start, end):
         tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         if "coach_review_jobs" in tables:
             job_columns = {row[1] for row in conn.execute("PRAGMA table_info(coach_review_jobs)")}
-            policy_filter = " AND prompt_version IN ('autonomous-coach-v2','autonomous-coach-v3','autonomous-coach-v4-starter-week','autonomous-coach-v5-availability','autonomous-coach-v5-availability-starter-week')" if "prompt_version" in job_columns else ""
+            policy_filter = " AND prompt_version IN ('autonomous-coach-v2','autonomous-coach-v3','autonomous-coach-v4-starter-week','autonomous-coach-v5-availability','autonomous-coach-v5-availability-starter-week','autonomous-coach-v6-schedule','autonomous-coach-v6-schedule-starter-week')" if "prompt_version" in job_columns else ""
             reviewed_ids = set()
             for saved in conn.execute("SELECT response_json FROM coach_review_jobs WHERE status='complete' AND response_json IS NOT NULL" + policy_filter):
                 try:
@@ -174,7 +174,7 @@ def build_dashboard(db_path=None, plan_file=None, output_html=None, today=None, 
     def safe_json(value):
         return json.dumps(value,ensure_ascii=True,allow_nan=False).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     assets_dir=SCRIPT_DIR/"dashboard_assets"
-    assets={name:(assets_dir/name).read_text(encoding="utf-8") for name in ("tailwind.js","chart.js","marked.js","purify.js","fontawesome.css","workout-fit.js","workout-ui.js")}
+    assets={name:(assets_dir/name).read_text(encoding="utf-8") for name in ("tailwind.js","chart.js","marked.js","purify.js","fontawesome.css","workout-fit.js","workout-ui.js","calendar-layout.js")}
     for name,value in list(assets.items()):
         assets[name]=value.replace("</script", "<\\/script")
     css=assets["fontawesome.css"]

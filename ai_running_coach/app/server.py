@@ -13,6 +13,8 @@ import secrets
 import threading
 from urllib.parse import urlsplit
 
+from .dashboard_view import saved_dashboard
+
 
 WEB = Path(__file__).with_name("web")
 INGRESS_PEER = "172.30.32.2"
@@ -34,6 +36,7 @@ GOAL_METADATA = "<!-- coach-goal "
 TRAINING_GOAL_PREFIX = "Training milestone: "
 OUTCOME_LABELS = {"A": "A (ideal)", "B": "B (main)", "C": "C (fallback)"}
 ZONE_NAMES = ("Recovery", "Endurance", "Tempo", "Hard", "Max")
+LONG_RUN_LABELS = ("Preferred Long Run Day", "Preferred Long Run Days")
 
 
 def profile_fields(markdown):
@@ -75,6 +78,8 @@ def profile_fields(markdown):
         fields["goals"][priority] = goal
     availability = re.search(r"^\*\*Weekly Availability:\*\*[ \t]*(.*)$", markdown, re.M)
     fields["days"] = [day for day in WEEKDAYS if availability and day in availability[1]]
+    preferred = re.findall(r"^\*\*Preferred Long Run Days?:\*\*[ \t]*(.*)$", markdown, re.M | re.I)
+    fields["long_run_days"] = [day for day in WEEKDAYS if any(re.search(r"\b" + day + r"\b", value, re.I) for value in preferred)]
     fields["zones"] = {}
     for match in re.finditer(r"^\*\*Zone ([1-5]) \([^\n]+\):\*\*\s*(\d+)\s*-\s*(\d+) bpm$", markdown, re.M):
         fields["zones"][match[1]] = [int(match[2]), int(match[3])]
@@ -83,8 +88,17 @@ def profile_fields(markdown):
     return fields
 
 
+def profile_view(markdown):
+    """Include saved free-text preferences without making them editable fields."""
+    fields = profile_fields(markdown)
+    fields['long_run_preference_text'] = '; '.join(re.findall(
+        r'^\*\*Preferred Long Run Days?:\*\*[ \t]*(.*)$', markdown, re.M | re.I,
+    ))
+    return fields
+
+
 def profile_markdown(data, existing=""):
-    if set(data) - {*PROFILE_FIELDS, *GOAL_FIELDS, "goals", "days", "zones", "zone_mode"}:
+    if set(data) - {*PROFILE_FIELDS, *GOAL_FIELDS, "goals", "days", "long_run_days", "zones", "zone_mode"}:
         raise ValueError("Unknown athlete profile field.")
     fields = {}
     for key in PROFILE_FIELDS:
@@ -137,6 +151,11 @@ def profile_markdown(data, existing=""):
     days = data.get("days", [])
     if not isinstance(days, list) or any(day not in WEEKDAYS for day in days):
         raise ValueError("Select available training days.")
+    long_run_days = data.get("long_run_days", saved["long_run_days"])
+    if not isinstance(long_run_days, list) or any(day not in WEEKDAYS for day in long_run_days):
+        raise ValueError("Select preferred long-run days or leave them blank for no preference.")
+    if days and any(day not in days for day in long_run_days):
+        raise ValueError("Preferred long-run days must also be selected as available training days. Update your availability or clear those preferences.")
     zones = data.get("zones", {})
     zone_mode = data.get("zone_mode", "known" if zones else "unknown")
     if zone_mode not in ("unknown", "known", "learn"):
@@ -162,6 +181,8 @@ def profile_markdown(data, existing=""):
         lines.append("**Coaching Style:** " + previous_style)
     if days:
         lines.append("**Weekly Availability:** " + ", ".join(day for day in WEEKDAYS if day in days))
+    if "long_run_days" in data and long_run_days:
+        lines.append("**Preferred Long Run Days:** " + ", ".join(day for day in WEEKDAYS if day in long_run_days))
     if not zones and (zone_mode != "learn" or not re.search(r"^\*\*Zone [1-5] \(", existing, re.M)):
         lines.append("**Heart Rate Zones:** Not configured")
     previous = 0
@@ -176,6 +197,8 @@ def profile_markdown(data, existing=""):
         lines.append(f"**Zone {number} ({ZONE_NAMES[int(number)-1]}):** {bounds[0]} - {bounds[1]} bpm")
     known = set(PROFILE_FIELDS.values())
     known.update(("Weekly Availability", "Heart Rate Zones", "HR Zone Learning"))
+    if "long_run_days" in data:
+        known.update(LONG_RUN_LABELS)
     race_priority = None
     zone_lines = []
     extras = []
@@ -187,7 +210,8 @@ def profile_markdown(data, existing=""):
         if label and label.upper() in ("A-RACE", "B-RACE", "C-RACE"):
             race_priority = label
             continue
-        if label in known or (race_priority and (label in ("Date", "Target Time") or line.startswith(GOAL_METADATA))):
+        if (label in known or ("long_run_days" in data and label and label.lower() in {name.lower() for name in LONG_RUN_LABELS})
+                or (race_priority and (label in ("Date", "Target Time") or line.startswith(GOAL_METADATA)))):
             continue
         if label and re.match(r"Zone [1-5] \(", label):
             zone_lines.append(line)
@@ -336,11 +360,11 @@ class CoachHandler(BaseHTTPRequestHandler):
             new_cookie = None if session else secrets.token_hex(32)
             self.send_json(200, {**runtime.status(), "csrf": self.csrf(session or new_cookie)}, cookie=new_cookie)
         elif path == "/api/profile":
-            self.send_json(200, profile_fields(runtime.profile()))
+            self.send_json(200, profile_view(runtime.profile()))
         elif path == "/api/profile-summary":
             markdown = runtime.profile()
             visible = '\n'.join(line for line in markdown.splitlines() if not line.startswith(GOAL_METADATA))
-            self.send_json(200, {"profile": profile_fields(markdown), "markdown": visible})
+            self.send_json(200, {"profile": profile_view(markdown), "markdown": visible})
         elif path in ("/exports/athlete.md", "/exports/training_plan.md", "/exports/training_calendar.pdf"):
             filename = path.rsplit('/', 1)[1]
             try:
@@ -357,17 +381,7 @@ class CoachHandler(BaseHTTPRequestHandler):
             if content is None:
                 self.send_json(404, {"error": "Generate a plan to open the dashboard."})
             else:
-                # The pinned dashboard has an offline display branch. Use it
-                # inside the opaque frame, where its status poll cannot run.
-                content = content.replace(
-                    b"if (!['http:','https:'].includes(location.protocol)) {",
-                    b"if (true) {",
-                    1,
-                )
-                # Old saved dashboards retain their DOM for legacy Today links,
-                # while the removed view stays inaccessible without a new AI run.
-                content += b'<style>#toggleViewBtn,#tableView{display:none!important}</style>'
-                self.respond(200, content, "text/html; charset=utf-8", dashboard=True)
+                self.respond(200, saved_dashboard(content), "text/html; charset=utf-8", dashboard=True)
         elif path == "/coach-status.json":
             self.send_json(200, runtime.health())
         else:

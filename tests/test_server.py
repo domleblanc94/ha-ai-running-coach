@@ -127,6 +127,62 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(result["B"]["race_date"], "2027-05-16")
         self.assertEqual(result["C"]["event"], "Run consistently")
 
+    def test_optional_long_run_alternatives_roundtrip_and_preserve_legacy_preference(self):
+        old = "**Athlete Name:** Runner\n**Heart Rate Zones:** Not configured\n**Weekly Availability:** Saturday, Sunday\n**Preferred Long Run Day:** Sunday\n**Preferred Rest Days:** Tuesday\n"
+        fields = profile_fields(old)
+        self.assertEqual(fields['long_run_days'], ['Sunday'])
+        without_field = {key: value for key, value in fields.items() if key != 'long_run_days'}
+        self.assertIn('**Preferred Long Run Day:** Sunday', profile_markdown(without_field, old))
+        fields['long_run_days'] = ['Sunday', 'Saturday']
+        updated = profile_markdown(fields, old)
+        self.assertIn('**Preferred Long Run Days:** Saturday, Sunday', updated)
+        self.assertNotIn('**Preferred Long Run Day:**', updated)
+        self.assertIn('**Preferred Rest Days:** Tuesday', updated)
+        self.assertEqual(profile_fields(updated)['long_run_days'], ['Saturday', 'Sunday'])
+        fields['long_run_days'] = []
+        cleared = profile_markdown(fields, updated)
+        self.assertNotIn('**Preferred Long Run', cleared)
+        self.assertEqual(profile_fields(cleared)['long_run_days'], [])
+
+    def test_long_run_preferences_must_fit_explicit_availability(self):
+        draft = {'name': 'Runner', 'days': ['Tuesday', 'Saturday'], 'long_run_days': ['Sunday']}
+        with self.assertRaisesRegex(ValueError, 'available training days'):
+            profile_markdown(draft)
+        draft['days'] = []
+        self.assertEqual(profile_fields(profile_markdown(draft))['long_run_days'], ['Sunday'])
+        draft['long_run_days'] = []
+        self.assertEqual(profile_fields(profile_markdown(draft))['long_run_days'], [])
+        for invalid in ('Sunday', ['Someday'], [False], None):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                profile_markdown({**draft, 'long_run_days': invalid})
+
+    def test_preference_save_updates_profile_without_coaching_or_changing_schedule(self):
+        session = self.session()
+        before_schedule = self.runtime.status()['schedule']
+        payload = {'name': 'Runner', 'days': ['Friday', 'Saturday'], 'long_run_days': ['Saturday']}
+        code, body, _ = self.request('POST', '/api/profile', json.dumps(payload), session)
+        self.assertEqual(code, 200, body)
+        summary = json.loads(self.request('GET', '/api/profile-summary')[1])
+        self.assertEqual(summary['profile']['long_run_days'], ['Saturday'])
+        self.assertEqual(self.runtime.status()['schedule'], before_schedule)
+        self.assertIsNone(self.runtime.status()['queued'])
+        self.assertFalse((self.runtime.workspace / 'ai_coach_master.sqlite').exists())
+
+    def test_unedited_free_text_long_run_preference_survives_profile_edit(self):
+        self.runtime.save_profile('**Athlete Name:** Runner\n**Heart Rate Zones:** Not configured\n**Preferred Long Run Day:** Weekend mornings\n')
+        session = self.session()
+        saved = json.loads(self.request('GET', '/api/profile')[1])
+        self.assertEqual(saved['long_run_days'], [])
+        self.assertEqual(saved['long_run_preference_text'], 'Weekend mornings')
+        code, body, _ = self.request('POST', '/api/profile', json.dumps({'name': 'Updated runner', 'days': ['Saturday']}), session)
+        self.assertEqual(code, 200, body)
+        self.assertIn('**Preferred Long Run Day:** Weekend mornings', self.runtime.profile())
+        summary = json.loads(self.request('GET', '/api/profile-summary')[1])
+        self.assertEqual(summary['profile']['long_run_preference_text'], 'Weekend mornings')
+        code, _, _ = self.request('POST', '/api/profile', json.dumps({'name': 'Updated runner', 'long_run_days': []}), session)
+        self.assertEqual(code, 200)
+        self.assertNotIn('**Preferred Long Run Day:', self.runtime.profile())
+
     def test_learning_mode_keeps_saved_ranges_and_leaves_new_ranges_unknown(self):
         previous = "**Athlete Name:** Test runner\n**Zone 2 (Endurance):** 140 - 155 bpm\n**Zone 5 (Max):** >= 190 bpm\n"
         draft = {"name": "Test runner", "zone_mode": "learn"}

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0-beta.8
+
+- Align partial weeks with the correct weekday columns in the training calendar.
+- Correct the display of saved dashboards without generating a new plan or spending an AI request.
+- Add optional preferred long-run days in the athlete setup, treated as alternative days for the coach to choose from.
+- Reject new plans with multiple running sessions on one date and identify conflicts in an existing plan. A run and a strength session can still share a date.
+
 ## 0.1.0-beta.7
 
 - Make the normal daily coaching allowance editable in Setup & settings, from 1 to 20 requests, with a default of 2.

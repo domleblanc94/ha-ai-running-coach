@@ -53,6 +53,32 @@ class BudgetTests(unittest.TestCase):
                 restarted.save_config({'daily_request_limit': value})
         self.assertEqual(restarted.status()['config']['daily_request_limit'], 7)
 
+    def test_existing_duplicate_plan_warning_does_not_change_plan_or_budget(self):
+        self.app.save_config({'daily_request_limit': '5'})
+        today = (self.now + timedelta(days=1)).date().isoformat()
+        tomorrow = (self.now + timedelta(days=4)).date().isoformat()
+        another_day = (self.now + timedelta(days=5)).date().isoformat()
+        plan = {'schema_version': 1, 'sessions': [
+            {'id': 'easy', 'date': today, 'workout_type': 'easy_run', 'amount': '7 km', 'target': 'Easy'},
+            {'id': 'long', 'date': today, 'workout_type': 'long_run', 'amount': '16 km', 'target': 'Easy'},
+            {'id': 'other-run', 'date': tomorrow, 'workout_type': 'easy_run', 'amount': '5 km', 'target': 'Easy'},
+            {'id': 'intervals', 'date': tomorrow, 'workout_type': 'interval_run', 'amount': '9 km', 'target': 'Controlled'},
+            {'id': 'another-run', 'date': another_day, 'workout_type': 'easy_run', 'amount': '5 km', 'target': 'Easy'},
+            {'id': 'strength', 'date': another_day, 'workout_type': 'Strength', 'amount': '20 minutes', 'target': 'Easy'},
+        ]}
+        path = self.app.workspace / 'training_plan.json'
+        path.write_text(json.dumps(plan))
+        before = {file: file.read_bytes() for file in (path, self.app.state_file, self.app.workspace / '.env')}
+        with patch.object(self.app, '_command', side_effect=AssertionError('Status must be read only')):
+            status = self.app.status()
+        self.assertEqual(status['running_session_conflicts'], [
+            {'date': today, 'session_ids': ['easy', 'long']},
+            {'date': tomorrow, 'session_ids': ['other-run', 'intervals']},
+        ])
+        self.assertEqual(status['request_budget']['limit'], 5)
+        self.assertEqual(status['request_budget']['used'], 0)
+        self.assertEqual(before, {file: file.read_bytes() for file in before})
+
     def test_malformed_private_limit_is_repairable_without_silently_changing_it(self):
         path = self.app.workspace / '.env'
         path.write_text(path.read_text() + 'COACH_MAX_DAILY_REQUESTS="invalid"\n')

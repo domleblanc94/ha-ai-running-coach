@@ -90,6 +90,7 @@ class Runtime:
         core = Path(core_dir) if core_dir else Path(__file__).resolve().parent.parent / 'core'
         self.calendar_rules = None
         self.calendar_cache = None
+        self.running_calendar_cache = None
         with file_lock(self.state_lock):
             # Install only when no wrapper subprocess is using the workspace.
             with file_lock(self.run_lock, blocking=False):
@@ -171,6 +172,7 @@ class Runtime:
             'worker_ok': self.worker_error is None, 'worker_error': self.worker_error,
             'hr_learning': hr_learning.status(learning, self.workspace / 'ai_coach_master.sqlite', local_day),
             'training_day_conflicts': self._training_day_conflicts(local_day),
+            'running_session_conflicts': self._running_session_conflicts(local_day),
             'request_budget': self._request_budget(config['daily_request_limit'], state),
         }
 
@@ -222,6 +224,19 @@ class Runtime:
             conflicts = self.calendar_rules.training_day_conflicts(plan, parsed, today)
             if key is not None:
                 self.calendar_cache = (key, conflicts)
+            return conflicts
+        except (OSError, ValueError, TypeError, KeyError):
+            return []
+
+    def _running_session_conflicts(self, today):
+        """Warn about an existing saved plan without changing or reviewing it."""
+        try:
+            path = checked(self.workspace / 'training_plan.json')
+            key = (path.stat().st_mtime_ns, path.stat().st_size, today)
+            if self.running_calendar_cache and self.running_calendar_cache[0] == key:
+                return self.running_calendar_cache[1]
+            conflicts = self.calendar_rules.running_session_conflicts(read_json(path), today)
+            self.running_calendar_cache = (key, conflicts)
             return conflicts
         except (OSError, ValueError, TypeError, KeyError):
             return []

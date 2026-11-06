@@ -6,7 +6,8 @@ import math
 import re
 from datetime import date, datetime, timedelta
 from source_policy import normalize_sport
-from training_calendar import calendar_profile, training_days, training_day_conflicts, race_calendar_conflicts
+from training_calendar import (calendar_profile, training_days, training_day_conflicts,
+                               race_calendar_conflicts, preferred_long_run_days, running_session_conflicts)
 
 POLICY_VERSION = 3
 
@@ -337,6 +338,11 @@ def apply_plan_changes(plan, changes, profile, today):
         raise ValueError('Training-day conflict: coach scheduled training outside selected days: ' +
                          '; '.join(item['session_id'] + ' on ' + item['date'] + ' (' + item['weekday'] + ')'
                                    for item in availability_errors))
+    running_errors = running_session_conflicts(result, today)
+    if running_errors:
+        raise ValueError('Multiple-running-session conflict: coach must replace or remove overlapping runs: ' +
+                         '; '.join(item['date'] + ' (' + ', '.join(item['session_ids']) + ')'
+                                   for item in running_errors))
     return result
 
 

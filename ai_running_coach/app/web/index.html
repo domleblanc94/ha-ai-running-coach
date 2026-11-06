@@ -65,6 +65,7 @@
           <label>Running experience<textarea name="experience" maxlength="500" rows="3" placeholder="Current weekly distance, recent long run, or time away from running"></textarea></label>
           <label>Current injury or training constraints<textarea name="injuries" maxlength="500" rows="3" placeholder="Optional"></textarea></label>
           <fieldset class="full"><legend>Available training days</legend><div id="days" class="days"></div><p class="hint">Choose the days you can train. Leaving every day blank means availability is not set and the coach may choose days.</p></fieldset>
+          <fieldset class="full"><legend>Preferred long-run days (optional)</legend><div id="long-run-days" class="days"></div><p id="long-run-hint" class="hint">Leave all blank for no preference. Multiple days give the coach alternative days for your long run; they do not request extra long runs.</p><p id="long-run-saved-note" class="hint" hidden></p><button id="clear-long-run-days" type="button" class="secondary">No preference</button></fieldset>
           <fieldset class="full"><legend>Goal priorities</legend><p class="hint">Add a race or training goal at each priority. Dates and targets are optional.</p><div id="goal-fields" class="goal-grid"></div></fieldset>
           <label>Heart rate zones<select name="zone_mode"><option value="unknown">Unknown / use effort</option><option value="known">Enter configured ranges</option><option value="learn">Learn HR zones from baseline runs</option></select></label>
           <p id="zone-learn-hint" class="hint full" hidden>Start with easy runs guided by effort and the talk test. The coach can review your observations while your saved ranges stay in place.</p>
@@ -102,6 +103,7 @@
       </section>
     </div>
     <section id="dashboard-panel" hidden>
+      <section id="running-conflict-warning" class="card attention" hidden><h2>Saved plan needs review</h2><p id="running-conflict-detail"></p><p>Check your training days and optional long-run preferences, then generate a new plan when you are ready. The saved plan remains in place until the coach produces a valid replacement.</p></section>
       <section id="availability-warning" class="card attention" hidden><h2>Training days have changed</h2><p id="availability-detail"></p><p>The saved plan stays in place until the coach produces a valid replacement. Generate a new plan to apply your saved availability.</p></section>
       <section id="dashboard-empty" class="card" hidden><h2>Your training dashboard starts here</h2><p>Your setup is saved. Generate your first plan to see your calendar and download workouts.</p><button id="first-dashboard-plan" type="button">Generate new plan</button></section>
       <section id="plan-downloads" class="card" hidden>

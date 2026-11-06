@@ -12,7 +12,7 @@ import sys
 import time
 from planning_engine import (parse_profile, parse_plan, validate_plan, build_evidence,
                              fingerprint, validate_review, plan_conflicts, apply_plan_changes, apply_coach_changes, render_plan, race_calendar_conflicts,
-                             training_days, training_day_conflicts)
+                             training_days, training_day_conflicts, preferred_long_run_days, running_session_conflicts)
 from migrate_plan import atomic_write
 from model_provider import ProviderClient, configured_models, provider_identity, provider_name
 from source_policy import activity_source_mode, assert_coaching_sources
@@ -22,8 +22,8 @@ DB_PATH = SCRIPT_DIR / 'ai_coach_master.sqlite'
 ATHLETE_FILE = SCRIPT_DIR / 'athlete.md'
 PLAN_FILE = SCRIPT_DIR / 'training_plan.md'
 CANONICAL_FILE = SCRIPT_DIR / 'training_plan.json'
-PROMPT_VERSION = 'autonomous-coach-v5-availability'
-STARTER_PROMPT_VERSION = 'autonomous-coach-v5-availability-starter-week'
+PROMPT_VERSION = 'autonomous-coach-v6-schedule'
+STARTER_PROMPT_VERSION = 'autonomous-coach-v6-schedule-starter-week'
 
 
 def load_environment():
@@ -100,6 +100,8 @@ def make_prompt(profile, plan, evidence, question):
     data = {'profile': profile, 'upcoming_sessions': future, 'recent_scheduled_sessions':recent_schedule, 'legacy_requires_reconciliation':plan.get('requires_coach_reconciliation',False), 'new_plan_requested':plan.get('new_plan_requested',False), 'race_calendar_conflicts':race_calendar_conflicts(plan,profile,evidence['today']), 'evidence': evidence}
     data['allowed_training_days'] = training_days(profile)
     data['training_day_conflicts'] = training_day_conflicts(plan, profile, evidence['today'])
+    data['preferred_long_run_days'] = preferred_long_run_days(profile)
+    data['running_session_conflicts'] = running_session_conflicts(plan, evidence['today'])
     new_plan_instruction=''
     if plan.get('new_plan_requested'):
         new_plan_instruction='The athlete explicitly requests a NEW plan, replacing the upcoming block. Return ONLY add operations for a complete new future block with fresh unique IDs (not old or retired IDs). Existing future sessions are reference only and will be archived after your replacement validates. Past sessions are preserved. '
@@ -112,6 +114,17 @@ def make_prompt(profile, plan, evidence, question):
         'training milestones and race-pace workouts are training. '
         'When allowed_training_days is null, no weekdays have been explicitly selected; '
         'choose suitable days from the other preferences and evidence, without treating this as zero availability. '
+        'Schedule at most one running session entry per date, including unchanged upcoming sessions. '
+        'When moving a session onto a day that already has a run, explicitly replace or remove the conflicting run; '
+        'do not stack a moved long run or intervals on top of an existing easy run. '
+        'Correct every supplied running_session_conflicts entry as part of the complete resulting schedule. '
+        'Warmups, cooldowns and strides belong inside that single running session or its structured workout. '
+        'A separate non-running session such as strength may share the date. '
+        'preferred_long_run_days lists optional alternative slots for the usual long run, not a request for a long run on every listed day. '
+        'Prefer one of these days when a long run is appropriate; allowed_training_days and configured race dates take precedence. '
+        'Explain a material departure from the long-run preference in the summary or change reason. '
+        'When preferred_long_run_days is null, still honor any meaningful free-text Preferred Long Run Days or Preferred Long Run Day in profile.preferences. '
+        'Only a missing, blank or explicit no-preference value leaves this choice to you; never invent an athlete preference. '
     )
     starter = starter_block(plan, evidence['today'])
     if starter:
@@ -319,7 +332,7 @@ def _run_daily_coach_check(user_question=None, dry_run=False, today=None, build_
     else:
         plan={'schema_version':1,'revision':0,'profile_hash':profile['source_hash'],'goals':profile['goals'],'sessions':[],'requires_coach_reconciliation':True}
     validate_plan(plan, profile)
-    if race_calendar_conflicts(plan,profile,today) or training_day_conflicts(plan,profile,today):
+    if race_calendar_conflicts(plan,profile,today) or training_day_conflicts(plan,profile,today) or running_session_conflicts(plan,today):
         plan['requires_coach_reconciliation']=True
     if DB_PATH.exists():
         conn=sqlite3.connect(DB_PATH.resolve().as_uri()+'?mode=ro',uri=True)

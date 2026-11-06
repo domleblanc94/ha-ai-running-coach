@@ -25,6 +25,14 @@ let candidateSignature = "";
 let setupWasReady = false;
 let profileRequest = 0;
 let downloading = false;
+let longRunPreferenceEdited = false;
+let savedLongRunPreference = "";
+
+function savedLongRunNote() {
+  byId("long-run-saved-note").hidden = !savedLongRunPreference;
+  byId("long-run-saved-note").textContent = "Saved preference: " + savedLongRunPreference
+    + ". This stays unchanged until you edit the preferred days or choose No preference and save.";
+}
 
 for (const day of weekdays) {
   const label = document.createElement("label");
@@ -34,7 +42,24 @@ for (const day of weekdays) {
   input.value = day;
   label.append(input, day.slice(0, 3));
   byId("days").append(label);
+  const preference = document.createElement("label");
+  const choice = document.createElement("input");
+  choice.type = "checkbox";
+  choice.name = "long_run_days";
+  choice.value = day;
+  preference.append(choice, day.slice(0, 3));
+  byId("long-run-days").append(preference);
 }
+byId("clear-long-run-days").addEventListener("click", () => {
+  for (const input of byId("long-run-days").querySelectorAll("input")) input.checked = false;
+  longRunPreferenceEdited = true;
+});
+byId("long-run-days").addEventListener("change", () => { longRunPreferenceEdited = true; });
+byId("days").addEventListener("change", () => {
+  const selected = Array.from(byId("days").querySelectorAll("input:checked"), input => input.value);
+  byId("long-run-hint").textContent = "Leave all blank for no preference. Multiple days are alternatives for your long run, not extra long runs."
+    + (selected.length ? " Choose from your available days: " + selected.join(", ") + "." : " With availability unset, any day can be a preference.");
+});
 for (const [priority, description] of goals) {
   const group = document.createElement("fieldset");
   const legend = document.createElement("legend");
@@ -189,6 +214,7 @@ async function showAthlete() {
     const availability = saved.markdown.match(/^\*\*Weekly Availability:\*\*\s*(.*)$/m)?.[1];
     card("Your running", [["Training goal", data.goal], ["Experience", data.experience],
       ["Training days", data.days.length ? data.days.join(", ") : availability || "Not specified - coach may choose days"],
+      ["Preferred long-run days", data.long_run_preference_text || (data.long_run_days?.length ? data.long_run_days.join(", ") + " (alternative days)" : "No preference")],
       ["Injuries and constraints", data.injuries]]);
     for (const [priority, label] of goals) {
       const goal = data.goals?.[priority];
@@ -236,6 +262,9 @@ function draw(next) {
     title = ["provider_auth", "provider_config", "garmin_auth"].includes(last.code) || lastStatus === "input_required"
       ? "Input required" : next.plan_ready ? "Last run failed" : "First plan could not be generated";
     detail = last.message || "Check the app logs for the run status before trying again.";
+  } else if (next.running_session_conflicts?.length || next.training_day_conflicts?.length) {
+    title = "Saved plan needs review";
+    detail = "Check the plan warnings and your saved training preferences before generating a replacement.";
   } else if (next.plan_ready) {
     title = "Your plan is ready";
     detail = next.schedule?.enabled
@@ -300,6 +329,12 @@ function draw(next) {
   byId("first-dashboard-plan").disabled = byId("new-plan").disabled;
   byId("first-dashboard-plan").textContent = byId("new-plan").textContent;
   const conflicts = next.training_day_conflicts || [];
+  const multipleRuns = next.running_session_conflicts || [];
+  byId("running-conflict-warning").hidden = multipleRuns.length === 0;
+  byId("running-conflict-detail").textContent = multipleRuns.length
+    ? "The saved plan has multiple running sessions on " + multipleRuns.length + (multipleRuns.length === 1 ? " day: " : " days: ")
+      + multipleRuns.slice(0, 5).map(item => item.date + " (" + item.session_ids.length + " runs)").join(", ")
+      + (multipleRuns.length > 5 ? ", and more." : ".") : "";
   byId("availability-warning").hidden = conflicts.length === 0;
   byId("availability-detail").textContent = conflicts.length ? "The saved plan includes " + conflicts.length
     + (conflicts.length === 1 ? " session" : " sessions") + " outside your selected training days: "
@@ -390,6 +425,11 @@ async function refresh() {
         }
       }
       for (const input of byId("days").querySelectorAll("input")) input.checked = (saved.days || []).includes(input.value);
+      for (const input of byId("long-run-days").querySelectorAll("input")) input.checked = (saved.long_run_days || []).includes(input.value);
+      savedLongRunPreference = saved.long_run_preference_text || "";
+      longRunPreferenceEdited = false;
+      savedLongRunNote();
+      byId("days").dispatchEvent(new Event("change"));
       for (const [zone, bounds] of Object.entries(saved.zones || {})) {
         field(profile, "zone_" + zone + "_low").value = bounds[0];
         field(profile, "zone_" + zone + "_high").value = bounds[1];
@@ -478,6 +518,11 @@ formAction(profile, "profile", () => {
     }
   }
   payload.days = Array.from(byId("days").querySelectorAll("input:checked"), input => input.value);
+  const preferredDays = Array.from(byId("long-run-days").querySelectorAll("input:checked"), input => input.value);
+  if (payload.days.length && preferredDays.some(day => !payload.days.includes(day))) {
+    throw new Error("Preferred long-run days must also be selected as available training days. Update your availability or clear those preferences.");
+  }
+  if (longRunPreferenceEdited) payload.long_run_days = preferredDays;
   payload.zone_mode = field(profile, "zone_mode").value;
   payload.zones = {};
   if (field(profile, "zone_mode").value === "known") {
@@ -489,6 +534,12 @@ formAction(profile, "profile", () => {
     if (!payload.zones[2]) throw new Error("Enter Zone 2 or choose unknown zones.");
   }
   return payload;
+}, () => {
+  if (longRunPreferenceEdited) {
+    savedLongRunPreference = Array.from(byId("long-run-days").querySelectorAll("input:checked"), input => input.value).join(", ");
+    savedLongRunNote();
+  }
+  longRunPreferenceEdited = false;
 });
 formAction(schedule, "schedule", () => ({
   enabled: field(schedule, "enabled").checked,

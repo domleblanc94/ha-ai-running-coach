@@ -84,6 +84,8 @@ class DiagnosticsTests(unittest.TestCase):
         for envelope in ('response was not JSON', 'unexpected response envelope', 'text response was missing'):
             with self.subTest(envelope=envelope):
                 self.assertEqual(diagnostics.request_failure('failed', 'gemini API: ' + envelope), 'response_invalid')
+        self.assertEqual(diagnostics.request_failure('invalid', 'Multiple-running-session conflict: synthetic date'), 'multiple_runs_conflict')
+        self.assertEqual(diagnostics.failure_stage('multiple_runs_conflict'), 'coaching')
 
     def fixture_provider(self, mode):
         # Modify only this test's installed workspace. The pinned source remains
@@ -95,7 +97,7 @@ class DiagnosticsTests(unittest.TestCase):
 import json as _fixture_json
 import socket as _fixture_socket
 from pathlib import Path as _FixturePath
-from datetime import date as _FixtureDate
+from datetime import date as _FixtureDate, timedelta as _FixtureDelta
 def _fixture_no_network(*args, **kwargs):
     raise AssertionError('External network forbidden in diagnostic test')
 _fixture_socket.socket.connect = _fixture_no_network
@@ -117,6 +119,17 @@ def _fixture_post(self, path, payload, headers):
     }
     if mode == 'review':
         review['plan_changes'] = []
+    if mode in ('four_runs', 'move_conflict'):
+        entries = [('sat-easy', 1, 'easy_run', '7 km'), ('sun-long', 2, 'long_run', '16 km'),
+                   ('tue-easy', 4, 'easy_run', '8 km'), ('wed-intervals', 5, 'interval_run', '9 km')]
+        if mode == 'move_conflict':
+            entries = [('sun-long', 1, 'long_run', '16 km'), ('wed-intervals', 4, 'interval_run', '9 km')]
+        review['plan_changes'] = [
+            {'op': 'add' if mode == 'four_runs' else 'update', 'session_id': sid,
+             'session': {'id': sid, 'date': (_FixtureDate.today() + _FixtureDelta(days=offset)).isoformat(),
+                         'workout_type': kind, 'amount': amount, 'target': 'Comfortable conversational effort'},
+             'reason': 'Synthetic move to an already occupied running day'}
+            for sid, offset, kind, amount in entries]
     return {'candidates': [{'content': {'parts': [{'text': _fixture_json.dumps(review)}]},
                            'finishReason': 'MAX_TOKENS' if mode == 'truncated' else 'STOP'}]}
 ProviderClient._post = _fixture_post
@@ -264,6 +277,24 @@ ProviderClient._post = _fixture_post
         self.assertEqual(self.app.profile(), profile)
         self.assertNotIn(PRIVATE, json.dumps(last) + log.getvalue())
         self.assertIn('[coaching/availability_conflict]', log.getvalue())
+
+    def test_actual_invalid_moves_are_rejected_without_changing_saved_plan(self):
+        self.fixture_provider('four_runs')
+        self.app.enqueue('new_plan')
+        self.assertTrue(self.app.tick())
+        paths = [self.app.workspace / name for name in ('athlete.md', 'training_plan.json', 'training_plan.md')]
+        before = {path: path.read_bytes() for path in paths}
+        dashboard = self.app.dashboard()
+        (self.app.workspace / 'provider_fixture.json').write_text('move_conflict', encoding='utf-8')
+        self.app.enqueue('run_now')
+        self.assertTrue(self.app.tick())
+        last = self.app.status()['last_run']
+        self.assertEqual(last['code'], 'multiple_runs_conflict', last)
+        self.assertEqual(last['stage'], 'coaching')
+        self.assertEqual(last['request_attempts'], 1)
+        self.assertEqual(before, {path: path.read_bytes() for path in paths})
+        self.assertEqual(self.app.dashboard(), dashboard)
+        self.assertFalse(self.app.tick())
 
 
 if __name__ == '__main__':

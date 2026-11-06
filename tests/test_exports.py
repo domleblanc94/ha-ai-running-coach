@@ -5,6 +5,7 @@ from pathlib import Path
 import tempfile
 import threading
 import unittest
+from unittest.mock import patch
 
 from ai_running_coach.app.runtime import Runtime
 from ai_running_coach.app.server import CoachServer, profile_markdown
@@ -100,6 +101,27 @@ class ExportTests(unittest.TestCase):
         self.assertTrue(body.startswith(legacy))
         self.assertIn(b'#toggleViewBtn,#tableView{display:none!important}', body)
         self.assertEqual((self.runtime.public / 'dashboard.html').read_bytes(), legacy)
+
+    def test_saved_calendar_fix_is_response_only_and_keeps_opaque_frame_policy(self):
+        self.plan()
+        legacy = b'<html><body><div id="calendarView"><div id="calendarGridContainer"></div></div></body></html>'
+        dashboard = self.runtime.public / 'dashboard.html'
+        dashboard.write_bytes(legacy)
+        paths = [dashboard, self.runtime.state_file, self.runtime.workspace / '.env',
+                 self.runtime.workspace / 'athlete.md', self.runtime.workspace / 'training_plan.json',
+                 self.runtime.workspace / 'training_plan.md']
+        before = {path: path.read_bytes() for path in paths}
+        with patch.object(self.runtime, '_command', side_effect=AssertionError('Rendering must not run the coach')):
+            code, body, headers = self.request('/dashboard')
+        self.assertEqual(code, 200)
+        self.assertTrue(body.startswith(legacy))
+        self.assertIn(b'window.CoachCalendar', body)
+        self.assertIn(b'No session planned', body)
+        self.assertNotIn(b'private-key-never-exported', body)
+        self.assertIn("sandbox allow-scripts allow-downloads", headers['Content-Security-Policy'])
+        self.assertNotIn('allow-same-origin', headers['Content-Security-Policy'])
+        self.assertEqual(before, {path: path.read_bytes() for path in paths})
+        self.assertFalse((self.runtime.workspace / 'ai_coach_master.sqlite').exists())
 
 
 if __name__ == '__main__':

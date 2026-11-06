@@ -1,6 +1,6 @@
 # Public source release review
 
-Status: **public beta 0.2.3b4**, intended for technical self-hosters running one personal source-checkout installation. It is not a stable, universally validated provider/device integration. Repository pushes and GitHub Release publication are separate maintainer operations. A separate personal Linux installation was backed up, migrated and checked against the official Garmin Personal API. Provider validation scope is recorded below.
+Status: **public beta 0.2.3b5**, intended for technical self-hosters running one personal source-checkout installation. It is not a stable, universally validated provider/device integration. Repository pushes and GitHub Release publication are separate maintainer operations. A separate personal Linux installation was backed up, migrated and checked against the official Garmin Personal API. Provider validation scope is recorded below.
 
 ## Findings corrected
 
@@ -20,7 +20,7 @@ Status: **public beta 0.2.3b4**, intended for technical self-hosters running one
 
 ## Verified scope
 
-Local verification uses Windows and CPython 3.13. The clean-source flow installs only base HTTP/dotenv dependencies in a new virtual environment, initializes without an existing profile/database/plan, runs an offline new-plan preview, imports synthetic summaries, and renders a synthetic dashboard. The latest network-blocked suite ran **187 tests: 183 passed and four optional checks skipped**. Seven FIT checks separately passed with Garmin's official decoder available. Provider protocol and failure-path tests use mocked HTTP responses; these establish request handling and validation behavior, not coaching quality.
+Local verification uses Windows and CPython 3.13. The clean-source flow installs only base HTTP/dotenv dependencies in a new virtual environment, initializes without an existing profile/database/plan, runs an offline new-plan preview, imports synthetic summaries, and renders a synthetic dashboard. The latest network-blocked suite ran **202 tests: 198 passed and four optional checks skipped**. Seven FIT checks separately passed with Garmin's official decoder available. Provider protocol and failure-path tests use mocked HTTP responses; these establish request handling and validation behavior, not coaching quality.
 
 During beta 1, one separately authorized live evaluation request to `gemini-3.5-flash-lite` succeeded with a 4096-token output cap. Provider-reported usage was 2861 input and 875 output tokens. The synthetic response contained three future calendar entries: a 30-minute easy running workout with an open/conversational target and two rest days, plus an `insufficient_evidence` trajectory. The same saved response then passed normal validation, journaled SQLite/file plan application and HTML rendering offline, without another API call. Production configuration, profile, plan and database were unchanged. This checks one account/model and a small synthetic end-to-end plan path; it does not establish free-tier eligibility, actual billed cost or coaching suitability for a real athlete.
 
@@ -39,6 +39,12 @@ Explicit weekly training days are validated before new coaching changes are comm
 ### Beta 4
 
 The normal daily coaching allowance remains two requests and can be configured from 1 to 20. A separate, explicitly confirmed manual exception permits one extra request per UTC day after that allowance is exhausted. The exception is dated, recorded in the request ledger and unavailable to scheduled runs. Failed provider attempts still count; changing an app allowance does not change a provider's quota, account access or pricing.
+
+### Beta 5
+
+Calendar sessions align with their actual weekdays when the first displayed week starts partway through the week. Days without an entry show **No session planned** in the Monday-to-Sunday grid, distinct from an explicit rest day, and sessions on the same date stay together. The compact mobile layout avoids empty gaps. This is a display correction; it does not change saved session dates or request a new coaching plan.
+
+The athlete profile can specify preferred long-run days as alternatives for the coach to choose from. Future plan changes must avoid putting multiple running sessions on the same date; a run and a strength session can still share a date. Moving a run onto an occupied running day therefore requires the coach to reconcile the existing session in the same valid update. Existing plan conflicts remain visible until a valid coaching update resolves them; the software does not silently delete or move sessions.
 
 ## Beta tester path
 

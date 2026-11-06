@@ -30,7 +30,13 @@ The allowance is an app limit, not a monetary spending cap. Increasing it or con
 
 After initial setup, the app opens on **Training dashboard**. Use **Athlete profile** to review your saved goals, available training days, running background and heart-rate settings. Use **Setup & settings** when you want to edit them.
 
+The calendar keeps dates in their Monday-to-Sunday columns, including a first week that starts partway through the week. **No session planned** means the saved plan has no entry for that date; it is distinct from a prescribed rest day. Multiple sessions on one date appear together. Compact mobile layouts omit empty gaps. Updating the app corrects the display of an existing dashboard without requiring a new coaching request or changing its saved session dates.
+
 Save changes to available training days before generating a replacement plan. With no days selected, availability is unspecified and the coach chooses the days. Once days are selected, a new plan must keep future training within them. Rest days may fall on any day, and an actual configured race can remain on its booked date. A saved profile change does not rewrite the existing plan by itself: the coach must return a valid new plan before it replaces the upcoming schedule. Completed and historical sessions remain part of your training record.
+
+Use **Preferred long-run days (optional)** to offer the coach one or more suitable days. Select several to offer alternatives; this does not ask for a long run on every selected day. Use **No preference** to clear the selection and let the coach choose from your available days. If you have selected available training days, preferred long-run days must be among them. Save the profile before requesting the next review or replacement plan.
+
+The app currently supports one planned running session per date. A run and a strength session may share a date. If the coach moves a run to a date that already has a run, it must reconcile the existing session in the same update. A conflicting response is rejected and the last valid saved plan is retained. Conflicts already present in an older plan are shown for review; saving settings or updating the app does not silently move or delete those sessions.
 
 Download the calendar as a PDF for printing or sharing. You can also download **athlete.md** and **training_plan.md**. These exports contain your private profile and training information; store and share them accordingly. They do not contain connection API keys. Exporting saved data does not make an AI request.
 

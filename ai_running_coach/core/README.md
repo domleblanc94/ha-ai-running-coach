@@ -1,6 +1,6 @@
 # AI Coach
 
-**Public beta 0.2.3b4** for technical self-hosters running their own installation. Expect to use a terminal, edit a private `.env` and profile, and review generated plans. This is a source-checkout application, with optional Home Assistant publishing. It is not a hosted service or a turnkey watch-sync app.
+**Public beta 0.2.3b5** for technical self-hosters running their own installation. Expect to use a terminal, edit a private `.env` and profile, and review generated plans. This is a source-checkout application, with optional Home Assistant publishing. It is not a hosted service or a turnkey watch-sync app.
 
 A self-hosted running coach that combines AI-authored training plans with local activity analysis and a mobile-friendly HTML dashboard. Run it manually or on a schedule; optionally publish the page to Home Assistant using your existing SSH transport.
 
@@ -79,6 +79,8 @@ python ai_coach.py --dry-run --new-plan
 ```
 
 Check that your goals, availability, activity source and missing-data labels are correct. Review `.env` request/output limits before enabling a schedule. The live `--new-plan` command below automatically saves a valid AI-authored future block; inspect that block before training from it. The request-count limit is not a monetary spending cap.
+
+In `athlete.md`, an optional line such as `**Preferred Long Run Days:** Saturday, Sunday` gives the coach alternative long-run days. It does not request a long run on every listed day. Leave it blank or use `No preference` to let the coach choose. When weekly availability is explicit, preferred days must be within it. New plan changes must keep at most one running session per date; a run and a strength session can share a date. Existing conflicts need a valid coach update, rather than silent changes to saved sessions.
 
 | Setting | Purpose |
 | --- | --- |
