@@ -70,7 +70,7 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
         <!-- MACRO COACHING FEEDBACK BANNER -->
         <div id="macroCoachBanner" class="hidden bg-slate-850 border border-amber-500/40 rounded-xl p-5 shadow-lg relative overflow-hidden">
             <div class="flex items-center gap-3 mb-3 text-amber-400 font-bold text-lg border-b border-slate-700/60 pb-2">
-                <i class="fa-solid fa-user-ninja"></i> AI Coach Daily Review & Focus
+                <i class="fa-solid fa-user-ninja"></i> AI Endurance Coach Daily Review & Focus
             </div>
             {assessment_html}
             <div id="macroCoachContent" class="text-xs md:text-sm text-slate-300 space-y-2 prose prose-invert prose-sm max-w-none leading-relaxed"></div>

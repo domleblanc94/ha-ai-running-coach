@@ -1,6 +1,6 @@
-# Public source release review
+# AI Endurance Coach release review
 
-Status: **public beta 0.3.0b1**, intended for technical self-hosters running one personal source-checkout installation. It is not a stable, universally validated provider/device integration. Repository pushes and GitHub Release publication are separate maintainer operations. A separate personal Linux installation was backed up, migrated and checked against the official Garmin Personal API. Provider validation scope is recorded below.
+Status: **public beta 0.3.0b2**, intended for technical self-hosters running one personal source-checkout installation. This release adopts the AI Endurance Coach display name; repository, package and runtime identifiers remain unchanged. It is not a stable, universally validated provider/device integration. Repository pushes and GitHub Release publication are separate maintainer operations. A separate personal Linux installation was backed up, migrated and checked against the official Garmin Personal API. Provider validation scope is recorded below.
 
 ## Findings corrected
 
