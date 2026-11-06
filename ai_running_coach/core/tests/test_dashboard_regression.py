@@ -75,7 +75,8 @@ class RestoredDashboardTests(unittest.TestCase):
                 response['plan_changes'] = [{'op': 'add', 'session_id': 'starter-session', 'reason': 'Starter session rationale'}]
             for version in ('autonomous-coach-v4-starter-week', 'autonomous-coach-v5-availability',
                             'autonomous-coach-v5-availability-starter-week', 'autonomous-coach-v6-schedule',
-                            'autonomous-coach-v6-schedule-starter-week'):
+                            'autonomous-coach-v6-schedule-starter-week', 'autonomous-coach-v7-new-plan',
+                            'autonomous-coach-v7-new-plan-starter-week'):
                 with self.subTest(version=version), closing(sqlite3.connect(db)) as conn:
                     conn.execute('UPDATE coach_review_jobs SET prompt_version=?, response_json=?',
                                  (version, json.dumps(response)))

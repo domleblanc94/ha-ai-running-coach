@@ -15,6 +15,8 @@ MESSAGES = {
     'provider_config': 'Check the selected AI provider, model and key in Settings.',
     'provider_truncated': 'The AI response reached its output limit and could not be applied.',
     'response_invalid': 'The AI response did not pass validation. The app kept the saved plan state.',
+    'new_plan_operations': 'The AI supplied unsupported instructions for replacing the upcoming plan, so the app kept the saved plan.',
+    'session_id_conflict': 'The AI reused an existing or retired session ID for a new session, so the app kept the saved plan.',
     'availability_conflict': 'The AI plan scheduled training outside your selected days, so it was not applied. Review your saved training days and generate a new plan when your request allowance permits.',
     'multiple_runs_conflict': 'The AI plan put more than one running session on a day, so it was not applied. Check your training days and optional long-run preferences before generating a new plan.',
     'daily_budget': 'The app has used its coaching request allowance for this UTC day. Wait for the reset, adjust the daily limit in Settings, or confirm an extra request if available.',
@@ -45,7 +47,7 @@ def failure_stage(code):
         return 'activities'
     if code.startswith('provider_') or code in {
         'daily_budget', 'review_budget', 'input_too_large', 'response_invalid', 'manual_extra_expired', 'manual_extra_unavailable',
-        'profile_invalid', 'source_provenance', 'availability_conflict', 'multiple_runs_conflict',
+        'profile_invalid', 'source_provenance', 'availability_conflict', 'multiple_runs_conflict', 'new_plan_operations', 'session_id_conflict',
     }:
         return 'coaching'
     if code == 'dashboard_render_failed':
@@ -103,6 +105,10 @@ def command_failure(stderr):
 
 def request_failure(status, error):
     if status == 'invalid':
+        if error == 'A new plan requires added sessions with new unique IDs.':
+            return 'new_plan_operations'
+        if error == 'Added session ID already exists or was retired.':
+            return 'session_id_conflict'
         if isinstance(error, str) and error.startswith('Multiple-running-session conflict:'):
             return 'multiple_runs_conflict'
         if isinstance(error, str) and error.startswith('Training-day conflict: coach scheduled training outside selected days: '):

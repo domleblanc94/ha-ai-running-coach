@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0-beta.9
+
+- Clarify replacement-plan instructions with fresh session identifiers and explicit weekday availability.
+- Handle redundant deletion of known future sessions during a valid replacement, while retaining historical, identifier and training-day checks.
+- Show specific reasons for unsupported replacement instructions and reused session identifiers, including matching saved failures from before the update.
+
 ## 0.1.0-beta.8
 
 - Align partial weeks with the correct weekday columns in the training calendar.

@@ -87,6 +87,45 @@ class DiagnosticsTests(unittest.TestCase):
         self.assertEqual(diagnostics.request_failure('invalid', 'Multiple-running-session conflict: synthetic date'), 'multiple_runs_conflict')
         self.assertEqual(diagnostics.failure_stage('multiple_runs_conflict'), 'coaching')
 
+    def test_new_plan_operation_diagnostic_matches_only_fixed_invalid_error(self):
+        for error, code in {
+            'A new plan requires added sessions with new unique IDs.': 'new_plan_operations',
+            'Added session ID already exists or was retired.': 'session_id_conflict',
+        }.items():
+            with self.subTest(code=code):
+                self.assertEqual(diagnostics.request_failure('invalid', error), code)
+                self.assertEqual(diagnostics.failure_stage(code), 'coaching')
+                self.assertIsNone(diagnostics.request_failure('failed', error))
+                self.assertEqual(diagnostics.request_failure('invalid', error + ' ' + PRIVATE), 'response_invalid')
+
+    def test_saved_generic_new_plan_failure_gets_safe_readonly_diagnostic(self):
+        started = datetime.now(timezone.utc) - timedelta(minutes=4)
+        finished = started + timedelta(minutes=1)
+        ledger = self.ledger([
+            (1, (started + timedelta(seconds=1)).isoformat(), 'invalid',
+             'A new plan requires added sessions with new unique IDs.', 'daily'),
+            (2, (finished + timedelta(seconds=1)).isoformat(), 'invalid', PRIVATE, 'daily'),
+        ])
+        last = {'action': 'new_plan', 'status': 'failed', 'code': 'response_invalid', 'stage': 'coaching',
+                'message': diagnostics.MESSAGES['response_invalid'], 'started_at': started.isoformat(),
+                'finished_at': finished.isoformat(), 'request_attempts': 1}
+        state = self.app._state()
+        state['last_run'] = last
+        atomic_json(self.app.state_file, state)
+        files = [ledger, self.app.state_file, self.app.workspace / 'athlete.md', self.app.workspace / '.env']
+        before = {path: path.read_bytes() for path in files}
+        with patch.object(self.app, '_command', side_effect=AssertionError('Status must not run the coach')):
+            recovered = self.app.status()['last_run']
+        self.assertEqual(recovered['code'], 'new_plan_operations')
+        self.assertEqual(recovered['request_attempts'], 1)
+        self.assertEqual(recovered['stage'], 'coaching')
+        self.assertNotIn(PRIVATE, json.dumps(recovered))
+        self.assertEqual(before, {path: path.read_bytes() for path in files})
+        state['last_run'] = dict(last, started_at=(finished + timedelta(seconds=1)).isoformat(),
+                                 finished_at=(finished + timedelta(seconds=2)).isoformat())
+        atomic_json(self.app.state_file, state)
+        self.assertEqual(self.app.status()['last_run']['code'], 'response_invalid')
+
     def fixture_provider(self, mode):
         # Modify only this test's installed workspace. The pinned source remains
         # untouched. The exact isolated adapter/engine/rendering code still runs.
@@ -119,6 +158,12 @@ def _fixture_post(self, path, payload, headers):
     }
     if mode == 'review':
         review['plan_changes'] = []
+    if mode == 'replace':
+        addition = review['plan_changes'][0]
+        addition['session_id'] = addition['session']['id'] = 'synthetic-replacement-run'
+        review['plan_changes'] = [
+            {'op': 'delete', 'session_id': 'synthetic-easy-run', 'session': None,
+             'reason': 'Replace the known upcoming session with the new block'}, addition]
     if mode in ('four_runs', 'move_conflict'):
         entries = [('sat-easy', 1, 'easy_run', '7 km'), ('sun-long', 2, 'long_run', '16 km'),
                    ('tue-easy', 4, 'easy_run', '8 km'), ('wed-intervals', 5, 'interval_run', '9 km')]
@@ -160,6 +205,23 @@ ProviderClient._post = _fixture_post
         self.assertIn('remains available', failure['message'])
         self.assertIn('[coaching/provider_truncated]', log.getvalue())
         self.assertNotIn(PRIVATE, json.dumps(failure) + log.getvalue())
+
+    def test_actual_new_plan_accepts_redundant_future_delete_and_fresh_addition(self):
+        self.fixture_provider('success')
+        self.app.enqueue('new_plan')
+        self.assertTrue(self.app.tick())
+        self.assertEqual(self.app.status()['last_run']['status'], 'success')
+        (self.app.workspace / 'provider_fixture.json').write_text('replace', encoding='utf-8')
+        self.app.enqueue('new_plan')
+        self.assertTrue(self.app.tick())
+        last = self.app.status()['last_run']
+        self.assertEqual(last['status'], 'success', last)
+        self.assertEqual(last['request_attempts'], 1)
+        plan = json.loads((self.app.workspace / 'training_plan.json').read_text(encoding='utf-8'))
+        self.assertEqual([item['id'] for item in plan['sessions']], ['synthetic-replacement-run'])
+        self.assertIn('synthetic-easy-run', plan['retired_session_ids'])
+        self.assertEqual(self.app.status()['request_budget']['used'], 2)
+        self.assertEqual(self.app.dashboard(), (self.app.workspace / 'dashboard.html').read_bytes())
 
     def test_actual_provider_failure_and_budget_exhaustion_do_not_silently_retry(self):
         self.fixture_provider('transport')

@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "release": "0.2.3-beta.5",
+  "release": "0.2.3-beta.6",
   "license_status": "selected",
   "files": [
     {
@@ -21,11 +21,11 @@
     },
     {
       "path": "README.md",
-      "sha256": "29214c68347a040a47c46541332ab9fa4ea2b922ab1cf4a037fb9dd2086f1495"
+      "sha256": "486c8222abafe656160474ba1be894bb28e5f8caeb8c45b70f85420e59dc8c0d"
     },
     {
       "path": "ai_coach.py",
-      "sha256": "1040fc8f0c798a034958d7dd85522a36de4437ab02b59b36ef0a762d60525fd2"
+      "sha256": "d2a7b95fcde596ecc7bc7312c36e4d61d38691f84e6c658d9f617dc593a9bb7c"
     },
     {
       "path": "coach_checkin.py",
@@ -109,7 +109,7 @@
     },
     {
       "path": "dashboard_panels.py",
-      "sha256": "2d4e5aa335ba2a8cd502344cbc1115f8dce3d047eaf82e97fddf755b4c761586"
+      "sha256": "1871eb6c47cd4872fc8af5a208e5d4e240c9a9031035cd3790461882560dfa91"
     },
     {
       "path": "dashboard_template.py",
@@ -121,7 +121,7 @@
     },
     {
       "path": "docs/RELEASE_REVIEW.md",
-      "sha256": "c7617574aae69ead28dded678a82a664f9191cb963f3fa8dc422bd86ceee7600"
+      "sha256": "8f8b755ba431577e2b6b29a6f71e83f30e7023aa66ba983022e1cee44ecf4fea"
     },
     {
       "path": "docs/THIRD_PARTY.md",
@@ -153,7 +153,7 @@
     },
     {
       "path": "generate_dashboard.py",
-      "sha256": "1eb979769b3d33836a773657749c8970f5142e32793c0429abbb46e9fe38f414"
+      "sha256": "8863496d3b86e4a626290a6e27d484f93f21fa6548f3493a8f329dbdecc65bb3"
     },
     {
       "path": "health_status.py",
@@ -177,11 +177,11 @@
     },
     {
       "path": "planning_engine.py",
-      "sha256": "b471bcf0a3b2164e434b7e831463b7bd0e0505911e8cc8f21802185aa744235c"
+      "sha256": "f64c9c1275b7a1ade46cc0b531eead73c767e1f0fbded85f0f25d0edb6abb27c"
     },
     {
       "path": "prepare_release.py",
-      "sha256": "007ba469345f91493837acf2b311971723e024c9b11e1f1a51d88053cdbb108e"
+      "sha256": "a3db3d3db57e9696baec46b3a34c852cf103628719f102290d025b53820ef1c7"
     },
     {
       "path": "publish_if_ready.py",
@@ -189,7 +189,7 @@
     },
     {
       "path": "pyproject.toml",
-      "sha256": "bb545ac87988b9a000c65521be26805f557d2d4da18f57b0255ce9021f5d3071"
+      "sha256": "141f09dc87f252726aeeb557b03177970dd8f2920cd551eb19841af83a4991c5"
     },
     {
       "path": "requirements.txt",
@@ -221,7 +221,7 @@
     },
     {
       "path": "tests/test_dashboard_regression.py",
-      "sha256": "aa6d3adc7585586f430b223216781e5bedd70c969ebe24dc4e53594080212023"
+      "sha256": "306d40dc6aa499dc5a70da2d2e27e54887bb6f175edddc1e2b9c1a54a87250e1"
     },
     {
       "path": "tests/test_dashboard_workflow.py",
@@ -266,6 +266,10 @@
     {
       "path": "tests/test_model_providers.py",
       "sha256": "24db31bccece4616f6961b8f020095ae3345e29d04346bcc67e5c16aa0b97dda"
+    },
+    {
+      "path": "tests/test_new_plan_contract.py",
+      "sha256": "52df0116549f8e711fa15acde2b26753c04e2a9eb40c61251090d6af63ff7932"
     },
     {
       "path": "tests/test_operations.py",

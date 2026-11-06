@@ -55,6 +55,7 @@ Start with **Coach Status** in the app. A failed run shows its time, stage, reas
 - **Daily budget:** wait until 00:00 UTC, change the normal allowance in **Setup & settings**, or confirm **Run once anyway** if today's extra request is still available.
 - **Provider quota:** check the provider account or wait for its reset. The app's extra request cannot bypass a provider quota.
 - **Truncated or invalid response:** the app keeps the last valid plan. Check the reason and request allowance before retrying.
+- **Replacement instructions or session identifier conflict:** the AI response could not safely replace the upcoming plan. The saved plan stays available. Updating may explain an earlier failure more precisely, but it does not replay rejected responses or start another request.
 - **Training-day conflict:** the proposed plan used a day outside your saved availability and was not applied. Review your saved days, then request a new plan when your allowance permits. Any previous plan stays visible until it is replaced successfully.
 - **Rendering, publication or storage:** check the app logs and storage. Back up the app before reinstalling or restoring it.
 

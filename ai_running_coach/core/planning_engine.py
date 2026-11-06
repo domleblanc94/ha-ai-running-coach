@@ -346,9 +346,46 @@ def apply_plan_changes(plan, changes, profile, today):
     return result
 
 
+def new_session_id_prefix(plan, today):
+    """Offer the model unused technical IDs without changing its prescriptions."""
+    reserved = set(plan.get('retired_session_ids', [])) | {session['id'] for session in plan['sessions']}
+    base = 'block-' + str(plan['revision'] + 1) + '-' + str(today).replace('-', '') + '-'
+    prefix = base
+    counter = 0
+    while any(identifier.startswith(prefix) for identifier in reserved):
+        counter += 1
+        prefix = base + str(counter) + '-'
+    return prefix
+
+
 def apply_new_plan(plan,changes,profile,today):
     """Replace only future scheduling after a valid AI-authored block exists."""
-    if not isinstance(changes,list) or not changes or any(change.get('op')!='add' for change in changes if isinstance(change,dict)):
+    if not isinstance(changes,list) or not changes or len(changes)>60:
+        raise ValueError('A new plan requires added sessions with new unique IDs.')
+    future_ids={session['id'] for session in plan['sessions'] if session['date']>=str(today)}
+    additions=[]
+    seen=set()
+    for change in changes:
+        if not isinstance(change,dict) or set(change)!={'op','session_id','session','reason'}:
+            raise ValueError('Invalid change fields.')
+        sid=change['session_id']
+        if not isinstance(sid,str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,100}',sid) or sid in seen:
+            raise ValueError('Invalid or duplicate operation/ID.')
+        seen.add(sid)
+        if not isinstance(change['reason'],str) or not 1<=len(change['reason'])<=500:
+            raise ValueError('Each change needs a concise coaching reason.')
+        if change['op']=='delete':
+            # The engine already archives every old future entry. Accept an
+            # explicit acknowledgement of that same removal, never extra edits.
+            if change['session'] is not None:
+                raise ValueError('Delete must have null session.')
+            if sid not in future_ids:
+                raise ValueError('Cannot change unknown or historical sessions.')
+        elif change['op']=='add':
+            additions.append(change)
+        else:
+            raise ValueError('A new plan requires added sessions with new unique IDs.')
+    if not additions:
         raise ValueError('A new plan requires added sessions with new unique IDs.')
     prepared=copy.deepcopy(plan)
     future=[session for session in prepared['sessions'] if session['date']>=str(today)]
@@ -358,7 +395,7 @@ def apply_new_plan(plan,changes,profile,today):
         prepared.setdefault('superseded_blocks',[]).append({'revision':plan['revision'],'superseded_from':str(today),'sessions':future})
     prepared['requires_coach_reconciliation']=True
     prepared.pop('new_plan_requested',None)
-    result=apply_plan_changes(prepared,changes,profile,today)
+    result=apply_plan_changes(prepared,additions,profile,today)
     result['active_block_started_on']=str(today)
     return result
 

@@ -536,7 +536,11 @@ class Runtime:
 
     def _last_run(self, state):
         last = state['last_run']
-        if not last or last.get('status') != 'failed' or last.get('code') != 'pipeline_failed' or last.get('stage'):
+        if not last or last.get('status') != 'failed':
+            return last
+        generic_validation = last.get('code') == 'response_invalid'
+        old_unknown = last.get('code') == 'pipeline_failed' and not last.get('stage')
+        if not (generic_validation or old_unknown):
             return last
         try:
             started = datetime.fromisoformat(last['started_at'])
@@ -546,6 +550,14 @@ class Runtime:
         except (ValueError, KeyError, TypeError):
             return last
         request, attempts = self._request_details(started, finished)
+        if generic_validation:
+            code = diagnostics.request_failure(request[1], request[2]) if request else None
+            # Reclassify only this evidenced failure, without changing its saved
+            # state or interpreting arbitrary response/error content for the UI.
+            if code not in {'new_plan_operations', 'session_id_conflict'}:
+                return last
+            return dict(last, code=code, stage=diagnostics.failure_stage(code),
+                        message=self._with_dashboard_context(diagnostics.MESSAGES[code]), request_attempts=attempts)
         code, message = self._failure(started, request, finished=finished)
         return dict(last, code=code, stage=diagnostics.failure_stage(code),
                     message=self._with_dashboard_context(message), request_attempts=attempts)
