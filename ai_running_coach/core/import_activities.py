@@ -20,8 +20,8 @@ from database_manager import ensure_schema, ingest_payload
 ROOT=Path(__file__).resolve().parent
 REQUIRED={'id','start_date','type'}
 TEXT={'name','description'}
-NUMERIC={'distance_m','moving_time_s','elapsed_time_s','elevation_gain_m',
-         'avg_heartrate','max_heartrate','perceived_exertion'}
+NUMERIC={'distance_m','moving_time_s','timer_duration_s','elapsed_time_s','elevation_gain_m',
+         'avg_heartrate','max_heartrate','perceived_exertion','avg_watts','weighted_avg_watts'}
 ALLOWED=REQUIRED|TEXT|NUMERIC
 
 

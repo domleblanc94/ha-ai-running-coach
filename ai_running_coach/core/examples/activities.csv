@@ -1,3 +1,4 @@
-id,start_date,type,name,distance_m,moving_time_s,elapsed_time_s,elevation_gain_m,avg_heartrate,description
-1,2027-01-01T08:00:00Z,Run,Fictional example run,4000,1800,1900,35,,Synthetic example only
-2,2027-01-03T09:00:00Z,Walk,Fictional example walk,,1200,,,,Missing distance remains unknown
+id,start_date,type,name,distance_m,timer_duration_s,moving_time_s,elapsed_time_s,elevation_gain_m,avg_heartrate,avg_watts,weighted_avg_watts,description
+1,2027-01-01T08:00:00Z,Run,Fictional example run,4000,,1800,1900,35,,,,Synthetic example only
+2,2027-01-02T08:00:00Z,Ride,Fictional example ride,18000,3600,,,,,150,160,Synthetic recorded power only
+3,2027-01-03T08:00:00Z,lap_swimming,Fictional example pool swim,800,1800,,,,,,,Timer duration may include rests

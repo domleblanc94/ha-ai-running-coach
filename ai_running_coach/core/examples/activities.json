@@ -1,3 +1,5 @@
 [
-  {"id": 1, "start_date": "2027-01-01T08:00:00Z", "type": "Run", "name": "Fictional example run", "distance_m": 4000, "moving_time_s": 1800, "elevation_gain_m": 35, "avg_heartrate": null, "description": "Synthetic example only"}
+  {"id": 1, "start_date": "2027-01-01T08:00:00Z", "type": "Run", "name": "Fictional example run", "distance_m": 4000, "moving_time_s": 1800, "elevation_gain_m": 35, "avg_heartrate": null, "description": "Synthetic example only"},
+  {"id": 2, "start_date": "2027-01-02T08:00:00Z", "type": "Ride", "name": "Fictional example ride", "distance_m": 18000, "timer_duration_s": 3600, "avg_watts": 150, "weighted_avg_watts": 160, "description": "Synthetic example only; power is recorded, not inferred"},
+  {"id": 3, "start_date": "2027-01-03T08:00:00Z", "type": "lap_swimming", "name": "Fictional example pool swim", "distance_m": 800, "timer_duration_s": 1800, "avg_heartrate": null, "description": "Synthetic example only; timer duration may include rests"}
 ]

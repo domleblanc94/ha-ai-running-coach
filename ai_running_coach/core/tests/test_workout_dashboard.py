@@ -43,4 +43,4 @@ class WorkoutDashboardTests(unittest.TestCase):
         source=Path(__file__).resolve().parents[1]/'dashboard_assets/workout-ui.js'
         script="const fs=require('fs'),vm=require('vm');const scope={window:{}};vm.createContext(scope);vm.runInContext(fs.readFileSync(process.argv[1],'utf8'),scope);console.log(JSON.stringify(['Easy Run + Strides','Run/Walk','Forest Run','Rest','Walk','Strength','Ride','Trail Hike','Hill Walk'].map(workout_type=>scope.window.WorkoutDownload.eligible({workout_type}))));"
         result=subprocess.run([shutil.which('node'),'-e',script,str(source)],capture_output=True,text=True,check=True)
-        self.assertEqual(json.loads(result.stdout),[True,True,True,False,False,False,False,False,False])
+        self.assertEqual(json.loads(result.stdout),[True,True,True,False,False,False,True,False,False])

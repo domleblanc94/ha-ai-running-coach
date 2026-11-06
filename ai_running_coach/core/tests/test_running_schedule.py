@@ -161,6 +161,9 @@ class RunningScheduleTests(unittest.TestCase):
             payload = {'summary': 'Review the whole week after availability changed.', 'trajectory': 'insufficient_evidence',
                        'reviews': [], 'plan_changes': moved_sessions()}
             corrected = {**payload, 'plan_changes': moved_sessions()+[removal('sat-easy'), removal('tue-easy')]}
+            for response in (payload, corrected):
+                for operation in response['plan_changes']:
+                    if operation['session'] is not None: operation['session']['sport']='running'
             generate = Mock(side_effect=[types.SimpleNamespace(text=json.dumps(value), usage_metadata=None)
                                          for value in (payload, corrected)])
             client = types.SimpleNamespace(models=types.SimpleNamespace(generate_content=generate))

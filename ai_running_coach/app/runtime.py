@@ -11,6 +11,7 @@ import signal
 import sqlite3
 import subprocess
 import sys
+import threading
 from zoneinfo import ZoneInfo
 
 from dotenv import dotenv_values
@@ -58,6 +59,28 @@ GARMIN_ISSUES = {
     'temporary_error': 'Garmin is temporarily unavailable. Try a later run.',
 }
 MANUAL_EXTRA_REASON = 'Confirmed Run once anyway in Home Assistant.'
+CORE_IMPORT_LOCK = threading.RLock()
+
+
+def load_calendar_rules(core):
+    """Load only bundled pure helpers without exposing private workspace code."""
+    with CORE_IMPORT_LOCK:
+        previous = sys.modules.get('sports')
+        had_previous = 'sports' in sys.modules
+        try:
+            sport_spec = importlib.util.spec_from_file_location('sports', core / 'sports.py')
+            sport_module = importlib.util.module_from_spec(sport_spec)
+            sport_spec.loader.exec_module(sport_module)
+            sys.modules['sports'] = sport_module
+            specification = importlib.util.spec_from_file_location('coach_calendar_rules', core / 'training_calendar.py')
+            rules = importlib.util.module_from_spec(specification)
+            specification.loader.exec_module(rules)
+            return rules
+        finally:
+            if had_previous:
+                sys.modules['sports'] = previous
+            else:
+                sys.modules.pop('sports', None)
 
 
 def utc_now():
@@ -95,9 +118,7 @@ class Runtime:
             # Install only when no wrapper subprocess is using the workspace.
             with file_lock(self.run_lock, blocking=False):
                 install_core(core, self.workspace)
-            specification = importlib.util.spec_from_file_location('coach_calendar_rules', core / 'training_calendar.py')
-            self.calendar_rules = importlib.util.module_from_spec(specification)
-            specification.loader.exec_module(self.calendar_rules)
+            self.calendar_rules = load_calendar_rules(core)
             if not checked(self.state_file).exists():
                 self._write_state({
                     'schema_version': 1, 'queued': None, 'running': None,

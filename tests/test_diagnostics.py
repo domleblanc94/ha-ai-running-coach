@@ -91,12 +91,16 @@ class DiagnosticsTests(unittest.TestCase):
         for error, code in {
             'A new plan requires added sessions with new unique IDs.': 'new_plan_operations',
             'Added session ID already exists or was retired.': 'session_id_conflict',
+            'Pool workout length must match the explicitly configured athlete pool length.': 'pool_workout_conflict',
         }.items():
             with self.subTest(code=code):
                 self.assertEqual(diagnostics.request_failure('invalid', error), code)
                 self.assertEqual(diagnostics.failure_stage(code), 'coaching')
                 self.assertIsNone(diagnostics.request_failure('failed', error))
                 self.assertEqual(diagnostics.request_failure('invalid', error + ' ' + PRIVATE), 'response_invalid')
+        self.assertEqual(diagnostics.request_failure('invalid', 'Race-day session conflict: ' + PRIVATE), 'race_day_conflict')
+        self.assertEqual(diagnostics.failure_stage('race_day_conflict'), 'coaching')
+        self.assertNotIn(PRIVATE, diagnostics.MESSAGES['race_day_conflict'])
 
     def test_saved_generic_new_plan_failure_gets_safe_readonly_diagnostic(self):
         started = datetime.now(timezone.utc) - timedelta(minutes=4)
@@ -152,12 +156,19 @@ def _fixture_post(self, path, payload, headers):
         'summary': 'Synthetic review: private-athlete-note-and-key-must-not-be-logged',
         'trajectory': 'insufficient_evidence', 'reviews': [],
         'plan_changes': [{'op': 'add', 'session_id': 'synthetic-easy-run',
-            'session': {'id': 'synthetic-easy-run', 'date': today, 'workout_type': 'Easy run',
+            'session': {'id': 'synthetic-easy-run', 'date': today, 'sport': 'running', 'workout_type': 'Easy run',
                         'amount': '20 minutes', 'target': 'Comfortable conversational effort'},
             'reason': 'Synthetic starter run'}],
     }
     if mode == 'review':
         review['plan_changes'] = []
+    if mode == 'multisport':
+        sessions = [
+            {'id': 'z-bike', 'date': today, 'sport': 'cycling', 'workout_type': 'Easy', 'amount': '45 min', 'target': 'Steady', 'brick': {'id': 'linked', 'order': 1}},
+            {'id': 'a-run', 'date': today, 'sport': 'running', 'workout_type': 'Easy', 'amount': '20 min', 'target': 'Conversational', 'brick': {'id': 'linked', 'order': 2}},
+            {'id': 'pool', 'date': (_FixtureDate.today()+_FixtureDelta(days=1)).isoformat(), 'sport': 'swimming', 'sub_sport': 'lap_swimming', 'workout_type': 'Technique', 'amount': '1000 m', 'target': 'Relaxed'},
+        ]
+        review['plan_changes'] = [{'op': 'add', 'session_id': s['id'], 'session': s, 'reason': 'Synthetic joint plan'} for s in sessions]
     if mode == 'replace':
         addition = review['plan_changes'][0]
         addition['session_id'] = addition['session']['id'] = 'synthetic-replacement-run'
@@ -172,7 +183,7 @@ def _fixture_post(self, path, payload, headers):
         review['plan_changes'] = [
             {'op': 'add' if mode == 'four_runs' else 'update', 'session_id': sid,
              'session': {'id': sid, 'date': (_FixtureDate.today() + _FixtureDelta(days=offset)).isoformat(),
-                         'workout_type': kind, 'amount': amount, 'target': 'Comfortable conversational effort'},
+                         'sport': 'running', 'workout_type': kind, 'amount': amount, 'target': 'Comfortable conversational effort'},
              'reason': 'Synthetic move to an already occupied running day'}
             for sid, offset, kind, amount in entries]
     return {'candidates': [{'content': {'parts': [{'text': _fixture_json.dumps(review)}]},
@@ -222,6 +233,21 @@ ProviderClient._post = _fixture_post
         self.assertIn('synthetic-easy-run', plan['retired_session_ids'])
         self.assertEqual(self.app.status()['request_budget']['used'], 2)
         self.assertEqual(self.app.dashboard(), (self.app.workspace / 'dashboard.html').read_bytes())
+
+    def test_actual_joint_multisport_plan_uses_one_request_and_publishes_all_disciplines(self):
+        self.fixture_provider('multisport')
+        self.app.save_profile(PROFILE + '**Training Mode:** triathlon\n**Pool Length:** 25 m\n')
+        self.app.enqueue('new_plan')
+        self.assertTrue(self.app.tick())
+        last = self.app.status()['last_run']
+        self.assertEqual(last['status'], 'success', last)
+        self.assertEqual(last['request_attempts'], 1)
+        self.assertEqual(self.app.status()['request_budget']['used'], 1)
+        saved = json.loads((self.app.workspace / 'training_plan.json').read_text(encoding='utf-8'))
+        self.assertEqual({s['sport'] for s in saved['sessions']}, {'running', 'cycling', 'swimming'})
+        self.assertEqual([s['brick']['order'] for s in saved['sessions'] if s.get('brick')], [2, 1])
+        self.assertIn(b'"pool_length_metres": 25.0', self.app.dashboard())
+        self.assertIn(b'const trainingMode = "triathlon"', self.app.dashboard())
 
     def test_actual_provider_failure_and_budget_exhaustion_do_not_silently_retry(self):
         self.fixture_provider('transport')

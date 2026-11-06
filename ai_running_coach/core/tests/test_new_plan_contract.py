@@ -24,7 +24,7 @@ def session(identifier, day='2026-11-07', kind='Run', **extra):
 
 
 def addition(value):
-    return {'op': 'add', 'session_id': value['id'], 'session': value, 'reason': 'A fresh block from current evidence.'}
+    return {'op': 'add', 'session_id': value['id'], 'session': dict(value,sport=value.get('sport','running')), 'reason': 'A fresh block from current evidence.'}
 
 
 def deletion(identifier):

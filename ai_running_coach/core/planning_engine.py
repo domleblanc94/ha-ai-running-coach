@@ -7,29 +7,87 @@ import re
 from datetime import date, datetime, timedelta
 from source_policy import normalize_sport
 from training_calendar import (calendar_profile, training_days, training_day_conflicts,
-                               race_calendar_conflicts, preferred_long_run_days, running_session_conflicts)
+                               race_calendar_conflicts, preferred_long_run_days, preferred_long_ride_days,
+                               running_session_conflicts, multisport_race_conflicts, _weekday_list)
+from sports import (TRAINING_MODES, ENDURANCE_SPORTS, session_sport, effective_goal_sport,
+                    activity_sport, activity_sub_sport, validate_session_sport, validate_bricks,
+                    sport_label, parse_sport_label)
 
-POLICY_VERSION = 3
+POLICY_VERSION = 4
+SESSION_FIELDS = {'id', 'date', 'workout_type', 'amount', 'target', 'goal_priority', 'workout', 'sport', 'sub_sport', 'brick'}
 
 
 def is_run(value):
     return normalize_sport(value)=='run'
 
 
-def parse_profile(text):
+def _profile_field(text, label):
+    match=re.search(r'\*\*'+re.escape(label)+r':\*\*[ \t]*([^\n]*)',text,re.I)
+    return match[1].strip() if match else ''
+
+
+def _profile_zones(text, prefix=''):
     zones = {}
-    for number, label, bounds in re.findall(r'\*\*Zone\s+(\d)\s*\(([^)]+)\):\*\*\s*([^\n]+)', text, re.I):
+    for number, label, bounds in re.findall(r'\*\*'+re.escape(prefix)+r'Zone\s+([1-5])\s*\(([^)]+)\):\*\*[ \t]*([^\n]+)', text, re.I):
         values = [int(n) for n in re.findall(r'\d+', bounds)]
         if not values:
             continue
         zones[number] = {'label': label, 'min': None if '<' in bounds else values[0],
                          'max': None if '>=' in bounds or '\u2265' in bounds else values[-1], 'display': bounds.strip()}
-    explicitly_unknown=bool(re.search(r'Heart Rate Zones[^\n]*(?:unknown|not configured|not supplied)',text,re.I))
-    if (not zones or '2' not in zones) and not explicitly_unknown:
-        raise ValueError('Profile must specify an explicit Zone 2 before migration/review.')
     for zone in zones.values():
         if zone['min'] is not None and zone['max'] is not None and zone['min'] > zone['max']:
             raise ValueError('Invalid profile zone boundaries.')
+    if prefix:
+        previous=None
+        for number in sorted(zones,key=int):
+            zone=zones[number]
+            if any(value is not None and not 0<value<=255 for value in (zone['min'],zone['max'])):
+                raise ValueError('Sport heart-rate zones must use explicit bpm within 1-255.')
+            if previous is not None and (previous['max'] is None or zone['min'] is None or zone['min']<previous['max']):
+                raise ValueError('Sport heart-rate zones must ascend without overlapping.')
+            previous=zone
+    return zones
+
+
+def _sport_settings(text, calendar, zones, mode):
+    allowed=training_days(calendar)
+    result={}
+    for sport in ('running','cycling','swimming'):
+        raw=_profile_field(text,sport.title()+' Availability')
+        days=_weekday_list(raw)
+        if raw and days is None:raise ValueError('Sport availability must list weekday names or be blank.')
+        if (mode==sport or mode=='triathlon') and allowed is not None and days is not None and not set(days)<=set(allowed):
+            raise ValueError('Sport availability must be within the selected global training days.')
+        result[sport]={'available_days':days,'zones':zones if sport=='running' else _profile_zones(text,sport.title()+' ')}
+    result['running']['preferred_long_days']=preferred_long_run_days(calendar)
+    result['cycling']['preferred_long_days']=preferred_long_ride_days(calendar)
+    ftp=_profile_field(text,'Cycling FTP')
+    match=re.fullmatch(r'(\d+(?:\.\d+)?)\s*(?:W|watts?)?',ftp,re.I) if ftp else None
+    if ftp and (not match or not 0<float(match[1])<=2000):raise ValueError('Cycling FTP must be an explicit value from above zero to 2000 watts.')
+    result['cycling']['ftp_watts']=float(match[1]) if match else None
+    css=_profile_field(text,'Swimming CSS')
+    match=re.fullmatch(r'(\d+):(\d{2})\s*(?:/\s*100\s*m)?',css,re.I) if css else None
+    if css and (not match or int(match[2])>=60 or not 0<int(match[1])*60+int(match[2])<=3600):
+        raise ValueError('Swimming CSS must be an explicit m:ss pace per 100 metres, up to 60 minutes.')
+    result['swimming']['css_seconds_per_100m']=int(match[1])*60+int(match[2]) if match else None
+    pool=_profile_field(text,'Pool Length')
+    match=re.fullmatch(r'(\d+(?:\.\d+)?)\s*(m|yd)',pool,re.I) if pool else None
+    metres=float(match[1])*(.9144 if match[2].lower()=='yd' else 1) if match else None
+    if pool and (not match or not 0<metres<=655.34):raise ValueError('Pool length requires an explicit positive value in m or yd within the FIT range.')
+    result['swimming'].update(pool_length_metres=metres,pool_length_unit=match[2].lower() if match else None)
+    swim=_profile_field(text,'Swimming Type')
+    if swim and swim not in {'lap_swimming','open_water'}:raise ValueError('Swimming Type must be lap_swimming or open_water.')
+    result['swimming']['sub_sport']=swim or None
+    return result
+
+
+def parse_profile(text):
+    mode=_profile_field(text,'Training Mode').lower() or 'running'
+    if mode not in TRAINING_MODES:raise ValueError('Training Mode must be running, cycling, swimming or triathlon.')
+    zones=_profile_zones(text)
+    explicitly_unknown=bool(re.search(r'Heart Rate Zones[^\n]*(?:unknown|not configured|not supplied)',text,re.I))
+    if mode in {'running','triathlon'} and (not zones or '2' not in zones) and not explicitly_unknown:
+        raise ValueError('Profile must specify an explicit Zone 2 before migration/review.')
     injury = re.search(r'\*\*Active Injuries:\*\*\s*([^\n]+)', text, re.I)
     calendar = calendar_profile(text)
     facts = {}
@@ -37,18 +95,20 @@ def parse_profile(text):
         match = re.search(r'\*\*' + re.escape(label) + r':\*\*\s*([^\n]+)',text)
         if match: facts[label] = match[1].strip()
     tone = text.split('**Tone Rules:**',1)[-1].strip() if '**Tone Rules:**' in text else ''
-    return {'schema_version': 1, 'zones': zones, 'zone_method': 'not configured' if not zones else 'profile-configured; not independently validated',
+    return {'schema_version': 1, 'training_mode':mode, 'sport_settings':_sport_settings(text,calendar,zones,mode),
+            'zones': zones, 'zone_method': 'not configured' if not zones else 'profile-configured running zones; not independently validated',
             'goals': calendar['goals'], 'active_injuries': injury[1].strip() if injury else 'unknown',
             'preferences': calendar['preferences'], 'athlete_facts': facts, 'communication_preferences': tone[:2000], 'source_hash': hashlib.sha256(text.encode()).hexdigest(),
             'uncertainties': ['Zone boundaries are configured estimates, not medical validation.',
                               'Sporting background does not establish muscle-fiber composition.']}
 
 
-def configured_zone_conflicts(text,profile):
+def configured_zone_conflicts(text,profile,sport='running'):
     pattern=r'\b(?:Zone\s*|Z\s*)([1-5])\b(?:\s*(?:heart\s*rate|HR|bpm|target|range|is|of|approximately|about|[():=@])){0,8}\s*(\d{2,3})\s*(?:[-\u2013\u2014]|to)\s*(\d{2,3})'
     errors=[]
     for number,low,high in re.findall(pattern,text,re.I):
-        configured=profile['zones'].get(number)
+        zones=profile.get('sport_settings',{}).get(sport,{}).get('zones',profile.get('zones',{}) if sport=='running' else {})
+        configured=zones.get(number)
         # A coach may prescribe a narrower session target inside a configured
         # zone. This validates membership, not mandatory use of its full range.
         lower=int(low);upper=int(high)
@@ -60,9 +120,25 @@ def configured_zone_conflicts(text,profile):
     return errors
 
 
-def plan_conflicts(markdown, profile):
+def workout_profile_conflicts(plan,profile,today):
+    """Future pool exports must use the athlete's explicit current pool setting."""
+    settings=profile.get('sport_settings',{}).get('swimming',{})
+    conflicts=[]
+    for session in plan.get('sessions',[]):
+        if session['date']<str(today) or session_sport(session)!='swimming' or session.get('workout') is None:
+            continue
+        workout=session['workout']
+        if (not isinstance(workout,dict) or settings.get('pool_length_metres') is None or
+                workout.get('poolLengthUnit')!=settings.get('pool_length_unit') or
+                not isinstance(workout.get('poolLengthMetres'),(int,float)) or
+                not math.isclose(workout['poolLengthMetres'],settings['pool_length_metres'],abs_tol=.005,rel_tol=0)):
+            conflicts.append(session['id'])
+    return conflicts
+
+
+def plan_conflicts(markdown, profile, sport='running'):
     conflicts = []
-    if configured_zone_conflicts(markdown,profile):
+    if sport is not None and configured_zone_conflicts(markdown,profile,sport):
         conflicts.append('Plan zone definitions differ from configured profile.')
     if re.search(r'all.*power walks|non-negotiable', markdown, re.I):
         conflicts.append('Plan contains blanket walking restrictions or punitive policy.')
@@ -75,26 +151,41 @@ def parse_plan(markdown, profile, today=None):
     """Structural migration only: the coach resolves superseded legacy targets."""
     sessions = []
     source_rows = []
-    seen = set()
+    seen = {}
+    headings = None
+    typed = False
     for line in markdown.splitlines():
         if not line.lstrip().startswith('|'):
             continue
         cells = [c.strip() for c in line.strip().strip('|').split('|')]
-        if len(cells) != 5 or not re.fullmatch(r'\d{4}-\d{2}-\d{2}', cells[1]):
+        if 'Date' in cells and 'Day' in cells:
+            headings={name.lower():index for index,name in enumerate(cells)}
+            continue
+        if len(cells) not in (5,6) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}', cells[1]):
             continue
         day = date.fromisoformat(cells[1])
-        source_rows.append({'date':cells[1], 'workout_type':cells[2], 'amount':cells[3], 'target':cells[4]})
-        if cells[1] in seen:
+        has_sport = len(cells)==6 and headings is not None and 'sport' in headings
+        if len(cells)==6 and not has_sport:raise ValueError('Typed plan tables require a Sport column header.')
+        typed = typed or has_sport
+        kind = cells[headings.get('workout type',3) if has_sport else 2].replace('**', '')
+        amount = cells[headings.get('distance / duration',4) if has_sport else 3]
+        target = cells[headings.get('target',5) if has_sport else 4]
+        entry={'date':cells[1], 'workout_type':kind, 'amount':amount, 'target':target}
+        if has_sport:
+            sport,sub_sport=parse_sport_label(cells[headings['sport']])
+            if sport:entry['sport']=sport
+            if sub_sport:entry['sub_sport']=sub_sport
+        source_rows.append(copy.deepcopy(entry))
+        if cells[1] in seen and not has_sport:
             raise ValueError('Duplicate scheduled date; migrate manually before continuing.')
-        seen.add(cells[1])
-        kind = cells[2].replace('**', '')
-        target = cells[4]
-        if plan_conflicts(target,profile):
-            target = 'Legacy target superseded by current profile; awaiting AI coach reconciliation.'
-        sessions.append({'id': 'session-' + cells[1], 'date': cells[1], 'workout_type': kind,
-                         'amount': cells[3], 'target': target})
+        seen[cells[1]]=seen.get(cells[1],0)+1
+        if plan_conflicts(target,profile,session_sport(entry)):
+            entry['target'] = 'Legacy target superseded by current profile; awaiting AI coach reconciliation.'
+        entry['id']='session-'+cells[1]+('-'+str(seen[cells[1]]) if seen[cells[1]]>1 else '')
+        sessions.append(entry)
     plan = {'source_schedule': source_rows, 'goals': profile['goals'], 'schema_version': 1, 'revision': 1, 'profile_hash': profile['source_hash'],
-            'requires_coach_reconciliation': bool(plan_conflicts(markdown,profile)),
+            'requires_coach_reconciliation': bool(plan_conflicts(markdown,profile,None if typed else 'running')) or
+                                             any('Legacy target superseded' in s['target'] for s in sessions),
             'migration_notes': ['Structural import of legacy schedule; Python has prescribed no replacement workouts.',
                                 'Conflicting legacy restrictions are superseded. The AI coach will reconcile upcoming sessions.'],
             'sessions': sessions}
@@ -114,13 +205,13 @@ def validate_plan(plan, profile):
         raise ValueError('No validated sessions.')
     ids = set()
     for session in sessions:
-        if not {'id', 'date', 'workout_type', 'amount', 'target'}.issubset(session) or set(session)-{'id', 'date', 'workout_type', 'amount', 'target','goal_priority','workout'}:
+        if not {'id', 'date', 'workout_type', 'amount', 'target'}.issubset(session) or set(session)-SESSION_FIELDS:
             raise ValueError('Invalid session fields.')
         date.fromisoformat(session['date'])
         if session['id'] in ids:
             raise ValueError('Duplicate session ID.')
         ids.add(session['id'])
-        text_fields=set(session)-{'workout'}
+        text_fields=set(session)-{'workout','brick'}
         if not all(isinstance(session[k], str) and 0 < len(session[k]) < 2000 for k in text_fields):
             raise ValueError('Invalid session text.')
         if any(v in session[k] for k in text_fields for v in ('\n','\r','|')):
@@ -130,6 +221,8 @@ def validate_plan(plan, profile):
         if 'workout' in session:
             from workout_schema import validate_workout
             validate_workout(session['workout'])
+        validate_session_sport(session)
+    validate_bricks(sessions)
     return plan
 
 
@@ -139,13 +232,25 @@ def render_plan(plan):
     for goal in plan.get('goals', []):
         lines += [f"- {goal['priority']}: {goal['event']} | {goal.get('date','date unknown')} | {goal.get('target_time','target unknown')}"]
     lines += ['']
+    typed=any('sport' in session for session in plan['sessions'])
     week = None
     for s in sorted(plan['sessions'], key=lambda x: x['date']):
         d = date.fromisoformat(s['date']); monday = d - timedelta(days=d.weekday())
         if monday != week:
             week = monday
-            lines += [f'### Week (w/c {week.isoformat()})', '', '| Day | Date | Workout Type | Distance / Duration | Target |', '|---|---|---|---|---|']
-        lines.append('| ' + ' | '.join([d.strftime('%A'), s['date'], s['workout_type'], s['amount'], s['target']]) + ' |')
+            header='| Day | Date | Sport | Workout Type | Distance / Duration | Target |' if typed else '| Day | Date | Workout Type | Distance / Duration | Target |'
+            lines += [f'### Week (w/c {week.isoformat()})', '', header, '|---|---|---|---|---|---|' if typed else '|---|---|---|---|---|']
+        cells=[d.strftime('%A'), s['date']]
+        if typed:cells.append(sport_label(s) if 'sport' in s else '')
+        lines.append('| ' + ' | '.join(cells+[s['workout_type'], s['amount'], s['target']]) + ' |')
+    bricks={}
+    for session in plan['sessions']:
+        if session.get('brick'):bricks.setdefault(session['brick']['id'],[]).append(session)
+    if bricks:
+        lines+=['','## Linked sessions','']
+        for legs in bricks.values():
+            ordered=sorted(legs,key=lambda session:session['brick']['order'])
+            lines.append('- '+ordered[0]['date']+': '+' → '.join(sport_label(leg)+' — '+leg['workout_type'] for leg in ordered))
     return '\n'.join(lines) + '\n'
 
 
@@ -229,7 +334,7 @@ def build_evidence(conn, today):
     from coach_checkin import FEEDBACK_FIELD_UNITS
     today = date.fromisoformat(today) if isinstance(today, str) else today
     cols = {row[1] for row in conn.execute('PRAGMA table_info(activities)')}
-    wanted = ['id','type','start_date','distance_m','moving_time_s','timer_duration_s','elapsed_time_s','avg_heartrate','elevation_gain_m','perceived_exertion','description','notes','source','metrics_source','cardiac_drift_pct','drift_validity','training_load','provider_metrics_json','hr_zone_seconds_json','hr_zones_json']
+    wanted = ['id','type','start_date','distance_m','moving_time_s','timer_duration_s','elapsed_time_s','avg_heartrate','elevation_gain_m','perceived_exertion','description','notes','source','metrics_source','cardiac_drift_pct','drift_validity','training_load','provider_metrics_json','hr_zone_seconds_json','hr_zones_json','avg_watts','weighted_avg_watts']
     fields = [c for c in wanted if c in cols]
     start = (today - timedelta(days=55)).isoformat()
     cursor = conn.execute('SELECT ' + ','.join(fields) + ' FROM activities WHERE date(start_date)>=? AND date(start_date)<=? ORDER BY start_date,id', (start, today.isoformat()))
@@ -244,8 +349,19 @@ def build_evidence(conn, today):
                 try:row[shown]=json.loads(raw)
                 except (ValueError,TypeError):row[shown]=None
         row['is_running'] = is_run(row.get('type'))
+        row['sport'] = activity_sport(row.get('type'))
+        sub_sport=activity_sub_sport(row.get('type'))
+        if sub_sport:row['sub_sport']=sub_sport
         duration, distance = row.get('moving_time_s'), row.get('distance_m')
-        row['pace_min_km'] = round(duration / 60 / (distance/1000), 2) if row['is_running'] and duration and distance and distance > 0 else None
+        row['pace_min_km'] = round(duration / 60 / (distance/1000), 2) if row['is_running'] and duration and duration>0 and distance and distance > 0 else None
+        if row['sport']=='cycling' and duration and duration>0 and distance and distance>0:
+            row['speed_kph'] = round(distance/duration*3.6,2)
+        timer=row.get('timer_duration_s')
+        if row['sport']=='swimming' and timer and timer>0 and distance and distance>0:
+            row['swim_timer_pace_seconds_per_100m'] = round(timer/(distance/100),1)
+            row['swim_pace_basis'] = 'Recorded timer duration; may include rests.'
+        for key in ('avg_watts','weighted_avg_watts'):
+            if row.get(key) is None:row.pop(key,None)
         row['_note_sources']=[('description',row.pop('description','')),('local_notes',row.get('notes'))]
         row['notes'] = '\n'.join(dict.fromkeys(str(v).strip() for _,v in row['_note_sources'] if v and str(v).strip()))[:1000]
         if row['notes']:row['reported_feedback']=parse_structured_notes(row['notes'])
@@ -266,13 +382,34 @@ def build_evidence(conn, today):
         weekly[-1].update(timer_minutes=round(sum(timers)/60,1) if timers else None,timer_duration_coverage=len(timers),longest_timer_duration_min=round(max(timers)/60,1) if timers else None)
     feedback=collect_feedback(conn,rows,today)
     for row in rows:row.pop('_note_sources',None)
-    return {'today': today.isoformat(), 'window_start': start, 'feedback_units':FEEDBACK_FIELD_UNITS, 'feedback_history':feedback,'current_athlete_reports':[r for r in feedback if r['current_report']], 'running_weeks_8':weekly, 'running_28d': {'count': len(running), 'total_km': round(km,2), 'avg_weekly_km': round(km/4,2), 'longest_km': round(max([(r.get('distance_m') or 0)/1000 for r in running] or [0]),2)},
-            'recent_7d': recent, 'limitations': ['Missing subjective effort is unknown, not low fatigue.', 'Average HR does not measure time in zones.', 'Race readiness requires more evidence than plan compliance.']}
+    sport_weeks=[]
+    for offset in range(7,-1,-1):
+        end=today-timedelta(days=offset*7);begin=end-timedelta(days=6)
+        block=[row for row in rows if begin.isoformat()<=str(row['start_date'])[:10]<=end.isoformat()]
+        def aggregate(items):
+            distances=[row['distance_m'] for row in items if isinstance(row.get('distance_m'),(int,float)) and row['distance_m']>=0]
+            timers=[row['timer_duration_s'] for row in items if isinstance(row.get('timer_duration_s'),(int,float)) and row['timer_duration_s']>=0]
+            moving=[row['moving_time_s'] for row in items if isinstance(row.get('moving_time_s'),(int,float)) and row['moving_time_s']>=0]
+            return {'activity_count':len(items),'distance_m':round(sum(distances),2) if distances else None,
+                    'distance_coverage':len(distances),'timer_minutes':round(sum(timers)/60,1) if timers else None,
+                    'timer_duration_coverage':len(timers),'moving_minutes':round(sum(moving)/60,1) if moving else None,
+                    'moving_duration_coverage':len(moving)}
+        by_sport={sport:aggregate([row for row in block if row['sport']==sport]) for sport in sorted({row['sport'] for row in block})}
+        combined=aggregate(block)
+        combined.pop('distance_m');combined.pop('distance_coverage')
+        sport_weeks.append({'ending':end.isoformat(),'by_sport':by_sport,'combined_duration':combined})
+    return {'today': today.isoformat(), 'window_start': start, 'feedback_units':FEEDBACK_FIELD_UNITS, 'feedback_history':feedback,'current_athlete_reports':[r for r in feedback if r['current_report']], 'sport_weeks_8':sport_weeks, 'running_weeks_8':weekly, 'running_28d': {'count': len(running), 'total_km': round(km,2), 'avg_weekly_km': round(km/4,2), 'longest_km': round(max([(r.get('distance_m') or 0)/1000 for r in running] or [0]),2)},
+            'recent_7d': recent, 'limitations': ['Missing subjective effort is unknown, not low fatigue.', 'Average HR does not measure time in zones.', 'Race readiness requires more evidence than plan compliance.',
+                'Official Garmin sync excludes child legs: multisport parent time is counted once and remains unallocated to individual sports.',
+                'A sport absent from a weekly by_sport map has no recorded activities that week; null metrics and coverage zero mean unknown measurement.',
+                'Legacy/local records without explicit parent relationships cannot be deduplicated by guesswork; combined duration coverage may be incomplete or overlapping.',
+                'Swimming timer pace can include rests; power and sport-specific zone references remain unknown when not recorded.']}
 
 
 def fingerprint(profile, plan, evidence, question, generation_identity=None):
     stable_evidence = copy.deepcopy({k:v for k,v in evidence.items() if k not in {'today','window_start'}})
     for week in stable_evidence.get('running_weeks_8',[]): week.pop('ending',None)
+    for week in stable_evidence.get('sport_weeks_8',[]): week.pop('ending',None)
     for key in ('feedback_history','current_athlete_reports'):
         for report in stable_evidence.get(key,[]):report.pop('age_days',None)
     today=date.fromisoformat(evidence['today'])
@@ -309,13 +446,14 @@ def apply_plan_changes(plan, changes, profile, today):
             del sessions[sid]; retired.add(sid)
         else:
             session=change['session']
-            if not isinstance(session,dict) or not {'id','date','workout_type','amount','target'}.issubset(session) or set(session)-{'id','date','workout_type','amount','target','goal_priority','workout'} or session['id']!=sid:
+            if not isinstance(session,dict) or not {'id','date','workout_type','amount','target'}.issubset(session) or set(session)-SESSION_FIELDS or session['id']!=sid:
                 raise ValueError('Change needs full session with matching stable ID.')
             d=date.fromisoformat(session['date'])
             if not str(today)<=d.isoformat() <= (date.fromisoformat(str(today))+timedelta(days=366)).isoformat():
                 raise ValueError('Changed session outside supported future window.')
+            validate_session_sport(session)
             # Enforce configured zone definitions, without deciding the training intensity.
-            if configured_zone_conflicts(session['target'],profile):
+            if configured_zone_conflicts(session['target'],profile,session_sport(session)):
                 raise ValueError('Coach may choose zones but cannot redefine profile zone boundaries.')
             sessions[sid]=copy.deepcopy(session)
     result['sessions']=sorted(sessions.values(),key=lambda s:(s['date'],s['id']))
@@ -331,8 +469,14 @@ def apply_plan_changes(plan, changes, profile, today):
     if not any(s['date']>=str(today) for s in result['sessions']):
         raise ValueError('Coach must provide an upcoming schedule when the current plan expires.')
     validate_plan(result,profile)
+    if workout_profile_conflicts(result,profile,today):
+        raise ValueError('Pool workout length must match the explicitly configured athlete pool length.')
     calendar_errors=race_calendar_conflicts(result,profile,today)
     if calendar_errors:raise ValueError('Race calendar conflict: '+'; '.join(calendar_errors))
+    race_day_errors=multisport_race_conflicts(result,today)
+    if race_day_errors:
+        raise ValueError('Race-day session conflict: a triathlon race already occupies the endurance training day: '+
+                         '; '.join(item['date'] for item in race_day_errors))
     availability_errors = training_day_conflicts(result, profile, today)
     if availability_errors:
         raise ValueError('Training-day conflict: coach scheduled training outside selected days: ' +
@@ -406,7 +550,7 @@ def apply_coach_changes(plan,changes,profile,today):
     return apply_plan_changes(plan,changes,profile,today)
 
 
-def validate_review(payload, evidence, plan, today, profile=None):
+def validate_review(payload, evidence, plan, today, profile=None, require_explicit_sport=False):
     required={'summary','trajectory','reviews','plan_changes'}
     optional={'weekly_priorities','assessment','next_review_trigger'}
     if not isinstance(payload,dict) or not required.issubset(payload) or set(payload)-required-optional:
@@ -442,6 +586,12 @@ def validate_review(payload, evidence, plan, today, profile=None):
             raise ValueError('Invalid trajectory assessment explanation.')
     if 'next_review_trigger' in payload and not text(payload['next_review_trigger'],500):
         raise ValueError('Invalid next review trigger.')
+    if require_explicit_sport and isinstance(payload['plan_changes'],list):
+        for change in payload['plan_changes']:
+            if isinstance(change,dict) and change.get('op') in {'add','update'}:
+                session=change.get('session')
+                if not isinstance(session,dict) or 'sport' not in session:
+                    raise ValueError('AI sessions must specify an explicit sport.')
     if profile is not None:
         apply_coach_changes(plan,payload['plan_changes'],profile,today)
     elif payload['plan_changes']:

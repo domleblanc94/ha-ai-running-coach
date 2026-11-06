@@ -122,6 +122,18 @@ with sqlite3.connect('ai_coach_master.sqlite') as conn:
             self.assertTrue(self.runtime.tick())
         command.assert_called_once_with('new_plan', timezone_name='UTC')
 
+    def test_saved_running_baseline_is_inactive_for_cycling_and_swimming(self):
+        self.runtime.save_config({'gemini_api_key': 'synthetic-test-key'})
+        for mode in ('cycling', 'swimming'):
+            with self.subTest(mode=mode):
+                self.runtime.save_profile(LEARN_PROFILE + '**Training Mode:** ' + mode + '\n')
+                self.assertEqual(self.runtime.status()['hr_learning']['state'], 'off')
+                self.assertIn('**HR Zone Learning:** Enabled', self.runtime.profile())
+                self.runtime.enqueue('new_plan')
+                with patch.object(self.runtime, '_command', return_value=1) as command:
+                    self.assertTrue(self.runtime.tick())
+                command.assert_called_once_with('new_plan', timezone_name='UTC')
+
     def test_only_completed_learning_assessment_is_presented(self):
         self.seed()
         fixtures = [

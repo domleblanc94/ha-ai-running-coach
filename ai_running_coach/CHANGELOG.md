@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0-beta.1
+
+- Add running, cycling, swimming and triathlon modes, per-sport goals and availability, optional FTP/CSS/pool settings and independent sport HR ranges. Existing profiles retain running defaults.
+- Review combined training in one AI request, with separate sport evidence and unchanged spending limits.
+- Label and filter dashboard sessions by sport, show separate distances and combined recorded duration, and include sport labels and ordered brick legs in PDF exports.
+- Download cycling and pool-swimming FIT workouts alongside running, with explicit power/cadence/stroke targets and m/yd pool units. Brick legs use separate files; open water and combined multisport events remain plan-only.
+- Verify FIT encoding using a pinned official Garmin decoder in CI; physical watch transfer/execution remains untested.
+
 ## 0.1.0-beta.9
 
 - Clarify replacement-plan instructions with fresh session identifiers and explicit weekday availability.

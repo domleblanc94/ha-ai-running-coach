@@ -8,6 +8,7 @@ import re
 import sqlite3
 
 from .storage import checked
+from .profile_sports import training_mode
 
 
 LEARNING_MARKER = re.compile(r'^\*\*HR Zone Learning:\*\*[ \t]+Enabled[ \t]*$', re.MULTILINE)
@@ -34,7 +35,7 @@ OBSERVATION_PREFIX = re.compile(
 
 
 def learning_enabled(profile):
-    return bool(LEARNING_MARKER.search(profile))
+    return training_mode(profile) in {'running', 'triathlon'} and bool(LEARNING_MARKER.search(profile))
 
 
 def validate_feedback(payload):

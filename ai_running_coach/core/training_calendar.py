@@ -2,6 +2,7 @@
 
 from datetime import date, datetime
 import re
+from sports import effective_goal_sport, session_sport, GOAL_SPORTS
 
 
 WEEKDAYS = ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')
@@ -17,11 +18,15 @@ def calendar_profile(text):
             current = {'priority': race[1], 'event': race[2].strip()}
             goals.append(current)
         elif current:
-            field = re.search(r'\*\*(Date|Target Time):\*\*\s*(.+)', line)
+            field = re.search(r'\*\*(Date|Target Time|Sport):\*\*\s*(.+)', line, re.I)
             if field:
-                current[field[1].lower().replace(' ', '_')] = field[2].strip()
+                key=field[1].lower().replace(' ', '_')
+                value=field[2].strip().lower() if key=='sport' else field[2].strip()
+                if key=='sport' and value not in GOAL_SPORTS:raise ValueError('Unsupported goal sport.')
+                current[key] = value
     preferences = {}
-    for label in ('Weekly Availability', 'Preferred Rest Days', 'Preferred Long Run Day', 'Preferred Long Run Days'):
+    for label in ('Weekly Availability', 'Preferred Rest Days', 'Preferred Long Run Day', 'Preferred Long Run Days',
+                  'Preferred Long Ride Days', 'Running Availability', 'Cycling Availability', 'Swimming Availability'):
         match = re.search(r'\*\*' + label + r':\*\*[ \t]*([^\n]*)', text, re.I)
         if match:
             preferences[label] = match[1].strip()
@@ -53,26 +58,12 @@ def preferred_long_run_days(profile):
     return _weekday_list(preferences.get('Preferred Long Run Days', preferences.get('Preferred Long Run Day', '')), alternatives=True)
 
 
+def preferred_long_ride_days(profile):
+    return _weekday_list(profile.get('preferences', {}).get('Preferred Long Ride Days', ''), alternatives=True)
+
+
 def planned_running_session(session):
-    """Classify planned workout labels, separately from recorded activity types."""
-    workout = session.get('workout')
-    if isinstance(workout, dict) and workout.get('sport') == 'running':
-        return True
-    label = re.sub(r'([a-z])([A-Z])', r'\1 \2', str(session.get('workout_type', '')))
-    kind = re.sub(r'[^a-z]+', ' ', label.lower()).strip()
-    nonrunning = bool(re.search(r'\b(?:strength|swim|swimming|cycling|cycle|bike|biking|ride|yoga|walk|walking|hike|hiking|rest|off|mobility|row|rowing|cross train|cross training)\b', kind))
-    # "Post-run mobility" describes a separate mobility session. A combined
-    # "Run + strength" still contains a run and occupies the day's running slot.
-    qualifier = re.search(r'\b(?:(?:pre|post) ?run(?:ning)?|(?:before|after) (?:a )?run(?:ning)?|for (?:runners?|running))\b', kind)
-    if nonrunning and qualifier:
-        return False
-    compact_aliases = {'easyrun', 'longrun', 'recoveryrun', 'trailrun', 'trailrunning',
-                       'trackrun', 'trackrunning', 'treadmillrun', 'treadmillrunning', 'runwalk'}
-    if kind in compact_aliases or re.search(r'\b(?:run|running|runs|jog|jogging)\b', kind):
-        return True
-    if nonrunning:
-        return False
-    return bool(re.search(r'\b(?:easy|long|recovery|progression|aerobic|tempo|threshold|intervals?|speed|fartlek|hills?|trail|race|strides?)\b', kind))
+    return session_sport(session) == 'running'
 
 
 def running_session_conflicts(plan, today):
@@ -83,6 +74,16 @@ def running_session_conflicts(plan, today):
             by_day.setdefault(session['date'], []).append(session['id'])
     return [{'date': day, 'session_ids': identifiers} for day, identifiers in sorted(by_day.items())
             if len(identifiers) > 1]
+
+
+def multisport_race_conflicts(plan, today):
+    by_day={}
+    for session in plan.get('sessions',[]):
+        if session['date']>=str(today) and session_sport(session) in {'running','cycling','swimming','multisport'}:
+            by_day.setdefault(session['date'],[]).append(session)
+    return [{'date':day,'session_ids':[item['id'] for item in sessions]}
+            for day,sessions in sorted(by_day.items())
+            if len(sessions)>1 and any(session_sport(item)=='multisport' for item in sessions)]
 
 
 def race_calendar_conflicts(plan,profile,today):
@@ -100,7 +101,9 @@ def race_calendar_conflicts(plan,profile,today):
         if session['date']<str(today):continue
         kind=session['workout_type']
         explicit=bool(session.get('goal_priority'))
-        event=bool(re.search(r'\brace\b',kind,re.I)) and not re.search(r'race[ -]*(?:pace|effort|simulation|specific|prep)',kind,re.I)
+        event=session_sport(session)=='multisport' or (bool(re.search(r'\brace\b',kind,re.I)) and not re.search(r'race[ -]*(?:pace|effort|simulation|specific|prep)',kind,re.I))
+        if session_sport(session)=='multisport' and not explicit:
+            errors.append(session['id']+': multisport is reserved for a configured triathlon race event.');continue
         if not explicit and not event:continue
         text=' '.join(str(session.get(k,'')) for k in ('workout_type','amount','target')).lower()
         matches=[(goal,day) for goal,day,words in goals if (explicit and goal.get('priority')==session['goal_priority']) or (not explicit and words and all(word in text for word in words))]
@@ -110,14 +113,16 @@ def race_calendar_conflicts(plan,profile,today):
             errors.append(session['id']+': race event needs an unambiguous configured goal_priority.')
         elif session['date']!=matches[0][1]:
             errors.append(session['id']+': event date must match '+matches[0][0]['priority']+' '+matches[0][1]+'.')
+        elif session_sport(session)!=effective_goal_sport(matches[0][0]):
+            errors.append(session['id']+': race sport must match the configured goal sport.')
+        elif session_sport(session)=='multisport' and matches[0][0].get('event','').lower().startswith('training milestone:'):
+            errors.append(session['id']+': multisport is reserved for a configured triathlon race event.')
     return errors
 
 
 def training_day_conflicts(plan, profile, today):
     """Validate selected days without moving or prescribing the coach's sessions."""
     allowed = training_days(profile)
-    if allowed is None:
-        return []
     races = [goal for goal in profile.get('goals', [])
              if not goal.get('event', '').lower().startswith('training milestone:')]
     conflicts = []
@@ -125,15 +130,16 @@ def training_day_conflicts(plan, profile, today):
         if session['date'] < str(today):
             continue
         weekday = WEEKDAYS[date.fromisoformat(session['date']).weekday()]
-        if weekday in allowed:
+        specific = profile.get('sport_settings', {}).get(session_sport(session), {}).get('available_days')
+        if (allowed is None or weekday in allowed) and (specific is None or weekday in specific):
             continue
         kind = session['workout_type']
         rest = re.sub(r'[^a-z]+', ' ', kind.lower()).strip()
-        if rest in {'rest', 'rest day', 'full rest', 'full rest day', 'complete rest',
-                    'complete rest day', 'off', 'off day'} and 'workout' not in session:
+        if (session_sport(session)=='rest' or ('sport' not in session and rest in {'rest', 'rest day', 'full rest', 'full rest day', 'complete rest',
+                    'complete rest day', 'off', 'off day'})) and 'workout' not in session:
             continue
-        event = bool(re.search(r'\brace\b', kind, re.I)) and not re.search(
-            r'race[ -]*(?:pace|effort|simulation|specific|prep)', kind, re.I)
+        event = session_sport(session)=='multisport' or (bool(re.search(r'\brace\b', kind, re.I)) and not re.search(
+            r'race[ -]*(?:pace|effort|simulation|specific|prep)', kind, re.I))
         if event and not race_calendar_conflicts({'sessions': [session]}, {'goals': races}, today):
             # A configured event date can fall outside normal training days.
             continue

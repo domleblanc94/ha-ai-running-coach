@@ -12,6 +12,19 @@ def plain(value):
     return ''.join(char for char in text if ord(char) >= 32 or char in '\n\t')
 
 
+def sport_caption(session):
+    """Use explicit saved disciplines, retaining untyped legacy wording."""
+    labels = {'running': 'Running', 'cycling': 'Cycling', 'swimming': 'Swimming', 'multisport': 'Triathlon',
+              'strength': 'Strength', 'mobility': 'Mobility', 'rest': 'Rest', 'other': 'Other'}
+    label = labels.get(session.get('sport'), '')
+    if session.get('sport') == 'swimming':
+        label = {'lap_swimming': 'Pool swimming', 'open_water': 'Open-water swimming'}.get(session.get('sub_sport'), label)
+    brick = session.get('brick')
+    if isinstance(brick, dict):
+        label += ' - Brick leg ' + plain(brick.get('order'))
+    return label
+
+
 def calendar_pdf(plan, athlete_name='', *, conflicts=()):
     """One printable calendar week per page, with full session detail afterward."""
     from reportlab.lib import colors
@@ -43,6 +56,9 @@ def calendar_pdf(plan, athlete_name='', *, conflicts=()):
         except (ValueError, TypeError, KeyError):
             raise ValueError('The saved plan contains an invalid date.') from None
         by_day[day].append(session)
+    for rows in by_day.values():
+        rows.sort(key=lambda item: ((item.get('brick') or {}).get('id', item.get('id', '')),
+                                   (item.get('brick') or {}).get('order', 0)))
     first, last = min(by_day), max(by_day)
     # Export only weeks that contain sessions, avoiding years of empty pages.
     weeks = sorted({day - timedelta(days=day.weekday()) for day in by_day})
@@ -110,7 +126,7 @@ def calendar_pdf(plan, athlete_name='', *, conflicts=()):
                 p.drawOn(canvas, x + 9, y - h)
             for number, session in enumerate(rows):
                 title = plain(session.get('workout_type', 'Session'))
-                amount = plain(session.get('amount', ''))
+                amount = sport_caption(session) + '\n' + plain(session.get('amount', ''))
                 title = title if len(title) <= 90 else title[:87] + '...'
                 amount = amount if len(amount) <= 90 else amount[:87] + '...'
                 p = text(title, bold)
@@ -168,9 +184,19 @@ def calendar_pdf(plan, athlete_name='', *, conflicts=()):
                 detail_page()
                 flowing(day.strftime('%A %d %B %Y') + ' (continued)', bold)
             flowing(plain(session.get('workout_type', 'Session')) + ' | ' + plain(session.get('amount', '')), bold)
+            if sport_caption(session):
+                flowing(sport_caption(session), small)
+            if session.get('brick'):
+                flowing('Linked brick: ' + plain(session['brick'].get('id')) + '. Follow the saved leg order; each supported leg has its own FIT download.', small)
+            if session.get('sub_sport') == 'open_water' or session.get('sport') == 'multisport':
+                flowing('Plan guidance only. A structured FIT workout is not available for this session type.', small)
             flowing(session.get('target') or 'No target recorded.')
             workout = session.get('workout')
             if isinstance(workout, dict):
+                if workout.get('sport') == 'swimming' and workout.get('poolLengthMetres'):
+                    length = workout['poolLengthMetres']
+                    unit = workout.get('poolLengthUnit', 'm')
+                    flowing(f'Pool length: {length / (0.9144 if unit == "yd" else 1):g} {unit}', small)
                 for index, step in enumerate(workout.get('steps', []), 1):
                     if not isinstance(step, dict):
                         continue
@@ -187,6 +213,12 @@ def calendar_pdf(plan, athlete_name='', *, conflicts=()):
                         parts.append(str(target.get('lowBpm', '?')) + '-' + str(target.get('highBpm', '?')) + ' bpm')
                     elif target.get('type') == 'speed':
                         parts.append(str(target.get('lowMps', '?')) + '-' + str(target.get('highMps', '?')) + ' m/s')
+                    elif target.get('type') == 'power':
+                        parts.append(str(target.get('lowWatts', '?')) + '-' + str(target.get('highWatts', '?')) + ' W')
+                    elif target.get('type') == 'cadence':
+                        parts.append(str(target.get('lowRpm', '?')) + '-' + str(target.get('highRpm', '?')) + ' rpm')
+                    elif target.get('type') == 'stroke':
+                        parts.append(plain(target.get('stroke', '')) + ' stroke')
                     elif target.get('type') == 'open':
                         parts.append('Open target')
                     if step.get('notes'):

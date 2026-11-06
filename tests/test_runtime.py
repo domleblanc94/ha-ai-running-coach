@@ -4,12 +4,13 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from types import ModuleType
 import tempfile
 from threading import Event
 import unittest
 from unittest.mock import MagicMock, patch
 
-from ai_running_coach.app.runtime import Runtime
+from ai_running_coach.app.runtime import Runtime, load_calendar_rules
 from ai_running_coach.app.scheduler import due_date
 from ai_running_coach.app.storage import atomic_json, file_lock
 
@@ -27,6 +28,30 @@ class RuntimeTests(unittest.TestCase):
     def setup_profile(self):
         self.app.save_config({'gemini_api_key': 'synthetic-test-key'})
         self.app.save_profile(PROFILE)
+
+    def test_bundled_calendar_load_preserves_unrelated_module_and_import_path(self):
+        other = ModuleType('sports')
+        original_path = list(sys.path)
+        with patch.dict(sys.modules, {'sports': other}):
+            runtime = Runtime(self.data.parent / 'second-data')
+            conflicts = runtime.calendar_rules.running_session_conflicts({'sessions': [
+                {'id': 'bike', 'date': '2026-11-06', 'sport': 'cycling', 'workout_type': 'Intervals'},
+                {'id': 'run', 'date': '2026-11-06', 'sport': 'running', 'workout_type': 'Intervals'},
+            ]}, '2026-11-06')
+            self.assertEqual(conflicts, [])
+            self.assertIs(sys.modules['sports'], other)
+            self.assertEqual(sys.path, original_path)
+
+    def test_bundled_calendar_import_failure_restores_prior_module(self):
+        core = self.data.parent / 'broken-bundle'
+        core.mkdir()
+        (core / 'sports.py').write_text('VALUE=1\n', encoding='utf-8')
+        (core / 'training_calendar.py').write_text('from sports import VALUE\nraise RuntimeError("fixture")\n', encoding='utf-8')
+        other = ModuleType('sports')
+        with patch.dict(sys.modules, {'sports': other}):
+            with self.assertRaisesRegex(RuntimeError, 'fixture'):
+                load_calendar_rules(core)
+            self.assertIs(sys.modules['sports'], other)
 
     def fixture_publication(self, html=b'<html>saved plan</html>'):
         now = datetime.now(timezone.utc)

@@ -52,7 +52,7 @@ def approval():
 
 def response(new_session=False):
     session = {'id': 'manual-first-session', 'date': (date.today()+timedelta(days=1)).isoformat(),
-               'workout_type': 'Run', 'amount': '30 min', 'target': 'Conversational effort'}
+               'sport': 'running', 'workout_type': 'Run', 'amount': '30 min', 'target': 'Conversational effort'}
     payload = {'summary': 'A fresh reviewed block.', 'trajectory': 'insufficient_evidence', 'reviews': [],
                'plan_changes': [{'op': 'add', 'session_id': session['id'], 'session': session, 'reason': 'Current evidence.'}] if new_session else []}
     return types.SimpleNamespace(text=json.dumps(payload), usage_metadata=None)

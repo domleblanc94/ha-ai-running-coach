@@ -10,7 +10,7 @@ If you installed from the documented repository URL, you can jump to the app pag
 
 ## First setup
 
-1. Create your athlete profile and set your availability. Use A for your main goal and B or C for supporting goals. Each goal can have an optional date and target. A race can also have ideal, main and fallback outcomes for the same event. With no target or outcome, the race goal defaults to **Just finish**. Existing target values carry over when you upgrade. Choose your heart-rate zone mode in the same form.
+1. Create your athlete profile and set your training mode and availability. Choose running, cycling, swimming or triathlon; existing profiles remain running until you change them. Use A for your main goal and B or C for supporting goals, with a sport for each goal. Each goal can have an optional date and target. A race can also have ideal, main and fallback outcomes for the same event. With no target or outcome, the race goal defaults to **Just finish**. Existing goals remain running goals when you change modes; select their sports deliberately. Choose your heart-rate zone mode in the same form.
 2. Choose your activity source. Offline mode skips Garmin sync and starts with the profile as its evidence. For Garmin mode, obtain your own official Personal API key and review the permitted use of your data. Configure the key and account region in the app. [Garmin developer program](https://developer.garmin.com/gc-developer-program/overview/)
 3. Select a model provider and enter its key. Generating or reviewing a plan uses that provider, including with the offline activity source. The default allowance is two coaching requests per UTC day, shared by manual and scheduled runs. Check your provider's account limits and pricing separately.
 4. Save your IANA timezone (for example, Europe/London) with scheduling unchecked. This controls plan dates and the daily review time. Request counts follow UTC days.
@@ -36,9 +36,27 @@ Save changes to available training days before generating a replacement plan. Wi
 
 Use **Preferred long-run days (optional)** to offer the coach one or more suitable days. Select several to offer alternatives; this does not ask for a long run on every selected day. Use **No preference** to clear the selection and let the coach choose from your available days. If you have selected available training days, preferred long-run days must be among them. Save the profile before requesting the next review or replacement plan.
 
-The app currently supports one planned running session per date. A run and a strength session may share a date. If the coach moves a run to a date that already has a run, it must reconcile the existing session in the same update. A conflicting response is rejected and the last valid saved plan is retained. Conflicts already present in an older plan are shown for review; saving settings or updating the app does not silently move or delete those sessions.
+The app supports one planned running session per date. Different sports, or a run and a strength session, may share a date. If the coach moves a run to a date that already has a run, it must reconcile the existing session in the same update. A conflicting response is rejected and the last valid saved plan is retained. Conflicts already present in an older plan are shown for review; saving settings or updating the app does not silently move or delete those sessions.
 
 Download the calendar as a PDF for printing or sharing. You can also download **athlete.md** and **training_plan.md**. These exports contain your private profile and training information; store and share them accordingly. They do not contain connection API keys. Exporting saved data does not make an AI request.
+
+## Running, cycling, swimming and triathlon
+
+**Setup & settings** offers a **Training focus** and optional availability for each sport. Sport days narrow the global training days; leave them blank to inherit the global setting. Preferred long-run and long-ride days are alternatives, not requests for several long sessions. Keep optional cycling FTP, swimming CSS, pool size and sport-specific HR ranges blank when unknown. Running ranges are not reused as cycling or swimming ranges. **Learn HR zones** applies to running baseline observations; it is not a cycling or swimming test protocol.
+
+One coach review considers all enabled disciplines and their combined demands. The same daily request allowance and output limit apply; enabling triathlon does not add per-sport calls. The dashboard labels and filters disciplines, keeps distances and pace measures separate, and shows combined recorded timer duration with missing-data coverage. Composite Garmin activities without separate imported legs remain composite training time, not invented per-sport distances. The PDF includes sport labels and linked brick order.
+
+Swimming distinguishes pool and open water. Enter the actual pool length and choose metres or yards; 25 yards is stored as 22.86 metres. CSS is an optional measured pace per 100 metres. Blank values stay unknown. Save profile changes before a new coaching review; saving or upgrading does not rewrite the current plan. The app retains the last successful dashboard HTML during an update. New sport charts and session labels appear after the next successful coaching run renders a dashboard; setup/profile controls are available immediately.
+
+## Download workouts for your watch
+
+Running, cycling and explicitly configured pool-swimming sessions can be previewed and downloaded as FIT workouts directly in the browser. Running supports HR/pace targets; cycling adds explicit Watts and cadence targets, without guessing FTP conversions. Pool workouts support stroke targets and time/distance/open steps. Missing targets remain open. The pool setting must agree with the profile; missing or mismatched settings show an explanation instead of a download.
+
+The preview displays pool distances in the selected m/yd unit while preserving metres internally. Prescriptions that are not whole pool lengths remain unchanged and show an informational notice. Garmin documents the Forerunner 965's [updated pool-workout behavior](https://support.garmin.com/en-CA/?faq=fXDWMUWcuw5ACMmLqjjC59); inspect the resulting watch steps and alerts before relying on them.
+
+Open-water swims and combined multisport/race entries are plan-only. Linked brick legs download as individual sport files with their order in the filename. Start each leg separately; no automatic transition or combined watch file is promised. The exporter allows up to 50 explicit steps per file. Edited or incomplete workouts use the existing review confirmation; preview changes affect only the download, not the saved plan.
+
+Files require manual transfer. This app does not upload to Garmin Connect, sync or delete watch workouts. The HA mobile app may require an external browser for downloading. Offline tests use Garmin's official FIT decoder, but physical Forerunner 965 transfer/execution remains untested. See the [standalone transfer guide](https://github.com/domleblanc94/ai-running-coach#download-a-workout-for-a-forerunner-965).
 
 ## Learn HR zones from baseline runs
 

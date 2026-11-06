@@ -14,7 +14,7 @@
   <main class="shell">
     <section id="setup-hero" class="hero">
       <p class="eyebrow">YOUR TRAINING SPACE</p>
-      <h1>Make your next run count.</h1>
+      <h1>Make your next session count.</h1>
       <p>Set up your coach, check your plan, and see what’s scheduled next.</p>
     </section>
     <section class="card run-card" aria-labelledby="run-title">
@@ -58,18 +58,20 @@
         <div class="actions"><button type="submit">Save connection</button><span class="form-result" role="status"></span></div>
       </form>
       <form id="profile-form" class="card">
-        <p class="eyebrow">02 / ATHLETE</p><h2>Tell the coach about your running</h2>
+        <p class="eyebrow">02 / ATHLETE</p><h2>Tell the coach about your training</h2>
         <div class="grid">
           <label>Athlete name<input name="name" maxlength="100" required autocomplete="off"></label>
+          <label>Training focus<select name="training_mode"><option value="running">Running</option><option value="cycling">Cycling</option><option value="swimming">Swimming</option><option value="triathlon">Triathlon</option></select><small>Changing focus keeps your existing goals and saved sport settings. Generate a new plan when you are ready to change the upcoming block.</small></label>
           <label>Training goal<input name="goal" maxlength="500" placeholder="Build consistency or prepare for a race"></label>
-          <label>Running experience<textarea name="experience" maxlength="500" rows="3" placeholder="Current weekly distance, recent long run, or time away from running"></textarea></label>
+          <label>Training experience<textarea name="experience" maxlength="500" rows="3" placeholder="Recent training, experience in each sport, or time away"></textarea></label>
           <label>Current injury or training constraints<textarea name="injuries" maxlength="500" rows="3" placeholder="Optional"></textarea></label>
           <fieldset class="full"><legend>Available training days</legend><div id="days" class="days"></div><p class="hint">Choose the days you can train. Leaving every day blank means availability is not set and the coach may choose days.</p></fieldset>
-          <fieldset class="full"><legend>Preferred long-run days (optional)</legend><div id="long-run-days" class="days"></div><p id="long-run-hint" class="hint">Leave all blank for no preference. Multiple days give the coach alternative days for your long run; they do not request extra long runs.</p><p id="long-run-saved-note" class="hint" hidden></p><button id="clear-long-run-days" type="button" class="secondary">No preference</button></fieldset>
+          <fieldset id="running-preferences" class="full"><legend>Preferred long-run days (optional)</legend><div id="long-run-days" class="days"></div><p id="long-run-hint" class="hint">Leave all blank for no preference. Multiple days give the coach alternative days for your long run; they do not request extra long runs.</p><p id="long-run-saved-note" class="hint" hidden></p><button id="clear-long-run-days" type="button" class="secondary">No preference</button></fieldset>
           <fieldset class="full"><legend>Goal priorities</legend><p class="hint">Add a race or training goal at each priority. Dates and targets are optional.</p><div id="goal-fields" class="goal-grid"></div></fieldset>
-          <label>Heart rate zones<select name="zone_mode"><option value="unknown">Unknown / use effort</option><option value="known">Enter configured ranges</option><option value="learn">Learn HR zones from baseline runs</option></select></label>
+          <label id="running-zone-mode-label">Running heart rate zones<select name="zone_mode"><option value="unknown">Unknown / use effort</option><option value="known">Enter configured ranges</option><option value="learn">Learn HR zones from baseline runs</option></select></label>
           <p id="zone-learn-hint" class="hint full" hidden>Start with easy runs guided by effort and the talk test. The coach can review your observations while your saved ranges stay in place.</p>
           <fieldset id="zones" class="full" hidden><legend>Configured ranges in bpm</legend><p class="hint">Enter Zone 2 and any other ranges you know. Leave unknown ranges blank.</p><div id="zone-fields" class="zone-grid"></div></fieldset>
+          <details class="full"><summary>Sport settings (optional)</summary><p class="hint">Add only values you know. Blank sport days use your general availability. Heart-rate zones stay separate for each sport.</p><div id="sport-settings" class="grid"></div></details>
         </div>
         <div class="actions"><button type="submit">Save athlete profile</button><span class="form-result" role="status"></span></div>
       </form>

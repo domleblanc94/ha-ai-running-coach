@@ -195,7 +195,7 @@ class PlanningTests(unittest.TestCase):
                 self.assertEqual(db.execute('SELECT status FROM coach_review_jobs').fetchone()[0],'pending')
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM daily_coach_reviews').fetchone()[0],0)
                 db.execute("UPDATE coach_review_jobs SET attempts=2,updated_at='2000-01-01'");db.commit();db.close()
-                replacement=dict(self.plan['sessions'][1],amount='6 km',target='AI-selected running session based on the athlete request.')
+                replacement=dict(self.plan['sessions'][1],sport='running',amount='6 km',target='AI-selected running session based on the athlete request.')
                 revised=dict(self.response,trajectory='on_track',plan_changes=[{'op':'update','session_id':replacement['id'],'session':replacement,'reason':'Adapt upcoming session to the athlete request and training evidence.'}])
                 api.models.generate_content=lambda **kw: types.SimpleNamespace(text=json.dumps(revised),usage_metadata=None)
                 result=ai_coach.run_daily_coach_check(today='2026-10-27')

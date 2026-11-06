@@ -14,6 +14,7 @@ import threading
 from urllib.parse import urlsplit
 
 from .dashboard_view import saved_dashboard
+from . import profile_sports
 
 
 WEB = Path(__file__).with_name("web")
@@ -55,6 +56,9 @@ def profile_fields(markdown):
             goal[key] = match[1] if match else ""
         goal["kind"] = "race" if goal["race_date"] or goal["target_time"] else "training"
         goal["outcomes"] = {}
+        discipline = re.search(r'^\*\*Sport:\*\*[ \t]*(.*)$', race[0], re.M | re.I) if race else None
+        if discipline:
+            goal['sport'] = discipline[1].strip().lower()
         if race:
             metadata = next((line for line in race[0].splitlines() if line.startswith(GOAL_METADATA) and line.endswith(" -->")), None)
             if metadata:
@@ -94,11 +98,13 @@ def profile_view(markdown):
     fields['long_run_preference_text'] = '; '.join(re.findall(
         r'^\*\*Preferred Long Run Days?:\*\*[ \t]*(.*)$', markdown, re.M | re.I,
     ))
+    fields['training_mode'] = profile_sports.training_mode(markdown)
+    fields['sport_settings'] = profile_sports.read_settings(markdown)
     return fields
 
 
 def profile_markdown(data, existing=""):
-    if set(data) - {*PROFILE_FIELDS, *GOAL_FIELDS, "goals", "days", "long_run_days", "zones", "zone_mode"}:
+    if set(data) - {*PROFILE_FIELDS, *GOAL_FIELDS, "goals", "days", "long_run_days", "zones", "zone_mode", "training_mode", "sport_settings"}:
         raise ValueError("Unknown athlete profile field.")
     fields = {}
     for key in PROFILE_FIELDS:
@@ -118,7 +124,7 @@ def profile_markdown(data, existing=""):
         goal_updates = {"A": {key: data.get(key, "") for key in GOAL_FIELDS}}
     goals = saved["goals"]
     for priority, updates in goal_updates.items():
-        if not isinstance(updates, dict) or set(updates) - {*GOAL_FIELDS, "kind", "outcomes"}:
+        if not isinstance(updates, dict) or set(updates) - {*GOAL_FIELDS, "kind", "outcomes", "sport"}:
             raise ValueError("Enter a goal name, optional date and target.")
         goal = {}
         for key in GOAL_FIELDS:
@@ -131,6 +137,11 @@ def profile_markdown(data, existing=""):
                 raise ValueError("Use a valid goal date.")
             date.fromisoformat(goal["race_date"])
         goal["kind"] = updates.get("kind", "race" if goal["race_date"] or goal["target_time"] else "training")
+        if 'sport' in updates or 'sport' in goals[priority]:
+            sport = updates.get('sport', goals[priority].get('sport'))
+            if not isinstance(sport, str) or sport not in profile_sports.GOAL_SPORTS:
+                raise ValueError('Choose Running, Cycling, Swimming or Triathlon for the goal.')
+            goal['sport'] = sport
         if goal["kind"] not in ("race", "training"):
             raise ValueError("Choose race or training goal.")
         outcomes = updates.get("outcomes", {})
@@ -148,25 +159,32 @@ def profile_markdown(data, existing=""):
         if not goal["event"] and (goal["race_date"] or goal["target_time"] or goal["outcomes"]):
             raise ValueError(f"Enter a name for goal {priority} or clear its date and target.")
         goals[priority] = goal
-    days = data.get("days", [])
+    days = data.get("days", saved['days'])
     if not isinstance(days, list) or any(day not in WEEKDAYS for day in days):
         raise ValueError("Select available training days.")
     long_run_days = data.get("long_run_days", saved["long_run_days"])
     if not isinstance(long_run_days, list) or any(day not in WEEKDAYS for day in long_run_days):
         raise ValueError("Select preferred long-run days or leave them blank for no preference.")
-    if days and any(day not in days for day in long_run_days):
+    active_running = data.get('training_mode', profile_sports.training_mode(existing)) in ('running', 'triathlon')
+    check_running_preference = active_running or 'long_run_days' in data
+    if check_running_preference and days and any(day not in days for day in long_run_days):
         raise ValueError("Preferred long-run days must also be selected as available training days. Update your availability or clear those preferences.")
-    zones = data.get("zones", {})
-    zone_mode = data.get("zone_mode", "known" if zones else "unknown")
+    existing = profile_sports.apply_settings(existing, data.get('sport_settings'), days, data.get('training_mode'))
+    running_days = profile_sports.read_settings(existing)['running']['available_days'] or days
+    if check_running_preference and running_days and any(day not in running_days for day in long_run_days):
+        raise ValueError('Preferred long-run days must fit your running availability.')
+    zones_edited = bool(set(data) & {'zones', 'zone_mode'})
+    zones = data.get("zones", saved['zones'])
+    zone_mode = data.get("zone_mode", ("known" if zones else "unknown") if 'zones' in data else saved['zone_mode'])
     if zone_mode not in ("unknown", "known", "learn"):
         raise ValueError("Choose a heart rate zone mode.")
     if zone_mode == "learn":
         zones = {}
     elif zone_mode == "unknown":
         zones = {}
-    if not isinstance(zones, dict) or set(zones) - set("12345") or zones and "2" not in zones:
+    if zones_edited and (not isinstance(zones, dict) or set(zones) - set("12345") or zones and "2" not in zones):
         raise ValueError("Enter your configured Zone 2 or choose unknown zones.")
-    if zone_mode == "known" and "2" not in zones:
+    if zones_edited and zone_mode == "known" and "2" not in zones:
         raise ValueError("Enter your configured Zone 2 or choose unknown zones.")
     lines = ["# Athlete profile", f"**Athlete Name:** {fields['name']}"]
     style = re.search(r"^\*\*Coaching Style:\*\*[ \t]*(.*)$", existing, re.M)
@@ -179,24 +197,29 @@ def profile_markdown(data, existing=""):
             lines.append(f"**{PROFILE_FIELDS[key]}:** {value}")
     if previous_style and not fields["goal"]:
         lines.append("**Coaching Style:** " + previous_style)
-    if days:
+    if 'days' in data and days:
         lines.append("**Weekly Availability:** " + ", ".join(day for day in WEEKDAYS if day in days))
     if "long_run_days" in data and long_run_days:
         lines.append("**Preferred Long Run Days:** " + ", ".join(day for day in WEEKDAYS if day in long_run_days))
-    if not zones and (zone_mode != "learn" or not re.search(r"^\*\*Zone [1-5] \(", existing, re.M)):
+    if ((zones_edited and not zones and (zone_mode != "learn" or not re.search(r"^\*\*Zone [1-5] \(", existing, re.M)))
+            or not zones_edited and not re.search(r'^\*\*(?:Zone [1-5] \(|Heart Rate Zones:)', existing, re.M)):
         lines.append("**Heart Rate Zones:** Not configured")
     previous = 0
-    for number, bounds in sorted(zones.items()):
+    for number, bounds in sorted(zones.items()) if zones_edited else ():
         if (
             not isinstance(bounds, list) or len(bounds) != 2
             or any(type(bound) is not int for bound in bounds)
-            or not previous < bounds[0] <= bounds[1] <= 300
+            or not 1 <= bounds[0] <= bounds[1] <= 255 or bounds[0] < previous
         ):
             raise ValueError("Enter ascending, non-overlapping heart rate ranges in bpm.")
         previous = bounds[1]
-        lines.append(f"**Zone {number} ({ZONE_NAMES[int(number)-1]}):** {bounds[0]} - {bounds[1]} bpm")
+        if zones_edited:
+            lines.append(f"**Zone {number} ({ZONE_NAMES[int(number)-1]}):** {bounds[0]} - {bounds[1]} bpm")
     known = set(PROFILE_FIELDS.values())
-    known.update(("Weekly Availability", "Heart Rate Zones", "HR Zone Learning"))
+    if 'days' in data:
+        known.add("Weekly Availability")
+    if zones_edited:
+        known.update(("Heart Rate Zones", "HR Zone Learning"))
     if "long_run_days" in data:
         known.update(LONG_RUN_LABELS)
     race_priority = None
@@ -211,17 +234,17 @@ def profile_markdown(data, existing=""):
             race_priority = label
             continue
         if (label in known or ("long_run_days" in data and label and label.lower() in {name.lower() for name in LONG_RUN_LABELS})
-                or (race_priority and (label in ("Date", "Target Time") or line.startswith(GOAL_METADATA)))):
+                or (race_priority and (label in ("Date", "Target Time", "Sport") or line.startswith(GOAL_METADATA)))):
             continue
         if label and re.match(r"Zone [1-5] \(", label):
-            zone_lines.append(line)
+            (zone_lines if zones_edited else extras).append(line)
             continue
         extras.append(line)
     # Retain an open-ended range from a pre-existing profile when the form
     # otherwise keeps the configured zones unchanged.
-    if zone_mode == "learn":
+    if zones_edited and zone_mode == "learn":
         lines.append("**HR Zone Learning:** Enabled")
-    if zone_mode == "learn" or zones and zones == saved["zones"]:
+    if zones_edited and (zone_mode == "learn" or zones and zones == saved["zones"]):
         for line in zone_lines:
             match = re.match(r"^\*\*Zone ([1-5])", line)
             if match[1] not in zones:
@@ -234,6 +257,8 @@ def profile_markdown(data, existing=""):
             if goal["kind"] == "training":
                 event = TRAINING_GOAL_PREFIX + event
             lines.append(f"**{priority}-Race:** {event}")
+            if 'sport' in goal:
+                lines.append('**Sport:** ' + goal['sport'])
             if goal["race_date"]:
                 lines.append(f"**Date:** {goal['race_date']}")
             targets = [f"{OUTCOME_LABELS[key]}: {goal['outcomes'][key]}" for key in PRIORITIES if key in goal["outcomes"]]

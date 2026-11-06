@@ -106,7 +106,7 @@ class WorkoutSchemaTests(unittest.TestCase):
         value=copy.deepcopy(FIXTURE);value['steps']*=26;invalid.append(value)
         value=copy.deepcopy(FIXTURE);value['name']='x\0y';invalid.append(value)
         value=copy.deepcopy(FIXTURE);value['name']='😀'*16;invalid.append(value)
-        value=copy.deepcopy(FIXTURE);value['sport']='cycling';invalid.append(value)
+        value=copy.deepcopy(FIXTURE);value['sport']='multisport';invalid.append(value)
         value=copy.deepcopy(FIXTURE);value['steps'][0]['notes']='é'*101;invalid.append(value)
         return invalid
 

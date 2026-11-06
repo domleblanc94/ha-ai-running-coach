@@ -10,9 +10,26 @@ from unittest.mock import patch
 from ai_running_coach.app.runtime import Runtime
 from ai_running_coach.app.server import CoachServer, profile_markdown
 from ai_running_coach.app.storage import file_lock
+from ai_running_coach.app.exports import calendar_pdf
 
 
 class ExportTests(unittest.TestCase):
+    def test_multisport_pdf_retains_separate_linked_legs_and_explicit_workout_targets(self):
+        plan = {'revision': 1, 'sessions': [
+            {'id': 'a-run', 'date': '2026-11-06', 'sport': 'running', 'workout_type': 'Easy', 'amount': '20 min', 'target': 'Easy', 'brick': {'id': 'linked', 'order': 2}},
+            {'id': 'z-bike', 'date': '2026-11-06', 'sport': 'cycling', 'workout_type': 'Easy', 'amount': '45 min', 'target': 'Steady', 'brick': {'id': 'linked', 'order': 1},
+             'workout': {'sport': 'cycling', 'steps': [{'duration': {'type': 'time', 'seconds': 2700}, 'target': {'type': 'power', 'lowWatts': 150, 'highWatts': 180}},
+                  {'duration': {'type': 'time', 'seconds': 60}, 'target': {'type': 'cadence', 'lowRpm': 80, 'highRpm': 95}}]}},
+            {'id': 'swim', 'date': '2026-11-07', 'sport': 'swimming', 'sub_sport': 'lap_swimming', 'workout_type': 'Technique', 'amount': '1000 m', 'target': 'Relaxed',
+             'workout': {'sport': 'swimming', 'poolLengthMetres': 22.86, 'poolLengthUnit': 'yd', 'steps': [{'duration': {'type': 'distance', 'metres': 1000}, 'target': {'type': 'stroke', 'stroke': 'freestyle'}}]}},
+            {'id': 'water', 'date': '2026-11-08', 'sport': 'swimming', 'sub_sport': 'open_water', 'workout_type': 'Open-water swim', 'amount': '1 km', 'target': 'Guidance'},
+        ]}
+        before = json.dumps(plan, sort_keys=True)
+        document = calendar_pdf(plan, 'Synthetic athlete')
+        self.assertTrue(document.startswith(b'%PDF-'))
+        self.assertTrue(document.rstrip().endswith(b'%%EOF'))
+        self.assertEqual(json.dumps(plan, sort_keys=True), before)
+
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)

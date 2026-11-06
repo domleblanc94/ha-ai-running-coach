@@ -17,9 +17,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - name: Install pinned official FIT decoder for offline tests
+        run: npm install --prefix "${{ runner.temp }}/coach-fit-sdk" --ignore-scripts --no-audit --no-fund @garmin/fitsdk@21.221.0
       - run: python -m pip install ".[all]"
       - run: python run_offline_tests.py
         env:
           COACH_TEST_NO_NETWORK: '1'
+          COACH_FIT_SDK_MODULE: '${{ runner.temp }}/coach-fit-sdk/node_modules/@garmin/fitsdk/src/index.js'
       - run: python setup_coach.py --demo demo
       - run: python ai_coach.py --help

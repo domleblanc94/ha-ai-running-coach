@@ -103,7 +103,7 @@ class DailyBudgetTests(unittest.TestCase):
             paths['PLAN_FILE'].unlink()
             paths['CANONICAL_FILE'].unlink()
             session = {'id': 'first-session', 'date': (date.today()+timedelta(days=1)).isoformat(),
-                       'workout_type': 'Run', 'amount': '30 min', 'target': 'Conversational effort'}
+                       'sport': 'running', 'workout_type': 'Run', 'amount': '30 min', 'target': 'Conversational effort'}
             payload = {'summary': 'A short first block.', 'trajectory': 'insufficient_evidence', 'reviews': [],
                        'plan_changes': [{'op': 'add', 'session_id': session['id'], 'session': session, 'reason': 'First evidence-led session.'}]}
             generate = Mock(return_value=types.SimpleNamespace(text=json.dumps(payload), usage_metadata=None))

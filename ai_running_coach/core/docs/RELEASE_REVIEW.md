@@ -1,6 +1,6 @@
 # Public source release review
 
-Status: **public beta 0.2.3b6**, intended for technical self-hosters running one personal source-checkout installation. It is not a stable, universally validated provider/device integration. Repository pushes and GitHub Release publication are separate maintainer operations. A separate personal Linux installation was backed up, migrated and checked against the official Garmin Personal API. Provider validation scope is recorded below.
+Status: **public beta 0.3.0b1**, intended for technical self-hosters running one personal source-checkout installation. It is not a stable, universally validated provider/device integration. Repository pushes and GitHub Release publication are separate maintainer operations. A separate personal Linux installation was backed up, migrated and checked against the official Garmin Personal API. Provider validation scope is recorded below.
 
 ## Findings corrected
 
@@ -20,7 +20,7 @@ Status: **public beta 0.2.3b6**, intended for technical self-hosters running one
 
 ## Verified scope
 
-Local verification uses Windows and CPython 3.13. The clean-source flow installs only base HTTP/dotenv dependencies in a new virtual environment, initializes without an existing profile/database/plan, runs an offline new-plan preview, imports synthetic summaries, and renders a synthetic dashboard. The latest network-blocked suite ran **208 tests: 204 passed and four optional checks skipped**. Seven FIT checks separately passed with Garmin's official decoder available. Provider protocol and failure-path tests use mocked HTTP responses; these establish request handling and validation behavior, not coaching quality.
+Local verification uses Windows and CPython 3.13. The clean-source flow installs only base HTTP/dotenv dependencies in a new virtual environment, initializes without an existing profile/database/plan, runs an offline new-plan preview, imports synthetic summaries, and renders a synthetic dashboard. The final network-blocked Windows suite ran **242 tests: 239 passed and three expected checks skipped** (two private-fixture opt-ins and the Windows symlink privilege check). FIT checks use the pinned official Garmin decoder for running, cycling and metric/yard pool swimming, including signatures, CRCs, all supported target types and unchanged legacy running bytes. Provider protocol and failure-path tests use mocked HTTP responses; these establish request handling and validation behavior, not coaching quality.
 
 During beta 1, one separately authorized live evaluation request to `gemini-3.5-flash-lite` succeeded with a 4096-token output cap. Provider-reported usage was 2861 input and 875 output tokens. The synthetic response contained three future calendar entries: a 30-minute easy running workout with an open/conversational target and two rest days, plus an `insufficient_evidence` trajectory. The same saved response then passed normal validation, journaled SQLite/file plan application and HTML rendering offline, without another API call. Production configuration, profile, plan and database were unchanged. This checks one account/model and a small synthetic end-to-end plan path; it does not establish free-tier eligibility, actual billed cost or coaching suitability for a real athlete.
 
@@ -49,6 +49,12 @@ The athlete profile can specify preferred long-run days as alternatives for the 
 ### Beta 6
 
 Replacement-plan requests supply clearer instructions for fresh session identifiers and explicit date/weekday availability. The replacement flow can accept redundant deletion of known future sessions while preserving checks against historical changes, reused or retired identifiers, unavailable training days and duplicate runs. Rejected responses retain the saved plan; this update does not replay an earlier response or request a new one automatically.
+
+## Multisport beta 0.3.0b1
+
+Running remains the default for legacy profiles, goals and plans. Explicit cycling, swimming and triathlon modes add per-sport availability, optional measured FTP/CSS/pool settings and separate zone references. One joint coach review still owns training decisions under the same budgets. The dashboard and printable calendar label sports and linked brick order; aggregate training time does not sum incompatible sport distances. Composite activities without imported legs are not expanded into invented per-sport evidence.
+
+FIT export adds cycling power/cadence and pool stroke targets. Pool size and m/yd units are explicit; 25 yards encodes as 22.86 metres. Arbitrary prescribed swim distances remain unchanged, with a preview notice for fractional pool lengths. Ordered brick legs export separately; open water and combined multisport event export remain unsupported. Official decoder checks verify the format, not physical watch behavior.
 
 ## Beta tester path
 

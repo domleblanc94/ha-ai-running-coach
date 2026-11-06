@@ -1,8 +1,8 @@
 # AI Coach
 
-**Public beta 0.2.3b6** for technical self-hosters running their own installation. Expect to use a terminal, edit a private `.env` and profile, and review generated plans. This is a source-checkout application, with optional Home Assistant publishing. It is not a hosted service or a turnkey watch-sync app.
+**Public beta 0.3.0b1** for technical self-hosters running their own installation. Expect to use a terminal, edit a private `.env` and profile, and review generated plans. This is a source-checkout application, with optional Home Assistant publishing. It is not a hosted service or a turnkey watch-sync app.
 
-A self-hosted running coach that combines AI-authored training plans with local activity analysis and a mobile-friendly HTML dashboard. Run it manually or on a schedule; optionally publish the page to Home Assistant using your existing SSH transport.
+A self-hosted coach for running, cycling, swimming and triathlon that combines AI-authored training plans with local activity analysis and a mobile-friendly HTML dashboard. Running remains the default for existing installations. Run it manually or on a schedule; optionally publish the page to Home Assistant using your existing SSH transport.
 
 The AI decides training progression, recovery, intensity and plan adjustments. Python calculates and compresses activity evidence, validates returned changes, stores versioned plans and renders the dashboard. It does not substitute a fixed training policy for the model's decisions.
 
@@ -22,7 +22,7 @@ See the [release review](docs/RELEASE_REVIEW.md) for the validation scope. Repor
 - Imports your activities through Garmin's official Personal API, or accepts local summaries in offline mode.
 - Generates a new training block or adapts an existing one using your goals, availability, zones, history and dated feedback.
 - Applies valid future-session changes automatically; preserves historical sessions and the last-good plan on failures.
-- Shows upcoming workouts, weekly planned/recorded distance, rolling running summaries, long-run history, coach priorities and uncertainty.
+- Shows upcoming workouts, sport filters, separate running/cycling/swimming summaries, combined recorded training time, coach priorities and uncertainty. Distances from different sports are not added together.
 - Supports Gemini, OpenAI and Anthropic through an explicitly selected provider. There is no automatic switch between providers.
 - Tracks actual model attempts and usage, caches identical completed evidence, and limits automatic request spending.
 - Keeps local check-ins and activity notes available for subsequent reviews.
@@ -80,7 +80,29 @@ python ai_coach.py --dry-run --new-plan
 
 Check that your goals, availability, activity source and missing-data labels are correct. Review `.env` request/output limits before enabling a schedule. The live `--new-plan` command below automatically saves a valid AI-authored future block; inspect that block before training from it. The request-count limit is not a monetary spending cap.
 
-In `athlete.md`, an optional line such as `**Preferred Long Run Days:** Saturday, Sunday` gives the coach alternative long-run days. It does not request a long run on every listed day. Leave it blank or use `No preference` to let the coach choose. When weekly availability is explicit, preferred days must be within it. New plan changes must keep at most one running session per date; a run and a strength session can share a date. Existing conflicts need a valid coach update, rather than silent changes to saved sessions.
+In `athlete.md`, an optional line such as `**Preferred Long Run Days:** Saturday, Sunday` gives the coach alternative long-run days. It does not request a long run on every listed day. Leave it blank or use `No preference` to let the coach choose. When weekly availability is explicit, preferred days must be within it. New plan changes keep at most one running session per date; different sports or a run and strength can share a date. Existing conflicts need a valid coach update, rather than silent changes to saved sessions.
+
+### Select sports and goals
+
+Set `**Training Mode:** running`, `cycling`, `swimming` or `triathlon` in the profile. An absent mode retains running behavior. Optional `**Running Availability:**`, `**Cycling Availability:**` and `**Swimming Availability:**` lines narrow the global training days for each sport. Blank sport availability inherits the global setting; it does not declare a new day available. Use `**Preferred Long Ride Days:**` for alternative ride days. Save only measured or deliberately configured values; leave optional fields blank when unknown:
+
+```markdown
+**Training Mode:** triathlon
+**Running Availability:**
+**Cycling Availability:**
+**Swimming Availability:**
+**Preferred Long Ride Days:**
+**Cycling FTP:**
+**Swimming CSS:**
+**Swimming Type:**
+**Pool Length:**
+```
+
+FTP is explicit Watts; CSS uses `m:ss /100m`. Swimming Type is `lap_swimming` or `open_water`. Pool Length requires a number plus `m` or `yd`; a 25-yard pool is stored as 22.86 metres. No pool size, FTP, CSS or sport zones are assumed. Existing unprefixed Zone 1–5 values apply to running. Cycling and swimming can have separate `**Cycling Zone 2 (Endurance):**` or `**Swimming Zone 2 (Endurance):**` fields in the same format; running zones are not copied across sports.
+
+Add `**Sport:** running`, `cycling`, `swimming` or `multisport` within each A/B/C goal block. Existing goals without a sport remain running goals, even after changing training mode. Untargeted race goals mean finishing. Triathlon plans can include ordered, linked brick legs on one day; each leg is a separate sport session. Multisport race entries and open-water swims are supported in the plan and dashboard, with the export limitations below.
+
+One review considers the combined training load and all enabled disciplines under the same request/output limits; switching sports does not multiply model calls or raise budgets. Recorded evidence stays separate by sport. The dashboard combines only recorded timer duration and shows missing-data coverage. Coaching evidence separately reports timer and moving duration with their coverage; it does not substitute elapsed time or calculate a physiological readiness score. Composite activities without separate imported legs remain composite time, rather than invented per-sport splits.
 
 | Setting | Purpose |
 | --- | --- |
@@ -166,7 +188,7 @@ python import_activities.py --file /path/to/activities.csv --db ai_coach_master.
 python import_activities.py --file /path/to/activities.csv --db ai_coach_master.sqlite --dataset my-watch
 ```
 
-Required fields: `id` (positive integer), `start_date` (ISO date/timestamp), `type`. Optional fields: `name`, `distance_m`, `moving_time_s`, `elapsed_time_s`, `elevation_gain_m`, `avg_heartrate`, `max_heartrate`, `perceived_exertion`, `description`. Units are metres, seconds and bpm. Empty/null values stay unknown. Stable IDs plus a dataset name allow repeated imports without creating duplicates. Existing databases are backed up before writes. Import does not call a model; a later explicit coaching review sends included evidence to the configured provider.
+Required fields: `id` (positive integer), `start_date` (ISO date/timestamp), `type`. Optional fields: `name`, `distance_m`, `timer_duration_s`, `moving_time_s`, `elapsed_time_s`, `elevation_gain_m`, `avg_heartrate`, `max_heartrate`, `avg_watts`, `weighted_avg_watts`, `perceived_exertion`, `description`. Units are metres, seconds, bpm and Watts. Empty/null values stay unknown. Use the original activity kind, such as `Run`, `Ride`, `lap_swimming` or `open_water_swimming`; generic `Swim` does not establish pool versus open water. Stable IDs plus a dataset name allow repeated imports without creating duplicates. Existing databases are backed up before writes. Import does not call a model; a later explicit coaching review sends included evidence to the configured provider.
 
 ## Feedback that reaches the coach
 
@@ -186,7 +208,11 @@ The dashboard's checkboxes are browser-only reminders. They do not tell the AI a
 
 ## Download a workout for a Forerunner 965
 
-Running sessions have a **Download workout** button in the upcoming list and calendar. It opens an editable preview; nothing is sent to a server. Review the compact step list and expand any row to edit step order, watch instructions, warm-up/recovery, time or distance limits, lap-button/open endings, and optional HR/pace ranges. Running workouts are limited to 50 steps. Changing units/target mode clears incompatible values rather than reinterpreting a number. Ambiguous legacy sessions and edited workouts require a review confirmation; an unchanged structured workout downloads directly after preview. The result is a `.fit` workout. Browser edits affect that file only, not the saved coaching plan.
+Running, cycling and explicitly configured pool-swimming sessions have a **Download workout** button in the upcoming list and calendar. It opens an editable preview; nothing is sent to a server. Review the compact step list and expand any row to edit step order, watch instructions, warm-up/recovery, time or distance limits and lap-button/open endings. The exporter limits all workouts to 50 explicit flat steps. Changing duration/target mode clears incompatible values rather than reinterpreting a number. Ambiguous legacy sessions and edited workouts require a review confirmation; an unchanged structured workout downloads directly after preview. The result is a `.fit` workout. Browser edits affect that file only, not the saved coaching plan.
+
+Running supports explicit HR and pace ranges. Cycling also supports absolute Watts, cadence in rpm and speed in km/h; missing targets stay open, and FTP percentages are not silently converted. Pool swimming supports stroke targets and explicit time/distance/open steps; pace/CSS guidance stays in step notes. The pool length and m/yd display unit must be explicit and agree with the athlete profile. Distances use metres internally, including yard pools. A fractional pool-length prescription is retained exactly and shown for review, not rounded or rejected as a training plan. Garmin documents the Forerunner 965's [updated pool-workout behavior](https://support.garmin.com/en-CA/?faq=fXDWMUWcuw5ACMmLqjjC59); alert/turn handling still depends on the watch.
+
+Open-water swimming and combined multisport/race entries are plan-only and show why export is unavailable. Linked brick legs download as separate files with their leg order in the preview and filename. Load and start each leg separately; the files do not automate transitions. Garmin's [workout compatibility table](https://support.garmin.com/en-CA/?faq=lLvhWrmlMv0vGmyGpWjOX6&tab=topics) lists running, cycling and pool swimming for the Forerunner 965. Its ability to record a triathlon is not a claim that this exporter delivers a combined multisport workout.
 
 Structured coach-authored steps are preserved when available. Legacy prose starts with a conservative editable step, not an invented interval recipe. For “4 km including 4 x 30-second strides”, the four strides are part of the stated total: the exporter does not append them to an extra 4 km, invent recovery times, infer stride pace, or convert timed strides into distance. Explicit lap-button steps are an option when timing/placement is intentionally flexible. For an HR ceiling without a known lower bound, keep the numeric watch target open rather than inventing a range; the original guidance remains visible for review.
 

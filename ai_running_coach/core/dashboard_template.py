@@ -1,5 +1,5 @@
 """Original dashboard layout, preserved from the pre-upgrade project."""
-def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, activities_json, macro_review_json, last_updated_str, today_json, freshness_html, other_activities_html, session_ids_json, planned_json, agenda_html, focus_html, assessment_html, history_html, feedback_html, workout_sessions_json):
+def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, activities_json, macro_review_json, last_updated_str, today_json, freshness_html, other_activities_html, session_ids_json, planned_json, agenda_html, focus_html, assessment_html, history_html, feedback_html, workout_sessions_json, sport_weeks_json="{}", training_mode_json='"running"'):
     return f"""<!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -47,7 +47,7 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
 </head>
 <body class="bg-slate-900 text-slate-100 font-sans min-h-screen p-4 md:p-8">
     <div class="max-w-7xl mx-auto space-y-8">
-        
+
         <!-- Header -->
         <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-6">
             <div>
@@ -61,7 +61,7 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
                     </span>
                 </div>
             </div>
-            
+
         </header>
 
         <section id="liveHealthBanner" role="status" class="border border-slate-700 bg-slate-800/60 rounded-xl p-3 text-xs text-slate-300">Live workflow status is loading. Saved sync and review times are shown below.</section>
@@ -79,11 +79,13 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
         <!-- Analytics Overview -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div class="bg-slate-800/60 border border-slate-800 rounded-xl p-5 shadow-lg md:col-span-2">
-                <div class="flex justify-between items-center mb-4">
+                <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
                     <h2 class="text-base font-semibold text-slate-300 flex items-center gap-2">
                         <i class="fa-solid fa-chart-simple text-sky-400"></i> Weekly Volume & Load
                     </h2>
-                    <div class="flex gap-2">
+                    <div class="flex flex-wrap gap-2">
+                        <label class="text-xs text-slate-400">Sport <select id="chartSport" class="bg-slate-900 border border-slate-600 rounded p-1"><option value="running">Running</option><option value="cycling">Cycling</option><option value="swimming">Swimming</option><option value="other">Other activities</option><option value="all">All sports · duration</option></select></label>
+                        <button id="btnMinutes" onclick="switchChartMetric('minutes')" class="px-2.5 py-1 rounded text-xs border border-slate-700">Timer minutes</button>
                         <button id="btnKm" onclick="switchChartMetric('km')" class="px-2.5 py-1 rounded text-xs font-semibold bg-sky-500/20 text-sky-400 border border-sky-500/40">Distance (km)</button>
                         <button id="btnLoad" onclick="switchChartMetric('load')" class="px-2.5 py-1 rounded text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700 hover:text-slate-200">Garmin Load</button>
                     </div>
@@ -91,6 +93,7 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
                 <div class="h-48">
                     <canvas id="volumeChart"></canvas>
                 </div>
+                <p id="chartCoverage" class="text-xs text-slate-400 mt-3"></p>
             </div>
 
             <div class="bg-slate-800/60 border border-slate-800 rounded-xl p-5 shadow-lg flex flex-col justify-between">
@@ -109,7 +112,7 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
                     <span>Legend:</span>
                     <span class="text-emerald-400">Easy</span> |
                     <span class="text-amber-400">Tempo</span> |
-                    <span class="text-sky-400">Long Run</span> |
+                    <span class="text-sky-400">Long session</span> |
                     <span class="text-slate-500">Rest</span>
                 </div>
             </div>
@@ -117,6 +120,7 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
 
         <!-- WEEKLY CALENDAR VIEW -->
         <div id="calendarView" class="space-y-6">
+            <div class="flex flex-wrap items-center gap-3"><label class="text-sm text-slate-300">Show <select id="calendarSport" class="bg-slate-900 border border-slate-600 rounded px-2 py-1"><option value="all">All sessions</option><option value="running">Running</option><option value="cycling">Cycling</option><option value="swimming">Swimming</option><option value="multisport">Triathlon</option><option value="other">Strength, mobility &amp; other</option></select></label><p id="calendarSportSummary" class="text-xs text-slate-400"></p></div>
             <div class="flex items-center gap-2 overflow-x-auto pb-3 border-b border-slate-800/80" id="weekTabsContainer"></div>
 
             <div id="calendarWeekdayHeader" class="coach-calendar-weekdays text-center text-xs font-bold text-slate-400 uppercase tracking-wider bg-slate-800/80 p-3 rounded-lg border border-slate-800">
@@ -151,6 +155,20 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
         const todayIso = {today_json};
         const sessionIds = {session_ids_json};
         const workoutSessions = {workout_sessions_json};
+        const sportWeeks = {sport_weeks_json};
+        const trainingMode = {training_mode_json};
+        const sportLabels = {{running:'Running',cycling:'Cycling',swimming:'Swimming',multisport:'Triathlon',strength:'Strength',mobility:'Mobility',rest:'Rest',other:'Other'}};
+        let calendarSport = 'all';
+        let chartSport = trainingMode === 'triathlon' ? 'all' : trainingMode;
+        function rowSport(row) {{return (workoutSessions[row.cardId] || {{}}).display_sport || (workoutSessions[row.cardId] || {{}}).sport || 'other';}}
+        function setCalendarSport(value) {{calendarSport=value;renderSelectedWeek(activeWeekIndex);}}
+        document.getElementById('calendarSport').addEventListener('change',event=>setCalendarSport(event.target.value));
+        document.getElementById('chartSport').addEventListener('change',event=>switchChartSport(event.target.value));
+        function brickOrder(a,b) {{
+            const left=(workoutSessions[a.cardId] || {{}}).brick, right=(workoutSessions[b.cardId] || {{}}).brick;
+            if (left && right && left.id===right.id) return left.order-right.order;
+            return 0;
+        }}
         document.addEventListener('DOMContentLoaded', () => {{
             document.querySelectorAll('[data-workout-session]').forEach(node => window.WorkoutDownload.attach(node, workoutSessions[node.dataset.workoutSession]));
         }});
@@ -243,10 +261,11 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
             if (tables.length > 0) {{
                 tables.forEach((table, weekIdx) => {{
                     const rows = Array.from(table.querySelectorAll('tbody tr'));
+                    const headers = Array.from(table.querySelectorAll('thead th')).map(cell => cell.innerText.trim().toLowerCase());
                     if (rows.length === 0) return;
 
                     let weekTitle = `Week ${{weekIdx + 1}}`;
-                    
+
                     let prev = table.previousElementSibling;
                     while (prev) {{
                         if (['H1', 'H2', 'H3', 'H4'].includes(prev.tagName)) {{
@@ -266,24 +285,30 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
                         const cols = Array.from(row.querySelectorAll('td')).map(td => td.innerText.trim());
                         if (cols.length < 2) return;
 
-                        let dayName = cols[0];
-                        let dateStr = '';
-                        let workoutType = cols[1];
-                        let distOrDuration = cols[2] || '—';
-                        let target = cols[3] || '';
-
-                        if (cols.length >= 5) {{
-                            dateStr = cols[1];
-                            workoutType = cols[2];
-                            distOrDuration = cols[3] || '—';
-                            target = cols[4] || '';
-                        }}
+                        const cell = (name, fallback) => cols[headers.includes(name) ? headers.indexOf(name) : fallback] || '';
+                        const dayName = cell('day',0);
+                        const dateStr = cols.length >= 5 ? cell('date',1) : '';
+                        const workoutType = cell('workout type',cols.length >= 5 ? 2 : 1);
+                        const distOrDuration = cell('distance / duration',cols.length >= 5 ? 3 : 2) || '—';
+                        const target = cell('target',cols.length >= 5 ? 4 : 3);
+                        const sportText = headers.includes('sport') ? cell('sport') : '';
 
                         const identityKey = dateStr + '|' + workoutType;
                         const occurrence = usedIds[identityKey] || 0;
                         usedIds[identityKey] = occurrence + 1;
+                        const cardId = (sessionIds[identityKey] || [])[occurrence] || `run_${{dateStr}}_${{rowIdx}}_${{encodeURIComponent(workoutType)}}`;
+                        if (!workoutSessions[cardId]) {{
+                            const named = {{'running':'running','cycling':'cycling','swimming':'swimming','pool swimming':'swimming','open-water swimming':'swimming','triathlon':'multisport','strength':'strength','mobility':'mobility','rest':'rest'}};
+                            const lower = workoutType.replace(/([a-z])([A-Z])/g,'$1 $2').toLowerCase().replace(/[^a-z]+/g,' ');
+                            const inferred = /\\b(swim|swimming)\\b/.test(lower) ? 'swimming' : /\\b(cycling|cycle|bike|biking|ride)\\b/.test(lower) ? 'cycling' : /\\bstrength\\b/.test(lower) ? 'strength' : /\\b(mobility|yoga)\\b/.test(lower) ? 'mobility' : /\\b(rest|off)\\b/.test(lower) ? 'rest' : /\\b(run|running|easy|long|tempo|intervals?|race|hill|trail|strides?)\\b/.test(lower) ? 'running' : 'other';
+                            const sport = named[sportText.toLowerCase()] || inferred;
+                            workoutSessions[cardId] = {{id:cardId,date:dateStr,workout_type:workoutType,amount:distOrDuration,target,display_sport:sport,sport_label:sportText || sportLabels[sport]}};
+                            if (sportText) workoutSessions[cardId].sport = sport;
+                            if (sportText==='Pool swimming') workoutSessions[cardId].sub_sport='lap_swimming';
+                            if (sportText==='Open-water swimming') workoutSessions[cardId].sub_sport='open_water';
+                        }}
                         weekObj.rows.push({{
-                            cardId: (sessionIds[identityKey] || [])[occurrence] || `run_${{dateStr}}_${{rowIdx}}_${{encodeURIComponent(workoutType)}}`,
+                            cardId,
                             dayName,
                             dateStr,
                             workoutType,
@@ -324,8 +349,8 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
                 const btn = document.createElement('button');
                 btn.type = 'button';
                 btn.className = `px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition border shrink-0 ${{
-                    isActive 
-                        ? 'bg-sky-500/20 text-sky-400 border-sky-500/50 shadow-sm ring-1 ring-sky-500/30' 
+                    isActive
+                        ? 'bg-sky-500/20 text-sky-400 border-sky-500/50 shadow-sm ring-1 ring-sky-500/30'
                         : 'bg-slate-800/80 text-slate-400 border-slate-700/60 hover:bg-slate-700 hover:text-slate-200'
                 }}`;
                 btn.innerHTML = `${{isActive ? '<i class="fa-solid fa-calendar-day mr-1.5"></i>' : ''}}${{escapeHtml(week.title)}}`;
@@ -347,7 +372,20 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
 
             const grid = document.createElement('div');
             grid.className = 'coach-calendar-grid';
-            window.CoachCalendar.renderWeek(grid, selectedWeek, renderDayCard);
+            const counts = {{}};
+            selectedWeek.rows.forEach(row => {{const sport=rowSport(row); counts[sport]=(counts[sport] || 0)+1;}});
+            document.getElementById('calendarSportSummary').textContent='Whole week: '+Object.entries(counts).map(([sport,count])=>(sportLabels[sport] || 'Other')+' '+count).join(' · ');
+            const header=document.getElementById('calendarWeekdayHeader');
+            if (calendarSport === 'all') {{
+                header.style.removeProperty('display');
+                window.CoachCalendar.renderWeek(grid, {{...selectedWeek,rows:[...selectedWeek.rows].sort(brickOrder)}}, renderDayCard);
+            }} else {{
+                header.style.display='none';
+                grid.className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3';
+                const rows=selectedWeek.rows.filter(row=>calendarSport==='other' ? ['strength','mobility','rest','other'].includes(rowSport(row)) : rowSport(row)===calendarSport).sort(brickOrder);
+                rows.forEach(row=>renderDayCard(grid,row.cardId,row.dayName,row.dateStr,row.workoutType,row.distOrDuration,row.target));
+                if(!rows.length) {{const empty=document.createElement('p');empty.className='text-slate-400 p-4';empty.textContent='No matching sessions this week. Other planned sessions remain in All sessions.';grid.appendChild(empty);}}
+            }}
 
             container.appendChild(grid);
         }}
@@ -356,7 +394,7 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
         function renderDayCard(gridContainer, cardId, dayName, dateStr, workoutType, distOrDuration, target) {{
             let badgeClass = 'bg-slate-800/80 border-slate-700/60 text-slate-300';
             let icon = 'fa-bed';
-            
+
             const typeLower = workoutType.toLowerCase();
             if (typeLower.includes('tempo') || typeLower.includes('threshold') || typeLower.includes('speed') || typeLower.includes('interval')) {{
                 badgeClass = 'bg-amber-950/40 border-amber-500/30 text-amber-300';
@@ -372,7 +410,12 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
                 icon = 'fa-mug-hot';
             }}
 
-            const dbActivities = completedActivities[dateStr] || [];
+            const session = workoutSessions[cardId] || {{}};
+            const sport = session.display_sport || session.sport || 'other';
+            icon = {{running:'fa-person-running',cycling:'fa-bicycle',swimming:'fa-person-swimming',multisport:'fa-flag-checkered',strength:'fa-dumbbell',mobility:'fa-child-reaching',rest:'fa-mug-hot',other:'fa-calendar'}}[sport] || 'fa-calendar';
+            const brick = session.brick;
+            const sportText = (session.sport_label || sportLabels[sport] || 'Other') + (brick ? ' · Brick leg '+brick.order : '');
+            const dbActivities = (completedActivities[dateStr] || []).filter(activity=>activity.sport===sport);
             const isPast = dateStr < todayIso;
             const displayWorkout = isPast ? (dbActivities.length ? 'Recorded activities' : 'No recorded activity') : workoutType;
             const displayAmount = isPast ? (dbActivities.length + ' recorded on ' + dateStr) : distOrDuration;
@@ -383,7 +426,7 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
             dayCard.className = `p-4 rounded-xl border flex flex-col justify-between shadow-sm hover:border-slate-600 transition min-h-[160px] relative ${{badgeClass}} ${{isCompleted ? 'ring-2 ring-emerald-500/50' : ''}}`;
             const activityReviewHtml = dbActivities.map(activity => {{
                 const feedback = activity.comment ? (activity.feedback_current ? `<div class="text-slate-300 italic whitespace-normal break-words leading-tight">${{escapeHtml(activity.comment)}}</div>` : `<details><summary class="cursor-pointer">Historical feedback (previous policy)</summary><div>${{escapeHtml(activity.comment)}}</div></details>`) : '';
-                return `<div class="mt-3 text-[11px] bg-slate-900/80 p-2 rounded border border-emerald-500/30 space-y-1"><div class="text-emerald-400 font-bold"><i class="fa-solid fa-circle-check"></i> Recorded: ${{escapeHtml(activity.name)}} (${{escapeHtml(activity.actual_km)}} km)</div><div>${{escapeHtml(activity.type)}}</div>${{feedback}}</div>`;
+                return `<div class="mt-3 text-[11px] bg-slate-900/80 p-2 rounded border border-emerald-500/30 space-y-1"><div class="text-emerald-400 font-bold"><i class="fa-solid fa-circle-check"></i> Recorded: ${{escapeHtml(activity.name)}} (${{escapeHtml(activity.amount_label)}})</div><div>${{escapeHtml(activity.type)}} · ${{escapeHtml(activity.rate_label || '')}}</div>${{feedback}}</div>`;
             }}).join('');
 
             dayCard.innerHTML = `
@@ -398,6 +441,7 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
                             <input type="checkbox" title="Local reminder only" ${{isCompleted ? 'checked' : ''}}  class="w-4 h-4 accent-emerald-500 rounded cursor-pointer">
                         </div>
                     </div>
+                    <div class="text-[11px] opacity-80 mb-1">${{escapeHtml(sportText)}}</div>
                     <div class="font-semibold text-sm leading-tight text-slate-100 ${{isCompleted ? 'line-through opacity-80' : ''}}">${{escapeHtml(displayWorkout)}}</div>
                     <div class="text-xs font-bold mt-1 text-sky-400">${{escapeHtml(displayAmount)}}</div>
                 </div>
@@ -406,6 +450,8 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
                 </div>
             `;
             dayCard.dataset.sessionId = cardId;
+            dayCard.dataset.sport = sport;
+            if(brick) {{dayCard.dataset.brickId=brick.id;dayCard.dataset.brickOrder=brick.order;}}
             dayCard.querySelector('input[type=checkbox]').id = cardId;
             dayCard.querySelector('input[type=checkbox]').addEventListener('change', () => toggleRunComplete(cardId));
             if (!isPast) window.WorkoutDownload.attach(dayCard, workoutSessions[cardId] || {{id:cardId,date:dateStr,workout_type:workoutType,amount:distOrDuration,target}});
@@ -447,36 +493,38 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
                 }}
             }}
         }});
-        switchChartMetric("km");
+        document.getElementById('chartSport').value=chartSport;
+        switchChartMetric(chartSport==='all' ? 'minutes' : 'km');
 
         function setDataWindow(days) {{
             dataWindow=days;
             document.querySelectorAll('[data-running-window]').forEach(el=>el.classList.toggle('hidden',Number(el.dataset.runningWindow)!==days));
             switchChartMetric(chartMetric);
         }}
+        function switchChartSport(sport) {{
+            chartSport=sport;
+            switchChartMetric(['all','other'].includes(sport) ? 'minutes' : chartMetric);
+        }}
         function switchChartMetric(type) {{
+            if (['all','other'].includes(chartSport)) type='minutes';
             chartMetric=type;
             const count=dataWindow===28?4:8;
+            const entries=(sportWeeks[chartSport] || []).slice(-count);
+            const unit=chartSport==='swimming' ? 'm' : 'km';
+            const field=type==='km' ? 'distance' : type;
+            const label=type==='minutes' ? 'Recorded timer minutes (may include rests)' : type==='load' ? 'Recorded Garmin training load' : 'Recorded '+(sportLabels[chartSport] || 'other activities')+' distance ('+unit+')';
             volumeChart.data.labels=weeksData.slice(-count);
-            const btnKm = document.getElementById('btnKm');
-            const btnLoad = document.getElementById('btnLoad');
-
-            if (type === 'km') {{
-                volumeChart.data.datasets[0].data = kmData.slice(-count);
-                volumeChart.data.datasets[0].label = 'Actual Kilometers Completed';
-                volumeChart.data.datasets[0].backgroundColor = '#38bdf8';
-                btnKm.className = 'px-2.5 py-1 rounded text-xs font-semibold bg-sky-500/20 text-sky-400 border border-sky-500/40';
-                btnLoad.className = 'px-2.5 py-1 rounded text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700 hover:text-slate-200';
-            }} else {{
-                volumeChart.data.datasets[0].data = loadData.slice(-count);
-                volumeChart.data.datasets[0].label = 'Garmin training load';
-                volumeChart.data.datasets[0].backgroundColor = '#f59e0b';
-                btnLoad.className = 'px-2.5 py-1 rounded text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/40';
-                btnKm.className = 'px-2.5 py-1 rounded text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700 hover:text-slate-200';
+            volumeChart.data.datasets=[{{label,data:entries.map(entry=>entry[field]),backgroundColor:type==='load' ? '#f59e0b' : '#38bdf8',borderRadius:6}}];
+            if(type==='km' && chartSport==='running') volumeChart.data.datasets.push({{label:'Known planned running km (time-only sessions excluded)',data:plannedData.slice(-count),backgroundColor:'#64748b',borderRadius:6}});
+            for(const [id,key] of [['btnKm','km'],['btnLoad','load'],['btnMinutes','minutes']]) {{
+                const button=document.getElementById(id);
+                button.hidden=['all','other'].includes(chartSport) && key!=='minutes';
+                button.className='px-2.5 py-1 rounded text-xs font-semibold border '+(type===key ? 'bg-sky-500/20 text-sky-400 border-sky-500/40' : 'bg-slate-800 text-slate-400 border-slate-700');
             }}
-            if (type==='km') {{
-                volumeChart.data.datasets[1]={{label:'Known planned running km (time-only sessions excluded)',data:plannedData.slice(-count),backgroundColor:'#64748b',borderRadius:6}};
-            }} else {{ volumeChart.data.datasets=volumeChart.data.datasets.slice(0,1); }}
+            document.getElementById('btnKm').textContent='Distance ('+unit+')';
+            const records=entries.reduce((sum,entry)=>sum+entry.count,0);
+            const coverage=entries.reduce((sum,entry)=>sum+(entry[type==='km' ? 'distance_coverage' : 'duration_coverage'] || 0),0);
+            document.getElementById('chartCoverage').textContent=(chartSport==='all' ? 'All sports' : sportLabels[chartSport] || 'Other activities')+' · '+records+' recorded activities. '+(type==='load' ? 'Only recorded load is shown; no missing values estimated.' : coverage+'/'+records+' '+(type==='km' ? 'distances' : 'timer durations')+' known. Missing values are not estimated; partial totals contain only recorded values.');
             volumeChart.update();
         }}
     </script>

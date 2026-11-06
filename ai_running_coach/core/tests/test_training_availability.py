@@ -117,6 +117,9 @@ class TrainingAvailabilityTests(unittest.TestCase):
                        'reviews': [], 'plan_changes': [addition(session('new-sunday', '2026-11-08'))]}
             valid = {**invalid, 'summary': 'Synthetic response honoring selected days.',
                      'plan_changes': [addition(session('new-monday', '2026-11-09'))]}
+            for response in (invalid, valid):
+                for operation in response['plan_changes']:
+                    if operation['session'] is not None: operation['session']['sport']='running'
             generate = Mock(side_effect=[types.SimpleNamespace(text=json.dumps(value), usage_metadata=None)
                                          for value in (invalid, valid)])
             client = types.SimpleNamespace(models=types.SimpleNamespace(generate_content=generate))

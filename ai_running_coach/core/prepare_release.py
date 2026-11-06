@@ -6,7 +6,7 @@ from pathlib import Path
 import shutil
 import zipfile
 
-SOURCE_FILES=["source_policy.py","import_activities.py","ai_coach.py","planning_engine.py","training_calendar.py","model_provider.py","migrate_plan.py","database_manager.py","garmin_sync.py","garmin_personal_api.py","workout_schema.py","parse_coach_output.py","cron_daily_update.py","generate_dashboard.py","dashboard_template.py","dashboard_panels.py","publish_if_ready.py","health_status.py","coach_checkin.py","coaching_eval.py","eval_cases.json","setup_coach.py","run_offline_tests.py","README.md","requirements.txt","pyproject.toml",".env.example",".gitignore","prepare_release.py"]
+SOURCE_FILES=["sports.py","source_policy.py","import_activities.py","ai_coach.py","planning_engine.py","training_calendar.py","model_provider.py","migrate_plan.py","database_manager.py","garmin_sync.py","garmin_personal_api.py","workout_schema.py","parse_coach_output.py","cron_daily_update.py","generate_dashboard.py","dashboard_template.py","dashboard_panels.py","publish_if_ready.py","health_status.py","coach_checkin.py","coaching_eval.py","eval_cases.json","setup_coach.py","run_offline_tests.py","README.md","requirements.txt","pyproject.toml",".env.example",".gitignore","prepare_release.py"]
 
 def build_release(source,output,create_archive=True):
     source=Path(source).resolve();output=Path(output).resolve()
@@ -27,7 +27,7 @@ def build_release(source,output,create_archive=True):
             raise ValueError("Release sources must be regular files within the checkout: "+name)
         if not origin.is_file():raise ValueError("Required release source missing: "+name)
         target=output/name;target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(origin,target)
-    manifest={"format":1,"release":"0.2.3-beta.6","license_status":"selected" if (output/"LICENSE").exists() else "pending maintainer decision","files":[{"path":name,"sha256":hashlib.sha256((output/name).read_bytes()).hexdigest()} for name in sorted(set(paths))]}
+    manifest={"format":1,"release":"0.3.0-beta.1","license_status":"selected" if (output/"LICENSE").exists() else "pending maintainer decision","files":[{"path":name,"sha256":hashlib.sha256((output/name).read_bytes()).hexdigest()} for name in sorted(set(paths))]}
     (output/"release-manifest.json").write_text(json.dumps(manifest,indent=2)+"\n",encoding="utf-8")
     if not create_archive:return output
     with zipfile.ZipFile(archive,"w",zipfile.ZIP_DEFLATED) as z:

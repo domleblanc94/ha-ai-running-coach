@@ -27,23 +27,37 @@ def esc(value):
     return html.escape(text(value), quote=True)
 
 def parse_sessions(markdown):
+    from sports import parse_sport_label
     sessions = []
     counts = defaultdict(int)
+    headers = None
     for line in markdown.splitlines():
         if not line.lstrip().startswith("|"):
             continue
         cols = [cell.strip().replace("**", "") for cell in line.strip().strip("|").split("|")]
-        if len(cols) < 5 or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", cols[1]):
+        if "Date" in cols and "Workout Type" in cols:
+            headers = {value.lower(): index for index, value in enumerate(cols)}
+            continue
+        layout = headers or {'day': 0, 'date': 1, 'workout type': 2, 'distance / duration': 3, 'target': 4}
+        def cell(key):
+            index = layout.get(key)
+            return cols[index] if index is not None and index < len(cols) else ''
+        day, kind = cell('date'), cell('workout type')
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", day):
             continue
         try:
-            date.fromisoformat(cols[1])
+            date.fromisoformat(day)
         except ValueError:
             continue
-        # Date + type + occurrence survives insertion/reordering of other weeks.
-        identity = cols[1] + ":" + cols[2]
+        identity = day + ":" + kind
         counts[identity] += 1
-        sessions.append(dict(day=cols[0], date=cols[1], kind=cols[2],
-            amount=cols[3], target=cols[4], id=identity + ":" + str(counts[identity])))
+        session = dict(day=cell('day'), date=day, kind=kind, amount=cell('distance / duration'),
+                       target=cell('target'), id=identity + ":" + str(counts[identity]))
+        if cell('sport'):
+            sport, subtype = parse_sport_label(cell('sport'))
+            session['sport'] = sport
+            if subtype: session['sub_sport'] = subtype
+        sessions.append(session)
     return sessions
 
 def read_database(path, start, end):
@@ -58,14 +72,14 @@ def read_database(path, start, end):
         conn.row_factory = sqlite3.Row
         columns = {row[1] for row in conn.execute("PRAGMA table_info(activities)")}
         if columns:
-            wanted = [c for c in ("id", "name", "type", "start_date", "distance_m", "ai_feedback", "description", "moving_time_s", "elapsed_time_s", "elevation_gain_m") if c in columns]
+            wanted = [c for c in ("id", "name", "type", "start_date", "distance_m", "ai_feedback", "description", "moving_time_s", "timer_duration_s", "elapsed_time_s", "elevation_gain_m", "training_load") if c in columns]
             for row in conn.execute("SELECT " + ",".join(wanted) + " FROM activities WHERE date(start_date) BETWEEN ? AND ? ORDER BY start_date", (start, end)):
                 item = dict(row)
                 activities[text(item.get("start_date"))[:10]].append(item)
         tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         if "coach_review_jobs" in tables:
             job_columns = {row[1] for row in conn.execute("PRAGMA table_info(coach_review_jobs)")}
-            policy_filter = " AND prompt_version IN ('autonomous-coach-v2','autonomous-coach-v3','autonomous-coach-v4-starter-week','autonomous-coach-v5-availability','autonomous-coach-v5-availability-starter-week','autonomous-coach-v6-schedule','autonomous-coach-v6-schedule-starter-week','autonomous-coach-v7-new-plan','autonomous-coach-v7-new-plan-starter-week')" if "prompt_version" in job_columns else ""
+            policy_filter = " AND prompt_version IN ('autonomous-coach-v2','autonomous-coach-v3','autonomous-coach-v4-starter-week','autonomous-coach-v5-availability','autonomous-coach-v5-availability-starter-week','autonomous-coach-v6-schedule','autonomous-coach-v6-schedule-starter-week','autonomous-coach-v7-new-plan','autonomous-coach-v7-new-plan-starter-week','autonomous-coach-v8-multisport','autonomous-coach-v8-multisport-starter-week')" if "prompt_version" in job_columns else ""
             reviewed_ids = set()
             for saved in conn.execute("SELECT response_json FROM coach_review_jobs WHERE status='complete' AND response_json IS NOT NULL" + policy_filter):
                 try:
@@ -119,10 +133,8 @@ def build_overview(conn, plan, today, profile=None):
     for session in plan.get("sessions",[]):
         day=date.fromisoformat(session['date']);week=(day-timedelta(days=day.weekday())).isoformat()
         item=planned.setdefault(week,{"known_km":0.0,"known_sessions":0,"unknown_sessions":0})
-        kind=session['workout_type']
-        if re.search(r'cross.?train|strength|mobility|walk|cycl|swim|yoga|row|\brest\b|\boff\b',kind,re.I) and not re.search(r'run|race',kind,re.I):continue
-        if not re.search(r'run|race|tempo|interval|hill|trail|threshold|speed|fartlek|progression|strides|jog',kind,re.I):
-            item['unknown_sessions']+=1;continue
+        from sports import session_sport
+        if session_sport(session) != 'running':continue
         quantities=re.findall(r'(\d+(?:\.\d+)?)\s*km\b',session['amount'],re.I)
         ambiguous=re.search(r'\d\s*[-\u2013x\u00d7]\s*\d+(?:\.\d+)?\s*km',session['amount'],re.I)
         ambiguous=ambiguous or re.search(r'\bor\b',session['amount'],re.I)
@@ -138,7 +150,7 @@ def build_overview(conn, plan, today, profile=None):
             try:event_date=datetime.strptime(raw,fmt).date();break
             except ValueError:continue
         if event_date:countdown={'event':goal.get('event','A-Race'),'date':event_date.isoformat(),'days':(event_date-today).days}
-    upcoming=sorted([session for session in plan.get('sessions',[]) if session['date']>=today.isoformat() and not re.search(r'\brest\b|\boff\b',session['workout_type'],re.I)],key=lambda item:(item['date'],item['id']))
+    upcoming=sorted([session for session in plan.get('sessions',[]) if session['date']>=today.isoformat() and __import__('sports').session_sport(session) != 'rest'],key=lambda item:(item['date'],item['id']))
     return {'windows':windows,'planned_weeks':planned,'countdown':countdown,'next_session':upcoming[0] if upcoming else None}
 
 
@@ -148,6 +160,7 @@ def build_dashboard(db_path=None, plan_file=None, output_html=None, today=None, 
     today = today or date.today()
     markdown = plan_file.read_text(encoding="utf-8") if plan_file.exists() else "No training plan available."
     canonical = None
+    profile = {}
     canonical_path = plan_file.parent / "training_plan.json"
     profile_path = plan_file.parent / "athlete.md"
     if (plan_file.parent / ".plan-commit.json").exists():
@@ -184,12 +197,15 @@ def build_dashboard(db_path=None, plan_file=None, output_html=None, today=None, 
         # WOFF2 is bundled; remove unused legacy font-format alternatives.
         css=__import__('re').sub(r',url\(\.\./webfonts/'+font+r'\.ttf\) format\("truetype"\)',"",css)
     assets["fontawesome.css"]=css
+    from dashboard_panels import activity_measure, weekly_sport_data, session_order
+    from sports import session_sport, sport_label, training_mode, activity_sport
     exported={}
     for d,records in activities.items():
         exported[d]=[]
         for item in records:
             distance=item.get("distance_m")
-            exported[d].append({"id":item.get("id"),"name":text(item.get("name")),"type":text(item.get("type")),"actual_km":round(distance/1000,2) if isinstance(distance,(int,float)) and math.isfinite(distance) else "unavailable","comment":text(item.get("ai_feedback")),"feedback_current":bool(item.get("feedback_current"))})
+            amount, rate = activity_measure(item)
+            exported[d].append({"sport":activity_sport(item.get("type")),"amount_label":amount,"rate_label":rate,"id":item.get("id"),"name":text(item.get("name")),"type":text(item.get("type")),"actual_km":round(distance/1000,2) if isinstance(distance,(int,float)) and math.isfinite(distance) else "unavailable","comment":text(item.get("ai_feedback")),"feedback_current":bool(item.get("feedback_current"))})
     monday=today-timedelta(days=today.weekday())
     weeks=[monday-timedelta(weeks=i) for i in reversed(range(8))]
     totals={w.isoformat():[0.0,0.0,0] for w in weeks}
@@ -210,7 +226,7 @@ def build_dashboard(db_path=None, plan_file=None, output_html=None, today=None, 
     overview=None
     if db_path.exists():
         with closing(sqlite3.connect(db_path.resolve().as_uri()+"?mode=ro",uri=True)) as conn:
-            overview=build_overview(conn,canonical or {"sessions":[],"goals":[]},today)
+            overview=build_overview(conn,canonical or {"sessions":[],"goals":[]},today,profile)
     from dashboard_panels import build_panels,coach_payload,duration,pace
     coach={}
     if db_path.exists():
@@ -243,14 +259,27 @@ def build_dashboard(db_path=None, plan_file=None, output_html=None, today=None, 
     other=''
     unmatched=[(d,item) for d,items in exported.items() if d not in planned_dates for item in items]
     if unmatched:
-        other='<details class="bg-slate-800/60 border border-slate-700 rounded-xl p-4"><summary class="text-sky-300 cursor-pointer">Other recent recorded activities</summary><ul class="text-sm text-slate-300 mt-3 space-y-2">'+''.join('<li>'+esc(d)+' &middot; '+esc(item["name"])+' &middot; '+esc(item["type"])+' &middot; '+esc(item["actual_km"])+' km</li>' for d,item in unmatched)+'</ul></details>'
+        other='<details class="bg-slate-800/60 border border-slate-700 rounded-xl p-4"><summary class="text-sky-300 cursor-pointer">Other recent recorded activities</summary><ul class="text-sm text-slate-300 mt-3 space-y-2">'+''.join('<li>'+esc(d)+' &middot; '+esc(item["name"])+' &middot; '+esc(item["type"])+' &middot; '+esc(item["amount_label"])+'</li>' for d,item in unmatched)+'</ul></details>'
     ids=defaultdict(list)
     if canonical:
-        for session in sorted(canonical["sessions"],key=lambda value:(value["date"],value["id"])):
+        # Match render_plan's stable date ordering exactly, including same-title
+        # sessions of different sports. Sorting IDs here would attach the wrong FIT.
+        for session in sorted(canonical["sessions"],key=lambda value:value["date"]):
             ids[session["date"]+'|'+session["workout_type"]].append(session["id"])
     partial=sum(item['unknown_sessions'] for key,item in (overview or {}).get('planned_weeks',{}).items() if key in {week.isoformat() for week in weeks})
-    other='<p class="text-xs text-slate-400">Weekly chart: actual running distance versus known planned running km. '+esc(partial)+' time-only, alternative or unclassified planned sessions excluded; no completion inference.</p>'+other
-    document=render_layout(assets=assets,weeks_json=safe_json(['w/c '+w.strftime('%d/%m') for w in weeks]),km_json=safe_json([round(totals[w.isoformat()][0],1) for w in weeks]),load_json=safe_json([round(totals[w.isoformat()][1],1) if totals[w.isoformat()][2] else None for w in weeks]),raw_markdown_json=safe_json(markdown),activities_json=safe_json(exported),macro_review_json=safe_json(review),last_updated_str=esc(generated_at),today_json=safe_json(today.isoformat()),freshness_html=freshness,other_activities_html=other,session_ids_json=safe_json(ids),planned_json=safe_json(planned_chart),agenda_html=panels["agenda"],focus_html=panels["focus"],assessment_html=panels["assessment"],history_html=panels["history"],feedback_html=panels["feedback"],workout_sessions_json=safe_json({item["id"]:item for item in (canonical["sessions"] if canonical else [])}))
+    other='<p class="text-xs text-slate-400">Weekly chart: distances stay separate by sport; combined totals use recorded timer minutes only (which can include rests). Running comparison uses known planned km. '+esc(partial)+' time-only, alternative or unclassified planned sessions excluded; no completion inference.</p>'+other
+    workout_payload = {}
+    pool = profile.get('sport_settings', {}).get('swimming', {})
+    for session in canonical['sessions'] if canonical else []:
+        item = dict(session)
+        item['display_sport'] = session_sport(session)
+        item['sport_label'] = sport_label(session)
+        if session_sport(session) == 'swimming':
+            for field in ('pool_length_metres', 'pool_length_unit'):
+                item[field] = pool.get(field)
+        workout_payload[item['id']] = item
+    sport_data = weekly_sport_data(activities, weeks, today)
+    document=render_layout(assets=assets,weeks_json=safe_json(['w/c '+w.strftime('%d/%m') for w in weeks]),km_json=safe_json([round(totals[w.isoformat()][0],1) for w in weeks]),load_json=safe_json([round(totals[w.isoformat()][1],1) if totals[w.isoformat()][2] else None for w in weeks]),raw_markdown_json=safe_json(markdown),activities_json=safe_json(exported),macro_review_json=safe_json(review),last_updated_str=esc(generated_at),today_json=safe_json(today.isoformat()),freshness_html=freshness,other_activities_html=other,session_ids_json=safe_json(ids),planned_json=safe_json(planned_chart),agenda_html=panels["agenda"],focus_html=panels["focus"],assessment_html=panels["assessment"],history_html=panels["history"],feedback_html=panels["feedback"],workout_sessions_json=safe_json(workout_payload),sport_weeks_json=safe_json(sport_data),training_mode_json=safe_json(training_mode(profile)))
     # Same-filesystem replacement prevents readers seeing partially written HTML.
     output_html.parent.mkdir(parents=True, exist_ok=True)
     temp_path = None
