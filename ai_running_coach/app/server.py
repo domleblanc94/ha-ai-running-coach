@@ -285,7 +285,7 @@ class CoachServer(ThreadingHTTPServer):
 
 
 class CoachHandler(BaseHTTPRequestHandler):
-    server_version = "AI Endurance Coach"
+    server_version = "AI Multisport Coach"
     sys_version = ""
 
     def setup(self):

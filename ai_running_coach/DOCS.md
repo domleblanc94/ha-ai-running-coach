@@ -1,12 +1,12 @@
-# AI Endurance Coach
+# AI Multisport Coach
 
-AI Endurance Coach is an experimental community app for one athlete. It uses Home Assistant ingress to open the setup and dashboard. Start it from the app page and select **Open Web UI**.
+AI Multisport Coach is an experimental community app for one athlete. It uses Home Assistant ingress to open the setup and dashboard. Start it from the app page and select **Open Web UI**.
 
 ## Add to the Home Assistant sidebar
 
-In Home Assistant, go to **Settings → Apps → AI Endurance Coach → Info** and turn on **Show in sidebar**. The menu entry is named **AI Endurance Coach** and uses the running icon. It is available to Home Assistant administrators. You can turn it off on the same page.
+In Home Assistant, go to **Settings → Apps → AI Multisport Coach → Info** and turn on **Show in sidebar**. The menu entry is named **AI Multisport Coach** and uses the running icon. It is available to Home Assistant administrators. You can turn it off on the same page.
 
-If you installed from the documented repository URL, you can jump to the app page. [Open AI Endurance Coach in Home Assistant](https://my.home-assistant.io/redirect/supervisor_app/?app=ce7ba695_ai_running_coach)
+If you installed from the documented repository URL, you can jump to the app page. [Open AI Multisport Coach in Home Assistant](https://my.home-assistant.io/redirect/supervisor_app/?app=ce7ba695_ai_running_coach)
 
 ## First setup
 
@@ -66,7 +66,7 @@ Learn mode preserves any saved ranges. If you have no saved ranges, they stay un
 
 ## Troubleshoot a failed run
 
-Start with **Coach Status** in the app. A failed run shows its time, stage, reason code and recorded model request count when available. Home Assistant also shows a short diagnostic under **Settings → Apps → AI Endurance Coach → Log**. After upgrading from an earlier beta, check Coach Status before retrying. The app can recover a more specific explanation from records already saved for that run. If those records are incomplete, the reason can still be unknown.
+Start with **Coach Status** in the app. A failed run shows its time, stage, reason code and recorded model request count when available. Home Assistant also shows a short diagnostic under **Settings → Apps → AI Multisport Coach → Log**. After upgrading from an earlier beta, check Coach Status before retrying. The app can recover a more specific explanation from records already saved for that run. If those records are incomplete, the reason can still be unknown.
 
 - **Garmin or activity sync:** check the selected activity source and Garmin access. If Garmin is limiting requests, wait before trying again.
 - **Provider authentication or request:** check the selected provider and model in Settings, and confirm the key and model access with that provider.

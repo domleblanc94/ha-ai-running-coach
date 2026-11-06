@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "local-ai-running-coach"
-version = "0.3.0b2"
-description = "AI Endurance Coach: self-hosted running, cycling, swimming and triathlon plans with an HTML dashboard"
+version = "0.3.0b3"
+description = "AI Multisport Coach: self-hosted running, cycling, swimming and triathlon plans with an HTML dashboard"
 requires-python = ">=3.11"
 license = "MIT"
 dependencies = ["python-dotenv>=1.0,<2", "requests>=2.32,<3"]

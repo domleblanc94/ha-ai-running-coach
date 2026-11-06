@@ -3,7 +3,7 @@ FROM python:3.13-slim-bookworm@sha256:281d39ff02e3b389401586134ff9e6572954687822
 ARG BUILD_ARCH
 ARG BUILD_VERSION
 LABEL io.hass.type="app" \
-      io.hass.name="AI Endurance Coach" \
+      io.hass.name="AI Multisport Coach" \
       io.hass.arch="${BUILD_ARCH}" \
       io.hass.version="${BUILD_VERSION}"
 

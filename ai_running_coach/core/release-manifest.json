@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "release": "0.3.0-beta.2",
+  "release": "0.3.0-beta.3",
   "license_status": "selected",
   "files": [
     {
@@ -21,7 +21,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "402f4904255303c8936636a10b34026ef785a5c2333cec4f956b6bbbf95fc454"
+      "sha256": "dacc3ea8e9f40d7f5d2db23f9a87e644feb10328236f1949a2f624e5abcd8194"
     },
     {
       "path": "ai_coach.py",
@@ -113,7 +113,7 @@
     },
     {
       "path": "dashboard_template.py",
-      "sha256": "459b65c5d8ce7dfe506e079b7b829e6586efa894a608ba4fc5b71a5d19a9f395"
+      "sha256": "8b1f9152e8036c80305d3e678105220f2025a7c5d04c5fd5d13b24de7d06b10f"
     },
     {
       "path": "database_manager.py",
@@ -121,7 +121,7 @@
     },
     {
       "path": "docs/RELEASE_REVIEW.md",
-      "sha256": "82efdc5f63c6158967f1868cc295011efc4f365533be01640612423a49963259"
+      "sha256": "0cdd1b122367e2dc967a2421bb5021acfd131605400d0e7053a2ff2fbed9095b"
     },
     {
       "path": "docs/THIRD_PARTY.md",
@@ -181,7 +181,7 @@
     },
     {
       "path": "prepare_release.py",
-      "sha256": "c0a3fe731bfaf307bdbdb8afe9d8a632c235c5d6742ec07a73d6a3ed9d8e7d23"
+      "sha256": "2c40259ee230405c971316caefaf8a4c523e724c6f227d286274512450b6c31b"
     },
     {
       "path": "publish_if_ready.py",
@@ -189,7 +189,7 @@
     },
     {
       "path": "pyproject.toml",
-      "sha256": "04c103f0604f82e8d861b3bf68a27a23fea3914c161c8c665a7dc4367c491f08"
+      "sha256": "a19519d294f6dc28657fb1a385bb228a8324f5f71a62c13c767f5c2c5fbfec79"
     },
     {
       "path": "requirements.txt",

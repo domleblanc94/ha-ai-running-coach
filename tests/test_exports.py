@@ -11,6 +11,7 @@ from ai_running_coach.app.runtime import Runtime
 from ai_running_coach.app.server import CoachServer, profile_markdown
 from ai_running_coach.app.storage import file_lock
 from ai_running_coach.app.exports import calendar_pdf
+from ai_running_coach.app.dashboard_view import saved_dashboard
 
 
 class ExportTests(unittest.TestCase):
@@ -139,6 +140,30 @@ class ExportTests(unittest.TestCase):
         self.assertNotIn('allow-same-origin', headers['Content-Security-Policy'])
         self.assertEqual(before, {path: path.read_bytes() for path in paths})
         self.assertFalse((self.runtime.workspace / 'ai_coach_master.sqlite').exists())
+
+    def test_saved_branding_changes_only_generated_head_title_without_writes_or_coaching(self):
+        old_title = b'<title>AI Endurance Coach - Calendar Dashboard</title>'
+        new_title = b'<title>AI Multisport Coach - Calendar Dashboard</title>'
+        prefix = (b'<!DOCTYPE html>\n<html lang="en" class="dark">\n<head>\n'
+                  b'    <meta charset="UTF-8">\n'
+                  b'    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n')
+        # Old-brand text in a script/body is data, including a complete title.
+        remainder = b'</head><body><p>AI Endurance Coach</p><script>const note="' + old_title + b'";</script></body></html>'
+        legacy = prefix + old_title + remainder
+        dashboard = self.runtime.public / 'dashboard.html'
+        dashboard.write_bytes(legacy)
+        state = self.runtime.state_file.read_bytes()
+        with patch.object(self.runtime, '_command', side_effect=AssertionError('Branding must not run the coach')):
+            code, body, headers = self.request('/dashboard')
+        self.assertEqual(code, 200)
+        self.assertTrue(body.startswith(prefix + new_title + remainder))
+        self.assertEqual(dashboard.read_bytes(), legacy)
+        self.assertEqual(self.runtime.state_file.read_bytes(), state)
+        self.assertIn('sandbox allow-scripts allow-downloads', headers['Content-Security-Policy'])
+        for unchanged in (prefix + new_title + remainder,
+                          prefix + b'<title>Custom title</title>' + remainder,
+                          b'<html><body>' + old_title + b'</body></html>'):
+            self.assertTrue(saved_dashboard(unchanged).startswith(unchanged))
 
 
 if __name__ == '__main__':

@@ -1,8 +1,9 @@
 # Changelog
 
-## 0.2.0-beta.2
+## 0.2.0-beta.3
 
-- Rename the visible app, setup, dashboard and PDF branding to **AI Endurance Coach** to reflect running, cycling, swimming and triathlon support.
+- Rename the visible app, setup, dashboard and PDF branding to **AI Multisport Coach** to reflect running, cycling, swimming and triathlon support.
+- Update the title shown for an existing saved dashboard when serving it, without rewriting the saved file or generating a new plan.
 - Keep the existing repository, installation slug, image, private storage and settings identifiers, so this remains an update to the same app.
 
 ## 0.2.0-beta.1
