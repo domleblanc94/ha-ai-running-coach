@@ -119,13 +119,13 @@
       if (course.summary.discontinuities) byId("race-quality-notes").open = true;
       const reference = course.preview[0]?.lon || 0;
       plot(byId("race-route-plot"), course.preview, p => ((p.lon - reference + 540) % 360 - 180) * Math.cos((course.preview[0]?.lat || 0) * Math.PI / 180), p => p.lat);
-      const hasElevation = plot(byId("race-elevation-plot"), course.preview, p => p.distance_m, p => p.elevation_m);
-      const elevationPoints = course.preview.filter(p => number(p.distance_m) && number(p.elevation_m));
-      byId("race-elevation-scale").textContent = hasElevation
-        ? "Distance shown: " + distance(Math.min(...elevationPoints.map(p => p.distance_m))) + "–" + distance(Math.max(...elevationPoints.map(p => p.distance_m)))
-          + ". Known preview height: " + elevation(Math.min(...elevationPoints.map(p => p.elevation_m))) + "–" + elevation(Math.max(...elevationPoints.map(p => p.elevation_m))) + "."
-        : "Course distance: 0.00 km–" + distance(course.summary.distance_m) + ". Elevation scale: unknown.";
-      byId("race-elevation-note").textContent = hasElevation ? "Course elevations are approximate. Missing points leave gaps; noisy elevations can affect ascent and pacing." : "This course has too little elevation data to plot. Elevation is unknown, not zero.";
+      const chart = window.CoachElevationChart.render(byId("race-elevation-plot"), course.preview, course.summary.distance_m);
+      byId("race-elevation-scale").textContent = "Course distance: 0.00 km–" + distance(chart.end)
+        + (chart.knownCount ? ". Known preview height: " + elevation(chart.minHeight) + "–" + elevation(chart.maxHeight) + "." : ". Elevation scale: unknown.");
+      byId("race-elevation-note").textContent = chart.hasProfile
+        ? "Course elevations are approximate. Missing points leave gaps; noisy elevations can affect ascent and pacing."
+        : chart.knownCount ? "Only isolated heights are available, shown as dots. There is too little connected elevation data for a profile."
+          : "This course has no elevation data to plot. Elevation is unknown, not zero.";
       const elevationBusy = saved.elevation_pending || latestStatus.running?.action === "race_elevation" || latestStatus.queued?.action === "race_elevation";
       const elevationRun = saved.elevation_last_run;
       byId("race-elevation-status").textContent = elevationBusy ? "Retrieving missing heights from Open-Meteo. No AI request is used…"
@@ -133,6 +133,7 @@
       byId("race-elevation-status").classList.toggle("error", !elevationBusy && ["failed", "interrupted"].includes(elevationRun?.status));
       byId("race-elevation-retry").hidden = !course.has_missing_elevation || elevationBusy;
       const source = course.summary.elevation_source;
+      byId("race-elevation-coaching-note").hidden = !source || Boolean(plan) || elevationBusy;
       const credit = byId("race-elevation-source"); credit.replaceChildren();
       if (source) {
         credit.append(document.createTextNode("Estimated surface elevations: Open-Meteo / Copernicus DEM 2021 GLO-90 (approximately 90 m resolution). Sample spacing: " + Math.round(source.sample_spacing_m) + " m; " + source.sample_count + " sampled points. Trees, buildings and bridges can differ from the running surface. "));

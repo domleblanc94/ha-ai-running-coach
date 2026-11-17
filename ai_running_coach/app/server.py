@@ -28,6 +28,7 @@ ASSETS = {
     "/assets/coach.js": ("coach.js", "text/javascript; charset=utf-8"),
     "/assets/race.js": ("race.js", "text/javascript; charset=utf-8"),
     "/assets/race-map.js": ("race-map.js", "text/javascript; charset=utf-8"),
+    "/assets/race-elevation-chart.js": ("race-elevation-chart.js", "text/javascript; charset=utf-8"),
     "/assets/leaflet.js": ("leaflet/leaflet.js", "text/javascript; charset=utf-8"),
     "/assets/leaflet.css": ("leaflet/leaflet.css", "text/css; charset=utf-8"),
 }

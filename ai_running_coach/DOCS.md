@@ -1,6 +1,6 @@
 # AI Multisport Coach
 
-**Version 1.3.0** is the community release of AI Multisport Coach for Home Assistant. It serves one athlete and opens its setup and private dashboard through Home Assistant ingress.
+**Version 1.3.1** is the community release of AI Multisport Coach for Home Assistant. It serves one athlete and opens its setup and private dashboard through Home Assistant ingress.
 
 ## Choose a route or preview the dashboard
 
@@ -40,11 +40,15 @@ New interval and strides sessions must explain warm-up, work repetitions and dur
 
 Open **Race planning** and upload a running or trail-race GPX (up to 5 MB and 50,000 points). The map displays OpenStreetMap tiles with your route drawn locally, and every import includes an elevation profile. Supplied valid GPX heights are preserved; missing heights automatically start an Open-Meteo terrain lookup. Your original upload is retained. Uploading, terrain lookup and course downloads use no AI or Garmin request and leave the training plan unchanged.
 
+The elevation chart labels distance along the course in **kilometres (km)** and height in **metres (m)**, with numeric axis ticks. Missing-height spans and disconnected sections remain gaps; chart labels do not alter the course data.
+
 Before Upload, the page explains that OpenStreetMap receives map-tile requests for the area you view and Open-Meteo receives sampled route locations when heights are missing. The free Open-Meteo service is for personal, noncommercial use; its API logs may retain coordinates for up to 90 days. It uses Copernicus GLO-90 approximate 90 m surface heights, which may include trees and buildings. Terrain data is CC BY 4.0 and source/derivation notices accompany enriched courses. Full-height GPX files do not contact the elevation service. The browser sends the map service only your site origin as referrer, excluding the private ingress path.
 
 If terrain lookup fails, the valid imported course remains saved and the profile reports incomplete coverage; select **Retry missing elevation** when ready. An older saved course with missing heights can also be retried. Opening it alone does not make an elevation request. The local outline/profile still work if map tiles cannot load. Unknown heights stay unknown, disconnected tracks must be corrected before pacing or FIT export, and all elevation totals are approximate. Changing course evidence requires a new explicit race review before using an older strategy with the updated course. [Provider terms, privacy, attribution and precision details](https://github.com/domleblanc94/ai-running-coach/blob/main/docs/RACE_PLANNING.md#map-and-elevation-profile).
 
 Enter the race name, optional date and what you want to discuss. **Generate race strategies** makes at most one model request using the shared daily allowance and your saved athlete/activity evidence. It does not sync Garmin or change the training calendar. The coach compares a conservative approach with a more ambitious option whose later pickup depends on conditions. If evidence is too weak for numerical pacing, the plan provides effort guidance instead. Read the dated evidence and limitations alongside any finish-time range.
+
+After missing-height lookup finishes, select **Generate race strategies** to have both conservative and ambitious options use the current course elevations, section gradients and stated terrain limitations. Importing or enriching the route does not automatically call the coach or rewrite previous advice. A changed course identity does not reuse an older strategy; if you already generated the strategies after elevation was added, you do not need to regenerate them just for this chart update.
 
 Change your question and select **Refine strategies** to discuss the saved race plan. Each new review uses the same allowance as training reviews; an identical completed request can reuse its cached result without another model call. Failed requests retain the previous valid race plan and do not retry automatically. Only one coaching action runs at a time. The full GPX is retained in private app storage. The AI receives compact route/terrain summaries instead of coordinates; the separate missing-height service receives the sampled locations disclosed above.
 

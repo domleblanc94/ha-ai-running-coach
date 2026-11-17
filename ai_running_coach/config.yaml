@@ -1,5 +1,5 @@
 name: AI Multisport Coach
-version: "1.3.0"
+version: "1.3.1"
 image: ghcr.io/domleblanc94/ha-ai-running-coach
 slug: ai_running_coach
 description: "Personal AI running, cycling, swimming and triathlon coach with a private dashboard"

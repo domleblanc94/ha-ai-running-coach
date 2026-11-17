@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.1
+
+- Label the race elevation chart with distance in kilometres and elevation in metres, with readable axis ticks on desktop and mobile.
+- Keep missing-height gaps and disconnected course sections visible without inventing elevations.
+- Clarify that newly generated race strategies use the current course elevation data; importing or enriching a course does not automatically rerun the coach.
+- Keep the shared coaching engine at version 1.3.0 and preserve existing private data, settings and request budgets.
+
 ## 1.3.0
 
 - Show race courses on an interactive OpenStreetMap background, with local route and elevation previews retained when maps cannot load.

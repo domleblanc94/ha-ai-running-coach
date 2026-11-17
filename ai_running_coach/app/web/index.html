@@ -9,6 +9,7 @@
   <script src="./assets/leaflet.js" defer></script>
   <script src="./assets/coach.js" defer></script>
   <script src="./assets/race-map.js" defer></script>
+  <script src="./assets/race-elevation-chart.js" defer></script>
   <script src="./assets/race.js" defer></script>
 </head>
 <body>
@@ -58,6 +59,7 @@
         <p class="eyebrow">WORK WITH YOUR COACH</p><h2>Compare two race strategies</h2>
         <div class="grid"><label>Race name<input name="race_name" maxlength="120" required></label><label>Race date (optional)<input name="race_date" type="date"></label><label class="full">What should the coach consider?<textarea name="question" maxlength="2000" rows="4" placeholder="For example: I want a comfortable first half, then an optional push if I am recovering well. Mention terrain, cut-offs, experience or aid stations you know."></textarea></label></div>
         <p id="race-readiness" class="hint"></p><p id="race-budget" class="hint"></p>
+        <p id="race-elevation-coaching-note" class="hint" hidden>Generate strategies to use this course’s current elevation data. Elevation lookup does not update an earlier coaching plan automatically.</p>
         <div class="actions"><button id="race-generate" type="submit">Generate race strategies · 1 AI request</button><span id="race-action-result" class="form-result" role="status"></span></div>
         <p class="hint">This saves a separate race plan. It does not replace your training calendar. Estimates depend on available fitness and elevation evidence; effort guidance stays useful when a reliable finish-time estimate is unavailable.</p>
       </form>
