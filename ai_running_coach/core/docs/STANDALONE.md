@@ -6,7 +6,7 @@ Want to see the interface first? [Open the fictional example](https://domleblanc
 
 ## 1. Download and prepare
 
-Install [Python](https://www.python.org/downloads/) **3.11 or newer**. Automated checks cover 3.11–3.13; Python 3.13 is a straightforward choice. Windows users can select the Python launcher during installation. Download [the version 1.1 source ZIP](https://github.com/domleblanc94/ai-running-coach/releases/download/v1.1.0/ai-multisport-coach-1.1.0.zip), extract it to a private folder and open a terminal in the extracted folder containing `setup_coach.py`. Keep its scripts, examples and dashboard assets together.
+Install [Python](https://www.python.org/downloads/) **3.11 or newer**. Automated checks cover 3.11–3.13; Python 3.13 is a straightforward choice. Windows users can select the Python launcher during installation. Download [the version 1.2 source ZIP](https://github.com/domleblanc94/ai-running-coach/releases/download/v1.2.0/ai-multisport-coach-1.2.0.zip), extract it to a private folder and open a terminal in the extracted folder containing `setup_coach.py`. Keep its scripts, examples and dashboard assets together.
 
 Create a private Python environment. On **Windows PowerShell**:
 
@@ -89,6 +89,8 @@ python generate_dashboard.py
 
 The first command makes a provider request and may incur costs under your provider plan. A valid response saves `training_plan.json` and `training_plan.md`. If a request fails, the last valid plan is retained; read the terminal error before retrying. The second command builds `dashboard.html` without another AI call. Open that HTML file in your browser and review the plan before training. A live workflow status is unavailable when opening a local file; the saved plan remains usable.
 
+The coach can label the planned block with phases such as baseline building, build, peak, taper, race or recovery, including each phase's dates and purpose. The dashboard and Markdown show those saved labels; uncovered dates show **Phase not specified**. Older plans gain labels through a normal successful review, without an extra request at installation. Back up `training_plan.json` as the authoritative structured plan as well as its readable Markdown export.
+
 For later reviews, run `python cron_daily_update.py`. It synchronizes the selected activity source, processes data, requests a bounded review and renders the dashboard. To deliberately replace only the future training block, use `--new-plan` again; past sessions are retained.
 
 ## 6. Optional private web viewing
@@ -129,4 +131,4 @@ On Windows, Task Scheduler can run `.venv\Scripts\python.exe` with argument `cro
 
 Before updating, privately back up your project data, including `.env`, `athlete.md`, `training_plan.*`, `ai_coach_master.sqlite`, hidden runtime files and activity folders. Stop your scheduler during the update, replace public code/assets from the release and rerun the doctor check. Do not replace your data with the synthetic example.
 
-Version 1.1 labels the packaged application, not universal provider or device certification. OpenAI/Anthropic/custom endpoint compatibility remains experimental beyond mocked tests. FIT files have independent decoder checks, but physical watch transfer/execution remains unverified. Transfers are manual; this release does not automatically upload or delete workouts on a watch. See the [release review](RELEASE_REVIEW.md) for the evidence and limitations, and report sanitized problems in the [standalone project](https://github.com/domleblanc94/ai-running-coach/issues).
+Version 1.2 labels the packaged application, not universal provider or device certification. OpenAI/Anthropic/custom endpoint compatibility remains experimental beyond mocked tests. FIT files have independent decoder checks, but physical watch transfer/execution remains unverified. Transfers are manual; this release does not automatically upload or delete workouts on a watch. See the [release review](RELEASE_REVIEW.md) for the evidence and limitations, and report sanitized problems in the [standalone project](https://github.com/domleblanc94/ai-running-coach/issues).

@@ -1,6 +1,6 @@
 # AI Multisport Coach
 
-**Version 1.1.0** is the community release of AI Multisport Coach for Home Assistant. It serves one athlete and opens its setup and private dashboard through Home Assistant ingress.
+**Version 1.2.0** is the community release of AI Multisport Coach for Home Assistant. It serves one athlete and opens its setup and private dashboard through Home Assistant ingress.
 
 ## Choose a route or preview the dashboard
 
@@ -70,6 +70,14 @@ The app supports one planned running session per date. Different sports, or a ru
 
 Download the calendar as a PDF for printing or sharing. You can also download **athlete.md** and **training_plan.md**. These exports contain your private profile and training information; store and share them accordingly. They do not contain connection API keys. Exporting saved data does not make an AI request.
 
+## Training phases
+
+The coach can label the plan with phases such as **Baseline building**, **Build**, **Peak**, **Taper** and **Recovery**, using names and dates appropriate to your goals. Each phase has inclusive start/end dates and a short purpose. Python validates and displays those labels; it does not infer phases from workout types or race dates.
+
+Expand **Training phases** in the dashboard to see the saved progression. **Current phase** refers to the dashboard's displayed date. **Phases in this week** follows the selected calendar week, showing each exact date range when a phase changes midweek. Uncovered dates show **Phase not specified**. The PDF calendar includes these weekly ranges and a separate overview with full phase purposes.
+
+Upgrading does not rewrite existing plans or use an AI request. Existing plans remain unspecified until the next successful review supplies phase labels; the last dashboard remains available if the review fails. Phase updates use the normal coaching request and budget, with historical labels retained. The private **training_plan.json** is authoritative: Markdown, HTML and PDF are views of its saved metadata, and editing exported Markdown does not assign or change phases.
+
 ## Running, cycling, swimming and triathlon
 
 **Setup & settings** offers a **Training focus** and optional availability for each sport. Sport days narrow the global training days; leave them blank to inherit the global setting. Preferred long-run and long-ride days are alternatives, not requests for several long sessions. Keep optional cycling FTP, swimming CSS, pool size and sport-specific HR ranges blank when unknown. Running ranges are not reused as cycling or swimming ranges. **Learn HR zones** applies to running baseline observations; it is not a cycling or swimming test protocol.
@@ -119,12 +127,12 @@ Include this app in a Home Assistant backup before updating. The Supervisor stop
 
 ## Moving from the standalone installation
 
-Version 1.1 has no guided migration from a standalone installation. The existing installation and this app have independent databases, Garmin binding and request ledgers. Keep the app schedule disabled until you have verified the migration.
+Version 1.2 has no guided migration from a standalone installation. The existing installation and this app have independent databases, Garmin binding and request ledgers. Keep the app schedule disabled until you have verified the migration.
 
 A future cutover needs a consistent source backup and one active scheduler. The migration needs to preserve the athlete profile and plans, SQLite request history for daily limits, and the exact Garmin account binding and source provenance. Copying only the athlete profile, or starting a new database against the same account on the same day, loses that continuity. Verify the restored files and review state with the schedule disabled. Keep the original installation and backup available for rollback. Stop the app schedule before resuming the standalone scheduler.
 
 ## Garmin key replacement
 
-Garmin account binding is preserved if a key changes. Version 1.1 has no in-app confirmation for key rotation. Back up the app and pause its schedule before rotating a key. Ask the maintainer for the same-account recovery procedure, and keep the sync checkpoint with its matching database. An account or region change requires a new workspace.
+Garmin account binding is preserved if a key changes. Version 1.2 has no in-app confirmation for key rotation. Back up the app and pause its schedule before rotating a key. Ask the maintainer for the same-account recovery procedure, and keep the sync checkpoint with its matching database. An account or region change requires a new workspace.
 
 FIT workout export remains experimental and requires manual transfer to a compatible watch.

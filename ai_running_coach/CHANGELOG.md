@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.0
+
+- Add coach-authored training phases with dates and a brief purpose, including flexible stages such as baseline building, build, peak, taper, race and recovery.
+- Show the current phase and exact selected-week transitions in the dashboard, plus saved phase ranges and purposes in Markdown and PDF exports.
+- Keep uncovered dates explicitly unspecified, preserve historical labels and partial-review metadata, and clear superseded future labels when generating a new plan.
+- Apply phase changes atomically with the training plan under the existing AI allowance. Updating the app does not call the coach or rewrite an existing personal plan.
+
 ## 1.1.0
 
 - Add a private Race planning tab: upload a running/trail GPX, inspect distance and elevation coverage, and ask the coach for conservative and conditional ambitious strategies based on current recorded evidence.

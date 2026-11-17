@@ -1,5 +1,5 @@
 """Original dashboard layout, preserved from the pre-upgrade project."""
-def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, activities_json, macro_review_json, last_updated_str, today_json, freshness_html, other_activities_html, session_ids_json, planned_json, agenda_html, focus_html, assessment_html, history_html, feedback_html, workout_sessions_json, sport_weeks_json="{}", training_mode_json='"running"', demo_mode=False):
+def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, activities_json, macro_review_json, last_updated_str, today_json, freshness_html, other_activities_html, session_ids_json, planned_json, agenda_html, focus_html, assessment_html, history_html, feedback_html, workout_sessions_json, sport_weeks_json="{}", training_mode_json='"running"', phase_overview_html='', phase_weeks_json='{}', demo_mode=False):
     return f"""<!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -131,8 +131,10 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
 
         <!-- WEEKLY CALENDAR VIEW -->
         <div id="calendarView" class="space-y-6">
+            {phase_overview_html}
             <div class="flex flex-wrap items-center gap-3"><label class="text-sm text-slate-300">Show <select id="calendarSport" class="bg-slate-900 border border-slate-600 rounded px-2 py-1"><option value="all">All sessions</option><option value="running">Running</option><option value="cycling">Cycling</option><option value="swimming">Swimming</option><option value="multisport">Triathlon</option><option value="other">Strength, mobility &amp; other</option></select></label><p id="calendarSportSummary" class="text-xs text-slate-400"></p></div>
             <div class="flex items-center gap-2 overflow-x-auto pb-3 border-b border-slate-800/80" id="weekTabsContainer"></div>
+            <section id="selectedWeekPhases" aria-label="Training phases for selected week" class="rounded-lg border border-slate-700 bg-slate-800/40 p-3 text-sm space-y-2"></section>
 
             <div id="calendarWeekdayHeader" class="coach-calendar-weekdays text-center text-xs font-bold text-slate-400 uppercase tracking-wider bg-slate-800/80 p-3 rounded-lg border border-slate-800">
                 <div>Mon</div>
@@ -168,6 +170,7 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
         const workoutSessions = {workout_sessions_json};
         const sportWeeks = {sport_weeks_json};
         const trainingMode = {training_mode_json};
+        const trainingPhaseWeeks = {phase_weeks_json};
         const sportLabels = {{running:'Running',cycling:'Cycling',swimming:'Swimming',multisport:'Triathlon',strength:'Strength',mobility:'Mobility',rest:'Rest',other:'Other'}};
         let calendarSport = 'all';
         let chartSport = trainingMode === 'triathlon' ? 'all' : trainingMode;
@@ -278,6 +281,7 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
                 tables.forEach((table, weekIdx) => {{
                     const rows = Array.from(table.querySelectorAll('tbody tr'));
                     const headers = Array.from(table.querySelectorAll('thead th')).map(cell => cell.innerText.trim().toLowerCase());
+                    if (!headers.includes('day') || !headers.some(value => ['workout type', 'workout'].includes(value))) return;
                     if (rows.length === 0) return;
 
                     let weekTitle = `Week ${{weekIdx + 1}}`;
@@ -384,7 +388,24 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
             container.innerHTML = '';
 
             const selectedWeek = allParsedWeeks[weekIdx];
+            const phaseContainer = document.getElementById('selectedWeekPhases');
+            phaseContainer.replaceChildren();
             if (!selectedWeek) return;
+            const phaseHeading = document.createElement('h3');
+            phaseHeading.className = 'font-semibold text-sky-300';
+            phaseHeading.textContent = 'Phases in this week';
+            phaseContainer.appendChild(phaseHeading);
+            const phaseSpans = trainingPhaseWeeks[selectedWeek.weekStart] || [];
+            if (!phaseSpans.length) {{
+                const missing = document.createElement('p'); missing.className = 'text-slate-400';
+                missing.textContent = 'Phase not specified'; phaseContainer.appendChild(missing);
+            }}
+            phaseSpans.forEach(span => {{
+                const line = document.createElement('p'); line.className = 'text-slate-300 break-words';
+                const name = document.createElement('strong'); name.textContent = span.phase ? span.phase.name : 'Phase not specified';
+                line.append(name, document.createTextNode(' · ' + span.start_date + ' – ' + span.end_date));
+                phaseContainer.appendChild(line);
+            }});
 
             const grid = document.createElement('div');
             grid.className = 'coach-calendar-grid';

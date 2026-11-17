@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "release": "1.1.0",
+  "release": "1.2.0",
   "license_status": "selected",
   "files": [
     {
@@ -25,11 +25,11 @@
     },
     {
       "path": "README.md",
-      "sha256": "353135aa81f4030aaf74b6fbd7eeb505b2a871752efde233faead08d7235948f"
+      "sha256": "098ed9bfaa3dc786ae9378c067a7993728760fb4eafa9e45066408fd68047fe3"
     },
     {
       "path": "ai_coach.py",
-      "sha256": "bb99eaa12d9662ff226e34f0ef27dc181a0246c21fc3ffe610dc9e9a7a2a54da"
+      "sha256": "177eb91698a66c01ec763b0ea940af5115306e846ab81b8c5f331ba6074defb9"
     },
     {
       "path": "build_demo_site.py",
@@ -121,11 +121,11 @@
     },
     {
       "path": "dashboard_panels.py",
-      "sha256": "7af076f80754d870e977198dd75dd5359eccfaed5cc8cc3aa99183d158a4657a"
+      "sha256": "7dd5401c51dfedb0df875104a5dd53688be040ac3368d99a47ce5ad637419d4e"
     },
     {
       "path": "dashboard_template.py",
-      "sha256": "7f660ec619fb13bca58cd96912d0e8bd1e1b5a5b78e46f54b0fbfc6421913658"
+      "sha256": "0a1c2be46d6e927dfc45afdb737d8f1c48fc35347f52967a0b32a1884fa8c2a0"
     },
     {
       "path": "database_manager.py",
@@ -133,7 +133,7 @@
     },
     {
       "path": "demo_data.py",
-      "sha256": "83db91ec0423eba3446f3cffe007da64dc5a46b9958d327d00fb97bec1503e0c"
+      "sha256": "b8e28b45d50d8ab80a43dbdb517de7fdb3ac57075c586d93e0bf46e8f31e8486"
     },
     {
       "path": "docs/RACE_PLANNING.md",
@@ -141,11 +141,11 @@
     },
     {
       "path": "docs/RELEASE_REVIEW.md",
-      "sha256": "7ca28bcd7073a1d6bdcd2f88a59116f9667026877a04a3282a5734601e02e14f"
+      "sha256": "47d96dc399743dce09973c1c77beb524599a29869fcdbeca09d479e9cfbdb6a3"
     },
     {
       "path": "docs/STANDALONE.md",
-      "sha256": "8d9454cece5a5d83872a428e7ceb0611e08aa216b7dba4d4b0118c5faae538e3"
+      "sha256": "0a409b57dd32eac3a2d742e024c37eb5e2725b584d67279b95d79bdb626f5f8c"
     },
     {
       "path": "docs/THIRD_PARTY.md",
@@ -177,7 +177,7 @@
     },
     {
       "path": "generate_dashboard.py",
-      "sha256": "e1e9429c76856d7a97c7007b9eb90a1578ac4e074cc308d3eed3bce41e716af0"
+      "sha256": "f4d30e01d41516084bba14e59f4e16b0ba56b1bfd643f257130c2378c35b66b9"
     },
     {
       "path": "health_status.py",
@@ -201,11 +201,11 @@
     },
     {
       "path": "planning_engine.py",
-      "sha256": "0af4fe1f3c4d577a085a9eb44c78d1559e53007306802b2e8d8e8660ac3edbcc"
+      "sha256": "e23f512205e9bf05c620347d473870022161e80fd207bb4faacc9533f9d74258"
     },
     {
       "path": "prepare_release.py",
-      "sha256": "b912e44ac280dd128c5a0a10c8174b2c513c4fafa178f9d0e431ae65f605c0a4"
+      "sha256": "6b073f61fa493b965761d9239c9ab126e75bd2204c849066a78ba9adfae19db0"
     },
     {
       "path": "publish_if_ready.py",
@@ -213,7 +213,7 @@
     },
     {
       "path": "pyproject.toml",
-      "sha256": "8bf7c755732a5db3732c248f2c85e6e9f18eb9b7f12aa23c649e5937e1317863"
+      "sha256": "66cef33edfbc9c4abc5cb850df9bddcd19d2b79348c7b37d84ac63420767bd2d"
     },
     {
       "path": "race_exports.py",
@@ -285,7 +285,7 @@
     },
     {
       "path": "tests/test_demo_site.py",
-      "sha256": "b6bd1584e409b2de66db8f879ca613889a5125226aeea28f966b13d919c4473b"
+      "sha256": "87b37972fc6cf5a3000f9449093e0c0a42dfff3a8482f5da172d70d6df13911f"
     },
     {
       "path": "tests/test_feedback_workflow.py",
@@ -317,7 +317,7 @@
     },
     {
       "path": "tests/test_model_providers.py",
-      "sha256": "0f4f91a30c843970ed93b4022134f7974a667750490c3408c21010b9abc84259"
+      "sha256": "caf5c0782de6132983beb0dfd42d9a2502634d42a93a79e654a9ef51bfbd1094"
     },
     {
       "path": "tests/test_multisport_dashboard.py",
@@ -342,6 +342,10 @@
     {
       "path": "tests/test_operations.py",
       "sha256": "7efbfbce06c8501a81fc34715f475a79dcb2f43fb67492c1242bae557c620ff1"
+    },
+    {
+      "path": "tests/test_phase_contract_regression.py",
+      "sha256": "2e052dfe53b588453d3698e210e2eb9b878cd37ed71df68380cf09e70290a604"
     },
     {
       "path": "tests/test_planning_engine.py",
@@ -396,6 +400,10 @@
       "sha256": "5dd21da64318c4117cdaacf6d95a9ddc17361e86199d7cca9303a5248e158bf5"
     },
     {
+      "path": "tests/test_training_phases.py",
+      "sha256": "d38fae3abadf41687ceca5b1c272da1872f9e89d4f3335a58c609adce1756dee"
+    },
+    {
       "path": "tests/test_workout_dashboard.py",
       "sha256": "2643dd48052f73819c5c9d58710109530b379f7ac014704e7e1652560c53f412"
     },
@@ -406,6 +414,10 @@
     {
       "path": "training_calendar.py",
       "sha256": "8e1a98e951c816295738303bcdb5325a3f3198978f5b7b4eef79ecdd03919105"
+    },
+    {
+      "path": "training_phases.py",
+      "sha256": "228b15cdfd28b7e7d4d712e80cad95da6db87d312493a8f3da8e373d5013605e"
     },
     {
       "path": "workout_schema.py",

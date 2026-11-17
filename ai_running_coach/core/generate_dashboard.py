@@ -79,7 +79,7 @@ def read_database(path, start, end):
         tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         if "coach_review_jobs" in tables:
             job_columns = {row[1] for row in conn.execute("PRAGMA table_info(coach_review_jobs)")}
-            policy_filter = " AND prompt_version IN ('autonomous-coach-v2','autonomous-coach-v3','autonomous-coach-v4-starter-week','autonomous-coach-v5-availability','autonomous-coach-v5-availability-starter-week','autonomous-coach-v6-schedule','autonomous-coach-v6-schedule-starter-week','autonomous-coach-v7-new-plan','autonomous-coach-v7-new-plan-starter-week','autonomous-coach-v8-multisport','autonomous-coach-v8-multisport-starter-week','autonomous-coach-v9-detail','autonomous-coach-v9-detail-starter-week')" if "prompt_version" in job_columns else ""
+            policy_filter = " AND prompt_version IN ('autonomous-coach-v2','autonomous-coach-v3','autonomous-coach-v4-starter-week','autonomous-coach-v5-availability','autonomous-coach-v5-availability-starter-week','autonomous-coach-v6-schedule','autonomous-coach-v6-schedule-starter-week','autonomous-coach-v7-new-plan','autonomous-coach-v7-new-plan-starter-week','autonomous-coach-v8-multisport','autonomous-coach-v8-multisport-starter-week','autonomous-coach-v9-detail','autonomous-coach-v9-detail-starter-week','autonomous-coach-v10-phases','autonomous-coach-v10-phases-starter-week')" if "prompt_version" in job_columns else ""
             reviewed_ids = set()
             for saved in conn.execute("SELECT response_json FROM coach_review_jobs WHERE status='complete' AND response_json IS NOT NULL" + policy_filter):
                 try:
@@ -197,7 +197,7 @@ def build_dashboard(db_path=None, plan_file=None, output_html=None, today=None, 
         # WOFF2 is bundled; remove unused legacy font-format alternatives.
         css=__import__('re').sub(r',url\(\.\./webfonts/'+font+r'\.ttf\) format\("truetype"\)',"",css)
     assets["fontawesome.css"]=css
-    from dashboard_panels import activity_measure, weekly_sport_data, session_order
+    from dashboard_panels import activity_measure, weekly_sport_data, session_order, build_phase_display
     from sports import session_sport, sport_label, training_mode, activity_sport
     exported={}
     for d,records in activities.items():
@@ -283,7 +283,8 @@ def build_dashboard(db_path=None, plan_file=None, output_html=None, today=None, 
                 item[field] = pool.get(field)
         workout_payload[item['id']] = item
     sport_data = weekly_sport_data(activities, weeks, today)
-    document=render_layout(assets=assets,weeks_json=safe_json(['w/c '+w.strftime('%d/%m') for w in weeks]),km_json=safe_json([round(totals[w.isoformat()][0],1) for w in weeks]),load_json=safe_json([round(totals[w.isoformat()][1],1) if totals[w.isoformat()][2] else None for w in weeks]),raw_markdown_json=safe_json(markdown),activities_json=safe_json(exported),macro_review_json=safe_json(review),last_updated_str=esc(generated_at),today_json=safe_json(today.isoformat()),freshness_html=freshness,other_activities_html=other,session_ids_json=safe_json(ids),planned_json=safe_json(planned_chart),agenda_html=panels["agenda"],focus_html=panels["focus"],assessment_html=panels["assessment"],history_html=panels["history"],feedback_html=panels["feedback"],workout_sessions_json=safe_json(workout_payload),sport_weeks_json=safe_json(sport_data),training_mode_json=safe_json(training_mode(profile)),demo_mode=demo_mode)
+    phase_display = build_phase_display(canonical or {}, today, dates)
+    document=render_layout(assets=assets,weeks_json=safe_json(['w/c '+w.strftime('%d/%m') for w in weeks]),km_json=safe_json([round(totals[w.isoformat()][0],1) for w in weeks]),load_json=safe_json([round(totals[w.isoformat()][1],1) if totals[w.isoformat()][2] else None for w in weeks]),raw_markdown_json=safe_json(markdown),activities_json=safe_json(exported),macro_review_json=safe_json(review),last_updated_str=esc(generated_at),today_json=safe_json(today.isoformat()),freshness_html=freshness,other_activities_html=other,session_ids_json=safe_json(ids),planned_json=safe_json(planned_chart),agenda_html=panels["agenda"],focus_html=panels["focus"],assessment_html=panels["assessment"],history_html=panels["history"],feedback_html=panels["feedback"],workout_sessions_json=safe_json(workout_payload),sport_weeks_json=safe_json(sport_data),training_mode_json=safe_json(training_mode(profile)),phase_overview_html=phase_display["overview"],phase_weeks_json=safe_json(phase_display["weeks"]),demo_mode=demo_mode)
     # Same-filesystem replacement prevents readers seeing partially written HTML.
     output_html.parent.mkdir(parents=True, exist_ok=True)
     temp_path = None

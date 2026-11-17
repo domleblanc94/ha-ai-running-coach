@@ -54,6 +54,7 @@ class PublicDemoTests(unittest.TestCase):
             self.assertEqual(parser.forms,[])
             self.assertIn('SYNTHETIC DEMO',html)
             self.assertIn('2027-05-05',html)
+            self.assertIn('Fictional phase: coordinate running, cycling and swimming',html)
             self.assertIn('https://github.com/domleblanc94/ha-ai-running-coach#readme',html)
             with self.assertRaises(ValueError):build_demo_site(first)
             self.assertEqual((first/'index.html').read_bytes(),(second/'index.html').read_bytes())

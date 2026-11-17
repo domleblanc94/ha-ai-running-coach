@@ -14,7 +14,7 @@ RUNTIME_SCRIPTS = {
     'garmin_sync.py', 'generate_dashboard.py', 'health_status.py',
     'migrate_plan.py', 'model_provider.py', 'planning_engine.py', 'publish_if_ready.py',
     'source_policy.py', 'sports.py', 'training_calendar.py', 'workout_schema.py',
-    'coaching_detail.py', 'session_instructions.py', 'race_gpx.py', 'race_planner.py', 'race_exports.py',
+    'coaching_detail.py', 'session_instructions.py', 'race_gpx.py', 'race_planner.py', 'race_exports.py', 'training_phases.py',
 }
 
 

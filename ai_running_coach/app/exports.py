@@ -5,6 +5,16 @@ from datetime import date, timedelta
 from html import escape
 from io import BytesIO
 from pathlib import Path
+import importlib.util
+
+
+def load_phase_rules():
+    """Load the bundled, standard-library-only phase helper, never private code."""
+    path = Path(__file__).resolve().parent.parent / 'core' / 'training_phases.py'
+    specification = importlib.util.spec_from_file_location('coach_export_phase_rules', path)
+    rules = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(rules)
+    return rules
 
 
 def plain(value):
@@ -25,7 +35,7 @@ def sport_caption(session):
     return label
 
 
-def calendar_pdf(plan, athlete_name='', *, conflicts=()):
+def calendar_pdf(plan, athlete_name='', *, conflicts=(), phase_rules=None):
     """One printable calendar week per page, with full session detail afterward."""
     from reportlab.lib import colors
     from reportlab.lib.enums import TA_LEFT
@@ -47,6 +57,10 @@ def calendar_pdf(plan, athlete_name='', *, conflicts=()):
         raise ValueError('Generate a plan with scheduled sessions before exporting the calendar.')
     if len(sessions) > 4000:
         raise ValueError('The saved plan is too large to export as a calendar.')
+    phases = plan.get('phases', [])
+    if phases or 'phases' in plan:
+        phase_rules = phase_rules or load_phase_rules()
+        phases = sorted(phase_rules.validate_phases(phases), key=lambda phase: phase['start_date'])
     by_day = defaultdict(list)
     for session in sessions:
         if not isinstance(session, dict):
@@ -92,19 +106,31 @@ def calendar_pdf(plan, athlete_name='', *, conflicts=()):
         p = text(line, small)
         _, h = p.wrap(width - 60, 34)
         p.drawOn(canvas, 30, height - 72 - h)
+        content_top = height - 84 - h
         if conflicts:
             p = text('CHECK TRAINING DAYS: This saved plan includes sessions outside your current availability. Regenerate the plan before following those sessions.', small)
             _, warning_height = p.wrap(width - 60, 30)
-            p.drawOn(canvas, 30, height - 104 - warning_height)
+            p.drawOn(canvas, 30, content_top - warning_height)
+            content_top -= warning_height + 12
         canvas.setFont('Coach', 8)
         canvas.drawString(30, 18, 'Saved plan revision ' + plain(plan.get('revision', 'unknown')) + ' | No session on a date does not imply rest.')
         canvas.drawRightString(width - 30, 18, str(page))
+        return content_top
 
     # Card contents are deliberately summaries. Full targets and every session
     # appear in the following pages, where text can flow without clipping.
     for week in weeks:
-        header('Training calendar', week.strftime('%d %b %Y') + ' - ' + (week + timedelta(days=6)).strftime('%d %b %Y'))
-        gap, left, top, bottom = 7, 30, height - (140 if conflicts else 116), 44
+        week_end = week + timedelta(days=6)
+        top = header('Training calendar', week.strftime('%d %b %Y') + ' - ' + week_end.strftime('%d %b %Y'))
+        spans = phase_rules.phase_spans(plan, week.isoformat(), week_end.isoformat()) if phase_rules else [
+            {'start_date': week.isoformat(), 'end_date': week_end.isoformat(), 'phase': None}]
+        for span in spans:
+            label = span['phase']['name'] if span['phase'] else 'Phase not specified'
+            p = text(label + ' | ' + span['start_date'] + ' - ' + span['end_date'], small)
+            _, h = p.wrap(width - 60, 100)
+            p.drawOn(canvas, 30, top - h)
+            top -= h + 3
+        gap, left, top, bottom = 7, 30, top - 8, 44
         cell_width = (width - 60 - 6 * gap) / 7
         for index in range(7):
             day = week + timedelta(days=index)
@@ -149,10 +175,12 @@ def calendar_pdf(plan, athlete_name='', *, conflicts=()):
 
     y = 0
 
+    section_title = 'Session details'
+    section_dates = first.strftime('%d %b %Y') + ' - ' + last.strftime('%d %b %Y')
+
     def detail_page():
         nonlocal y
-        header('Session details', first.strftime('%d %b %Y') + ' - ' + last.strftime('%d %b %Y'))
-        y = height - (140 if conflicts else 116)
+        y = header(section_title, section_dates)
 
     def flowing(value, style=paragraph):
         nonlocal y
@@ -172,6 +200,20 @@ def calendar_pdf(plan, athlete_name='', *, conflicts=()):
             canvas.showPage()
             detail_page()
 
+    if phases:
+        section_title = 'Training phases'
+        section_dates = 'Coach-authored progression; dates are inclusive. Unassigned dates are not inferred.'
+        detail_page()
+        for phase in phases:
+            if y < 150:
+                canvas.showPage()
+                detail_page()
+            flowing(phase['name'], bold)
+            flowing(phase['start_date'] + ' - ' + phase['end_date'], small)
+            flowing(phase['purpose'])
+        canvas.showPage()
+        section_title = 'Session details'
+        section_dates = first.strftime('%d %b %Y') + ' - ' + last.strftime('%d %b %Y')
     detail_page()
     for day in sorted(by_day):
         if y < 130:

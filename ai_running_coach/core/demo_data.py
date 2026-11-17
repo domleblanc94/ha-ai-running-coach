@@ -51,7 +51,9 @@ def populate_demo(root,today):
         session(5,'brick-run','running','Brick: run','15 min',brick={'id':'demo-weekend-brick','order':2},workout={'name':'DEMO brick run','sport':'running','steps':[step('active',seconds=900)]}),
         session(6,'rest','rest','Rest','—'),
     ]
-    plan={'schema_version':1,'revision':1,'profile_hash':profile['source_hash'],'goals':profile['goals'],'sessions':sessions}
+    plan={'schema_version':1,'revision':1,'profile_hash':profile['source_hash'],'goals':profile['goals'],'sessions':sessions,
+          'phases':[{'start_date':monday.isoformat(),'end_date':(monday+timedelta(days=6)).isoformat(),
+                     'name':'Build','purpose':'Fictional phase: coordinate running, cycling and swimming within this sample week.'}]}
     validate_plan(plan,profile)
     (root/'training_plan.json').write_text(json.dumps(plan,indent=2)+'\n',encoding='utf-8')
     (root/'training_plan.md').write_text(render_plan(plan),encoding='utf-8')

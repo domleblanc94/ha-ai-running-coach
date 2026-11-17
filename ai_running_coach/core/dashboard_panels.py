@@ -6,6 +6,28 @@ import re
 from sports import activity_sport, session_sport, sport_label
 
 
+def build_phase_display(plan, today, session_dates):
+    """Present only the coach's saved phase labels, including unassigned gaps."""
+    from training_phases import phase_for_date, phase_spans, validate_phases
+    phases = sorted(validate_phases(plan.get('phases', [])), key=lambda phase: phase['start_date'])
+    current = phase_for_date(plan, today.isoformat())
+    label = ('Current phase: ' + current['name']) if current else 'Current phase not specified'
+    overview = '<details id="trainingPhases" class="border border-slate-700 bg-slate-800/60 rounded-xl p-4"><summary class="cursor-pointer font-semibold text-sky-300 break-words">Training phases · ' + html.escape(label) + '</summary>'
+    overview += '<p class="text-xs text-slate-400 mt-2">Saved coach-authored progression. Current phase is shown for ' + today.isoformat() + '; the calendar below follows your selected week.</p>'
+    if phases:
+        overview += '<ol class="space-y-3 mt-3">'
+        for phase in phases:
+            active = phase['start_date'] <= today.isoformat() <= phase['end_date']
+            overview += '<li class="border-l-2 ' + ('border-emerald-400' if active else 'border-slate-600') + ' pl-3 min-w-0 break-words"><p class="text-sm font-semibold text-slate-200">' + html.escape(phase['name']) + (' <span class="text-emerald-300 text-xs">· Current</span>' if active else '') + '</p>'
+            overview += '<p class="text-xs text-slate-400">' + phase['start_date'] + ' – ' + phase['end_date'] + '</p><p class="text-sm text-slate-300 mt-1 whitespace-pre-wrap">' + html.escape(phase['purpose']) + '</p></li>'
+        overview += '</ol>'
+    else:
+        overview += '<p class="text-sm text-slate-300 mt-3">The saved plan has no phase labels. They will appear when the coach adds them; no phases have been inferred from your workouts.</p>'
+    overview += '</details>'
+    weeks = {date.fromisoformat(value) - timedelta(days=date.fromisoformat(value).weekday()) for value in session_dates}
+    return {'overview': overview, 'weeks': {week.isoformat(): phase_spans(plan, week.isoformat(), (week + timedelta(days=6)).isoformat()) for week in sorted(weeks)}}
+
+
 def session_order(item):
     brick = item.get('brick') or {}
     return (item['date'], brick.get('id', item['id']), brick.get('order', 0), item['id'])
@@ -72,7 +94,7 @@ def coach_payload(conn):
     tables={row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     if 'coach_review_jobs' not in tables:return {}
     import json
-    row=conn.execute("SELECT response_json FROM coach_review_jobs WHERE status='complete' AND prompt_version IN ('autonomous-coach-v2','autonomous-coach-v3','autonomous-coach-v4-starter-week','autonomous-coach-v5-availability','autonomous-coach-v5-availability-starter-week','autonomous-coach-v6-schedule','autonomous-coach-v6-schedule-starter-week','autonomous-coach-v7-new-plan','autonomous-coach-v7-new-plan-starter-week','autonomous-coach-v8-multisport','autonomous-coach-v8-multisport-starter-week','autonomous-coach-v9-detail','autonomous-coach-v9-detail-starter-week') ORDER BY updated_at DESC LIMIT 1").fetchone()
+    row=conn.execute("SELECT response_json FROM coach_review_jobs WHERE status='complete' AND prompt_version IN ('autonomous-coach-v2','autonomous-coach-v3','autonomous-coach-v4-starter-week','autonomous-coach-v5-availability','autonomous-coach-v5-availability-starter-week','autonomous-coach-v6-schedule','autonomous-coach-v6-schedule-starter-week','autonomous-coach-v7-new-plan','autonomous-coach-v7-new-plan-starter-week','autonomous-coach-v8-multisport','autonomous-coach-v8-multisport-starter-week','autonomous-coach-v9-detail','autonomous-coach-v9-detail-starter-week','autonomous-coach-v10-phases','autonomous-coach-v10-phases-starter-week') ORDER BY updated_at DESC LIMIT 1").fetchone()
     try:
         payload=json.loads(row[0]) if row and row[0] else {}
         return payload if isinstance(payload,dict) else {}

@@ -14,6 +14,7 @@ from sports import (TRAINING_MODES, ENDURANCE_SPORTS, session_sport, effective_g
                     sport_label, parse_sport_label)
 from coaching_detail import review_detail
 from session_instructions import validate_quality_session, workout_instruction_lines
+from training_phases import PHASES_UNSET, validate_phases, replace_future_phases
 
 POLICY_VERSION = 4
 SESSION_FIELDS = {'id', 'date', 'workout_type', 'amount', 'target', 'goal_priority', 'workout', 'sport', 'sub_sport', 'brick'}
@@ -202,6 +203,7 @@ def validate_plan(plan, profile):
         raise ValueError('Profile changed: reconcile canonical plan before review.')
     if plan.get('goals') != profile['goals']:
         raise ValueError('Canonical goals differ from configured profile.')
+    validate_phases(plan.get('phases', []))
     sessions = plan.get('sessions')
     if not isinstance(sessions, list) or (not sessions and not plan.get('requires_coach_reconciliation')):
         raise ValueError('No validated sessions.')
@@ -234,6 +236,20 @@ def render_plan(plan):
     for goal in plan.get('goals', []):
         lines += [f"- {goal['priority']}: {goal['event']} | {goal.get('date','date unknown')} | {goal.get('target_time','target unknown')}"]
     lines += ['']
+    def phase_text(value):
+        # Keep untrusted coach labels plain text in Markdown/HTML renderers.
+        import html
+        escaped = html.escape(value, quote=False)
+        return re.sub(r'([\\`*_{}\[\]()#+.!|>-])', r'\\\1', escaped)
+    phases = validate_phases(plan.get('phases', []))
+    lines += ['## Training phases', '']
+    if phases:
+        for phase in sorted(phases, key=lambda item: item['start_date']):
+            lines += ['- ' + phase['start_date'] + ' to ' + phase['end_date'] + ': **' +
+                      phase_text(phase['name']) + '** - ' + phase_text(phase['purpose'])]
+        lines += ['', 'Dates outside these ranges: Phase not specified.', '']
+    else:
+        lines += ['Phase not specified. The coach can label the upcoming plan at the next successful review.', '']
     typed=any('sport' in session for session in plan['sessions'])
     week = None
     for s in sorted(plan['sessions'], key=lambda x: x['date']):
@@ -429,7 +445,7 @@ def fingerprint(profile, plan, evidence, question, generation_identity=None):
     return hashlib.sha256(json.dumps(parts, sort_keys=True, allow_nan=False).encode()).hexdigest()
 
 
-def apply_plan_changes(plan, changes, profile, today):
+def apply_plan_changes(plan, changes, profile, today, phases=PHASES_UNSET):
     if not isinstance(changes,list) or len(changes)>60:
         raise ValueError('Invalid plan change count.')
     result=copy.deepcopy(plan)
@@ -472,7 +488,10 @@ def apply_plan_changes(plan, changes, profile, today):
     unresolved=[s['id'] for s in result['sessions'] if s['date']>=str(today) and 'Legacy target superseded' in s['target']]
     if plan.get('requires_coach_reconciliation') and unresolved:
         raise ValueError('Coach must replace or remove superseded upcoming targets: '+','.join(unresolved))
-    if changes or plan.get('requires_coach_reconciliation'):
+    if phases is not PHASES_UNSET:
+        result['phases'] = replace_future_phases(plan.get('phases', []), phases, today)
+    phase_changed = result.get('phases', PHASES_UNSET) != plan.get('phases', PHASES_UNSET)
+    if changes or plan.get('requires_coach_reconciliation') or phase_changed:
         result['revision']+=1
         result['requires_coach_reconciliation']=False
         result['authored_by']='AI coach'
@@ -512,7 +531,7 @@ def new_session_id_prefix(plan, today):
     return prefix
 
 
-def apply_new_plan(plan,changes,profile,today):
+def apply_new_plan(plan,changes,profile,today,phases=PHASES_UNSET):
     """Replace only future scheduling after a valid AI-authored block exists."""
     if not isinstance(changes,list) or not changes or len(changes)>60:
         raise ValueError('A new plan requires added sessions with new unique IDs.')
@@ -545,24 +564,29 @@ def apply_new_plan(plan,changes,profile,today):
     future=[session for session in prepared['sessions'] if session['date']>=str(today)]
     prepared['sessions']=[session for session in prepared['sessions'] if session['date']<str(today)]
     prepared['retired_session_ids']=sorted(set(prepared.get('retired_session_ids',[]))|{session['id'] for session in future})
-    if future:
-        prepared.setdefault('superseded_blocks',[]).append({'revision':plan['revision'],'superseded_from':str(today),'sessions':future})
+    if future or any(phase['end_date'] >= str(today) for phase in plan.get('phases', [])):
+        archived = {'revision':plan['revision'],'superseded_from':str(today),'sessions':future}
+        if 'phases' in plan:
+            archived['phases'] = copy.deepcopy(plan['phases'])
+        prepared.setdefault('superseded_blocks',[]).append(archived)
     prepared['requires_coach_reconciliation']=True
     prepared.pop('new_plan_requested',None)
-    result=apply_plan_changes(prepared,additions,profile,today)
+    # Replacement sessions must never inherit superseded future phase labels.
+    replacement = [] if phases is PHASES_UNSET else phases
+    result=apply_plan_changes(prepared,additions,profile,today,phases=replacement)
     result['active_block_started_on']=str(today)
     return result
 
 
-def apply_coach_changes(plan,changes,profile,today):
+def apply_coach_changes(plan,changes,profile,today,phases=PHASES_UNSET):
     if plan.get('new_plan_requested'):
-        return apply_new_plan(plan,changes,profile,today)
-    return apply_plan_changes(plan,changes,profile,today)
+        return apply_new_plan(plan,changes,profile,today,phases=phases)
+    return apply_plan_changes(plan,changes,profile,today,phases=phases)
 
 
 def validate_review(payload, evidence, plan, today, profile=None, require_explicit_sport=False):
     required={'summary','trajectory','reviews','plan_changes'}
-    optional={'weekly_priorities','assessment','next_review_trigger'}
+    optional={'weekly_priorities','assessment','next_review_trigger','phases'}
     if not isinstance(payload,dict) or not required.issubset(payload) or set(payload)-required-optional:
         raise ValueError('Invalid review envelope.')
     if payload['trajectory'] not in {'insufficient_evidence','on_track','ahead','behind'}:
@@ -611,7 +635,7 @@ def validate_review(payload, evidence, plan, today, profile=None, require_explic
                 if not isinstance(session,dict) or 'sport' not in session:
                     raise ValueError('AI sessions must specify an explicit sport.')
     if profile is not None:
-        apply_coach_changes(plan,payload['plan_changes'],profile,today)
-    elif payload['plan_changes']:
+        apply_coach_changes(plan,payload['plan_changes'],profile,today,phases=payload.get('phases',PHASES_UNSET))
+    elif payload['plan_changes'] or 'phases' in payload:
         raise ValueError('Profile required to validate plan changes.')
     return payload
