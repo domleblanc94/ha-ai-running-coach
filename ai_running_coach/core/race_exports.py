@@ -117,6 +117,12 @@ def course_fit(route, name=None, strategy=None, *, created_at=None):
 def course_gpx(route, name=None):
     route = validate_route(route)
     root = ET.Element('gpx', {'version': '1.1', 'creator': 'AI Multisport Coach', 'xmlns': 'http://www.topografix.com/GPX/1/1'})
+    if route.get('elevation_enrichment'):
+        from race_elevation import source_notes, SOURCE_URL
+        metadata = ET.SubElement(root, 'metadata')
+        ET.SubElement(metadata, 'desc').text = source_notes(route)
+        link = ET.SubElement(metadata, 'link', {'href': SOURCE_URL})
+        ET.SubElement(link, 'text').text = 'Map-derived surface elevation: Open-Meteo / Copernicus GLO-90'
     track = ET.SubElement(root, 'trk')
     ET.SubElement(track, 'name').text = str(name or route['name'])[:120]
     segment_id, element = None, None

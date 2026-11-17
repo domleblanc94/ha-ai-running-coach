@@ -3,6 +3,7 @@
 from datetime import date
 import base64
 import json
+import math
 from zoneinfo import ZoneInfo
 
 from .storage import atomic_json, checked, file_lock
@@ -22,6 +23,14 @@ MESSAGES = {
     'busy': 'Another coach action is using the workspace. Wait for it to finish.',
     'interrupted': 'The race review was interrupted. Your last valid race plan is retained; it will not retry automatically.',
     'race_unavailable': 'Race planning could not read its saved data. Check the app logs and try again after the current action finishes.',
+    'elevation_unavailable': 'Elevation lookup is unavailable. The imported course is retained; retry when the connection is available.',
+    'elevation_rate_limit': 'The elevation service request allowance is temporarily used. The course is retained; try again later.',
+    'elevation_invalid_response': 'The elevation service returned unusable data. The imported course is retained; retry later.',
+    'elevation_no_data': 'The elevation service has no usable heights for this course. The imported course is retained with unknown heights.',
+    'elevation_too_fragmented': 'This course has too many separate missing-height sections for a bounded lookup. Its original data is retained.',
+    'elevation_no_improvement': 'The new lookup would lose known heights. Your current course and elevations are retained; retry later.',
+    'elevation_interrupted': 'Elevation lookup was interrupted. The imported course is retained; use Retry to try again.',
+    'route_changed': 'The course changed during this action. Refresh Race planning before trying again.',
 }
 
 
@@ -34,7 +43,7 @@ class RaceFailure(RuntimeError):
 class RaceRuntime:
     def _race_call(self, operation, payload, *, timezone_name='UTC'):
         result, output = self._command(operation, input_text=json.dumps(payload, allow_nan=False),
-                                       timeout=150 if operation == 'race_review' else 20,
+                                       timeout=150 if operation == 'race_review' else 75 if operation == 'race_elevation' else 20,
                                        timezone_name=timezone_name, capture=True)
         if result or not isinstance(output, str) or len(output) > 16 * 1024 * 1024:
             raise RaceFailure('race_unavailable')
@@ -48,17 +57,30 @@ class RaceRuntime:
         except (ValueError, KeyError, TypeError):
             raise RaceFailure('race_unavailable') from None
 
-    def _race_course(self):
+    def _race_envelope(self):
         path = checked(self.data / 'race-course.json')
         if not path.exists():
             return None
         try:
-            course = json.loads(path.read_bytes())
+            saved = json.loads(path.read_bytes())
+            course = saved.get('active') if isinstance(saved, dict) and saved.get('storage_version') == 1 else saved
             if not isinstance(course, dict) or not isinstance(course.get('route_hash'), str):
                 raise ValueError('Invalid course')
-            return course
+            if saved is course:
+                return {'storage_version': 1, 'original_gpx': None, 'original': course, 'active': course}
+            if not isinstance(saved.get('original'), dict) or (saved.get('original_gpx') is not None and not isinstance(saved['original_gpx'], str)):
+                raise ValueError('Invalid original course')
+            return saved
         except (ValueError, OSError):
             raise RaceFailure('race_unavailable') from None
+
+    def _race_course(self):
+        envelope = self._race_envelope()
+        return envelope['active'] if envelope else None
+
+    @staticmethod
+    def _missing_heights(course):
+        return any(point.get('elevation_m') is None for point in course.get('points', []))
 
     def _race_ready(self, state):
         config = self._config(self._env())
@@ -68,33 +90,128 @@ class RaceRuntime:
     def race_status(self):
         with file_lock(self.state_lock):
             state = self._state()
-            course = self._race_course()
+            envelope = self._race_envelope()
+            course = envelope['active'] if envelope else None
             result = {'course': None, 'plan': None, 'last_run': state.get('race_last_run'),
+                      'elevation_last_run': state.get('race_elevation_last_run'),
+                      'elevation_pending': any((state.get(key) or {}).get('action') == 'race_elevation' for key in ('queued', 'running')),
                       'ready': self._race_ready(state), 'busy': bool(state['queued'] or state['running'])}
         if course:
             # High-resolution GPS stays in private storage; only the bounded
             # preview is needed by the local ingress page.
             result['course'] = {key: course[key] for key in ('schema_version', 'route_hash', 'name', 'sport', 'summary', 'preview')}
+            result['course']['has_missing_elevation'] = self._missing_heights(course)
+            result['course']['has_original_gpx'] = envelope.get('original_gpx') is not None or envelope.get('original_gpx_base64') is not None
             result['plan'] = self._race_call('race_read', {'route_hash': course['route_hash']})
         return result
 
     def save_race_course(self, payload):
-        if set(payload) != {'gpx', 'filename'} or not isinstance(payload['gpx'], str):
+        encoded = set(payload) == {'gpx_base64', 'filename'}
+        if not encoded and (set(payload) != {'gpx', 'filename'} or not isinstance(payload['gpx'], str)):
             raise ValueError('Choose a GPX file to upload.')
         if not isinstance(payload['filename'], str) or len(payload['filename']) > 200 or '\0' in payload['filename']:
             raise ValueError('Choose a GPX filename under 200 characters.')
-        if not payload['gpx'].strip() or len(payload['gpx'].encode('utf-8')) > GPX_LIMIT:
+        try:
+            if encoded and (not isinstance(payload['gpx_base64'], str) or len(payload['gpx_base64']) > (GPX_LIMIT + 2) // 3 * 4):
+                raise ValueError('Invalid upload')
+            raw = base64.b64decode(payload['gpx_base64'], validate=True) if encoded else payload['gpx'].encode('utf-8')
+        except (ValueError, UnicodeError):
+            raise ValueError('Choose a valid GPX file no larger than 5 MB.') from None
+        if not raw.strip() or len(raw) > GPX_LIMIT:
             raise ValueError('Choose a GPX file no larger than 5 MB.')
-        with file_lock(self.run_lock, blocking=False), file_lock(self.state_lock):
+        with file_lock(self.run_lock, blocking=False):
+            with file_lock(self.state_lock):
+                self._idle(self._state())
+            # Keep the state lock available to status requests during parsing.
+            course = self._race_call('race_parse', payload)
+            with file_lock(self.state_lock):
+                state = self._state()
+                self._idle(state)
+                atomic_json(self.data / 'race-course.json', {'storage_version': 1, 'original_gpx': payload.get('gpx'),
+                                                           'original_gpx_base64': payload.get('gpx_base64'),
+                                                           'original': course, 'active': course})
+                state.pop('race_last_run', None)
+                state.pop('race_elevation_last_run', None)
+                if self._missing_heights(course):
+                    state['queued'] = {'action': 'race_elevation', 'trigger': 'import',
+                                       'queued_at': self._now().isoformat(), 'route_hash': course['route_hash']}
+                self._write_state(state)
+        return self.race_status()
+
+    def enqueue_elevation(self, payload):
+        if set(payload) != {'route_hash'} or not isinstance(payload['route_hash'], str):
+            raise ValueError('Refresh Race planning before retrying elevation.')
+        with file_lock(self.state_lock):
             state = self._state()
             self._idle(state)
-            course = self._race_call('race_parse', payload)
-            atomic_json(self.data / 'race-course.json', course)
-            # A previous course's status must not be presented as this course's
-            # result. Its saved plans remain in the private race history.
-            state.pop('race_last_run', None)
+            course = self._race_course()
+            if not course or course['route_hash'] != payload['route_hash']:
+                raise RaceFailure('route_changed')
+            if not self._missing_heights(course):
+                raise ValueError('This course already has heights for every point.')
+            if self.worker_error:
+                raise RaceFailure('elevation_unavailable')
+            state['queued'] = {'action': 'race_elevation', 'trigger': 'manual',
+                               'queued_at': self._now().isoformat(), 'route_hash': course['route_hash']}
             self._write_state(state)
-        return self.race_status()
+            return self._status(state)
+
+    def _tick_elevation(self, action, started):
+        """Enrich outside the state lock; never spend an AI request or publish training."""
+        code, changed = 'elevation_unavailable', False
+        final_hash = action['route_hash']
+        try:
+            with file_lock(self.state_lock):
+                envelope = self._race_envelope()
+                if not envelope or envelope['active']['route_hash'] != action['route_hash']:
+                    raise RaceFailure('route_changed')
+            enriched = self._race_call('race_elevation', {'route': envelope['original'], 'current_route': envelope['active']})
+            if not isinstance(enriched, dict) or not isinstance(enriched.get('route_hash'), str):
+                raise RaceFailure('elevation_invalid_response')
+            with file_lock(self.state_lock):
+                current = self._race_envelope()
+                if not current or current['active']['route_hash'] != action['route_hash']:
+                    raise RaceFailure('route_changed')
+                final_hash = enriched['route_hash']
+                changed = final_hash != action['route_hash']
+                atomic_json(self.data / 'race-course.json', {**current, 'active': enriched})
+            code = 'elevation_partial' if self._missing_heights(enriched) else 'complete'
+        except RaceFailure as error:
+            code = error.code
+        except (ValueError, OSError, RuntimeError, TypeError, KeyError):
+            code = 'elevation_unavailable'
+        success = code in ('complete', 'elevation_partial')
+        message = ('Course elevation is ready. No AI request was used.' if code == 'complete' else
+                   'Some heights remain unknown. Available elevations are saved; Retry can try the missing sections again.' if code == 'elevation_partial' else MESSAGES[code])
+        with file_lock(self.state_lock):
+            state = self._state()
+            state['running'] = None
+            if changed:
+                state.pop('race_last_run', None)
+            state['race_elevation_last_run'] = {'action': 'race_elevation', 'status': 'success' if success else 'failed',
+                'code': code, 'started_at': action['started_at'], 'finished_at': self._now().isoformat(),
+                'route_hash': final_hash, 'message': message, 'request_attempts': 0}
+            self._write_state(state)
+        print(f'AI Coach [elevation/{code}] {message}', flush=True)
+        return True
+
+    def race_geometry(self, route_hash):
+        with file_lock(self.state_lock):
+            course = self._race_course()
+            if not course or course['route_hash'] != route_hash:
+                raise RaceFailure('route_changed')
+            points = course.get('points', [])
+            if not 2 <= len(points) <= 50000:
+                raise RaceFailure('invalid_input')
+            geometry = []
+            for point in points:
+                lat, lon, segment = point.get('lat'), point.get('lon'), point.get('segment')
+                if (type(lat) not in (int, float) or type(lon) not in (int, float) or not math.isfinite(lat)
+                        or not math.isfinite(lon) or not -90 <= lat <= 90 or not -180 <= lon <= 180
+                        or type(segment) is not int or not 0 <= segment < 50000):
+                    raise RaceFailure('invalid_input')
+                geometry.append([lat, lon, segment])
+            return {'route_hash': route_hash, 'points': geometry}
 
     def enqueue_race(self, payload):
         if set(payload) != {'route_hash', 'question', 'race_name', 'race_date'}:
@@ -164,7 +281,7 @@ class RaceRuntime:
         return True
 
     def race_export(self, kind, strategy_id=None, *, route_hash=None, request_id=None):
-        if kind not in ('fit', 'gpx'):
+        if kind not in ('fit', 'gpx', 'original', 'source'):
             raise ValueError('Choose the course GPX or course FIT download.')
         if strategy_id is not None and (kind != 'fit' or strategy_id not in ('conservative', 'ambitious')):
             raise ValueError('Choose a saved race strategy.')
@@ -174,6 +291,17 @@ class RaceRuntime:
                 raise FileNotFoundError('Upload a GPX first.')
             if not isinstance(route_hash, str) or route_hash != course['route_hash']:
                 raise ValueError('The course changed. Refresh Race planning before downloading it.')
+            if kind == 'original':
+                envelope = self._race_envelope()
+                if envelope.get('original_gpx_base64') is not None:
+                    try:
+                        return base64.b64decode(envelope['original_gpx_base64'], validate=True)
+                    except (ValueError, TypeError):
+                        raise RaceFailure('race_unavailable') from None
+                original = envelope.get('original_gpx')
+                if original is None:
+                    raise ValueError('The original upload was not retained by this older app version. The course GPX is still available.')
+                return original.encode('utf-8')
             strategy = None
             if strategy_id:
                 saved = self._race_call('race_read', {'route_hash': course['route_hash']})

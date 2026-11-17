@@ -27,6 +27,9 @@ ASSETS = {
     "/assets/coach.css": ("coach.css", "text/css; charset=utf-8"),
     "/assets/coach.js": ("coach.js", "text/javascript; charset=utf-8"),
     "/assets/race.js": ("race.js", "text/javascript; charset=utf-8"),
+    "/assets/race-map.js": ("race-map.js", "text/javascript; charset=utf-8"),
+    "/assets/leaflet.js": ("leaflet/leaflet.js", "text/javascript; charset=utf-8"),
+    "/assets/leaflet.css": ("leaflet/leaflet.css", "text/css; charset=utf-8"),
 }
 WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 PROFILE_FIELDS = {
@@ -334,7 +337,7 @@ class CoachHandler(BaseHTTPRequestHandler):
             )
         else:
             policy = (
-                "default-src 'self'; script-src 'self'; style-src 'self'; frame-src 'self'; "
+                "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://tile.openstreetmap.org; frame-src 'self'; "
                 "frame-ancestors 'self'; object-src 'none'; base-uri 'none'; form-action 'self'"
             )
         self.send_header("Content-Security-Policy", policy)
@@ -404,8 +407,17 @@ class CoachHandler(BaseHTTPRequestHandler):
                 self.send_json(200, runtime.race_status())
             except RuntimeError as error:
                 self.send_json(409, {'error': str(error)})
-        elif path in ('/exports/race-course.fit', '/exports/race-course.gpx', '/exports/race-course-conservative.fit', '/exports/race-course-ambitious.fit'):
+        elif path == '/api/race/geometry':
+            try:
+                parameters = parse_qs(urlsplit(self.path).query, keep_blank_values=True, max_num_fields=2)
+                if set(parameters) != {'route_hash'} or len(parameters['route_hash']) != 1:
+                    raise ValueError('Refresh Race planning before loading the course map.')
+                self.send_json(200, runtime.race_geometry(parameters['route_hash'][0]))
+            except (ValueError, RuntimeError) as error:
+                self.send_json(409, {'error': str(error)})
+        elif path in ('/exports/race-course.fit', '/exports/race-course.gpx', '/exports/race-course-conservative.fit', '/exports/race-course-ambitious.fit', '/exports/race-original.gpx', '/exports/race-elevation-source.txt'):
             kind = path.rsplit('.', 1)[1]
+            kind = 'original' if path.endswith('race-original.gpx') else 'source' if kind == 'txt' else kind
             strategy = 'conservative' if path.endswith('-conservative.fit') else 'ambitious' if path.endswith('-ambitious.fit') else None
             try:
                 parameters = parse_qs(urlsplit(self.path).query, keep_blank_values=True, max_num_fields=4)
@@ -421,7 +433,8 @@ class CoachHandler(BaseHTTPRequestHandler):
             except (ValueError, RuntimeError) as error:
                 self.send_json(409, {'error': str(error)})
             else:
-                self.respond(200, content, 'application/octet-stream' if kind == 'fit' else 'application/gpx+xml', download='race-' + (strategy + '-' if strategy else '') + 'course.' + kind)
+                filename = 'race-original.gpx' if kind == 'original' else 'race-elevation-source.txt' if kind == 'source' else 'race-' + (strategy + '-' if strategy else '') + 'course.' + kind
+                self.respond(200, content, 'application/octet-stream' if kind == 'fit' else 'text/plain; charset=utf-8' if kind == 'source' else 'application/gpx+xml', download=filename)
         elif path in ("/exports/athlete.md", "/exports/training_plan.md", "/exports/training_calendar.pdf"):
             filename = path.rsplit('/', 1)[1]
             try:
@@ -458,6 +471,7 @@ class CoachHandler(BaseHTTPRequestHandler):
             "/api/schedule": lambda payload: self.save_schedule(runtime, payload),
             '/api/race/course': runtime.save_race_course,
             '/api/race/action': runtime.enqueue_race,
+            '/api/race/elevation': runtime.enqueue_elevation,
         }
         if path not in actions:
             self.send_json(404, {"error": "Action not found."})

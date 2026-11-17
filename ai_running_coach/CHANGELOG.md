@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.0
+
+- Show race courses on an interactive OpenStreetMap background, with local route and elevation previews retained when maps cannot load.
+- Automatically look up missing GPX elevations using Open-Meteo terrain data during import, preserve supplied heights and the original upload, and offer retry when terrain coverage is incomplete.
+- Explain location sharing before upload, retain terrain source/licence notices in course summaries and exports, and distinguish approximate surface heights from recorded elevations.
+- Keep terrain work separate from AI requests and training-plan state; imported courses survive lookup failures and saved strategies are tied to the course evidence they used.
+
 ## 1.2.0
 
 - Add coach-authored training phases with dates and a brief purpose, including flexible stages such as baseline building, build, peak, taper, race and recovery.

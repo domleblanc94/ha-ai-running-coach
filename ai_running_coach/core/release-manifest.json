@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "release": "1.2.0",
+  "release": "1.3.0",
   "license_status": "selected",
   "files": [
     {
@@ -17,7 +17,7 @@
     },
     {
       "path": ".gitignore",
-      "sha256": "b0b75f8a020bfcce65a6e3de5651ea5d5b187d20e817eaec51b7d3c94544a4dd"
+      "sha256": "6868c50762c2dda363d19e2fb428dd0484397737354301988188d5ad9a6bc3d1"
     },
     {
       "path": "LICENSE",
@@ -25,7 +25,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "098ed9bfaa3dc786ae9378c067a7993728760fb4eafa9e45066408fd68047fe3"
+      "sha256": "24f10f4a2fb4c1f2fe8bd5baeb43eaef3974f411c4608bc5a8279cd999109d5f"
     },
     {
       "path": "ai_coach.py",
@@ -137,19 +137,19 @@
     },
     {
       "path": "docs/RACE_PLANNING.md",
-      "sha256": "959731318005c62c483d7363a23e1dfa88ccbf6483fbc41a26d2b4c8c39c6996"
+      "sha256": "fd4d1b1bf52226b5a14d55feb9c9130f47415d4cdb93b8b47c4f7b2c1fd92ef8"
     },
     {
       "path": "docs/RELEASE_REVIEW.md",
-      "sha256": "47d96dc399743dce09973c1c77beb524599a29869fcdbeca09d479e9cfbdb6a3"
+      "sha256": "86069a5c94f283b36aa227cd9a5dca1306029e1d990e1a4d9c4023e0e4a7c73e"
     },
     {
       "path": "docs/STANDALONE.md",
-      "sha256": "0a409b57dd32eac3a2d742e024c37eb5e2725b584d67279b95d79bdb626f5f8c"
+      "sha256": "6f17de405ce5005e134697ce0bb64a77096a116083c7e2507abd459abced2586"
     },
     {
       "path": "docs/THIRD_PARTY.md",
-      "sha256": "f240b1ca40e248020fe0d56b66d36ce8328041a629917fcab59bf02f85469f26"
+      "sha256": "f4e3d7513cb2cbae0975bfb9d67fadb3893b44691690ab13250afb4989a7e612"
     },
     {
       "path": "eval_cases.json",
@@ -205,7 +205,7 @@
     },
     {
       "path": "prepare_release.py",
-      "sha256": "6b073f61fa493b965761d9239c9ab126e75bd2204c849066a78ba9adfae19db0"
+      "sha256": "d05a84eb7259d2e1edf42936bc653850299dd2028c3af0809f3d053cf8daa867"
     },
     {
       "path": "publish_if_ready.py",
@@ -213,19 +213,23 @@
     },
     {
       "path": "pyproject.toml",
-      "sha256": "66cef33edfbc9c4abc5cb850df9bddcd19d2b79348c7b37d84ac63420767bd2d"
+      "sha256": "6acbd358b7d29cdcb269e7f0f473c3968dbb34d061ba47a2f20350e0424c5f5c"
+    },
+    {
+      "path": "race_elevation.py",
+      "sha256": "a9e63f7617927c878091c1f6b5a63b09e8a4c0ea61398b7adabd5037f3bf67ec"
     },
     {
       "path": "race_exports.py",
-      "sha256": "f3374eeba9780cae7649921685102301f7d99b3d920658fb9b24f3a7bb7c818f"
+      "sha256": "be762dd76a82cf83220e27092c6bdb443e087b0de3f311f95a1b29ff56cab003"
     },
     {
       "path": "race_gpx.py",
-      "sha256": "48d0a53c6021ecc28550cc9cacc72add6ed361ee83b4136564add72417f42cb7"
+      "sha256": "3ad31c6eeede4f2b37c76377e60f601ababe0fecc639fbd1a16c97b5f38687ec"
     },
     {
       "path": "race_planner.py",
-      "sha256": "0ed6924dc99cc51d049982cb2ba42b4d37b17919c047cd8d8919c17548ac0c76"
+      "sha256": "f4ee108518181a76b8ed5512aace791a7fe808653378ef39439564adf36427cb"
     },
     {
       "path": "requirements.txt",
@@ -353,11 +357,15 @@
     },
     {
       "path": "tests/test_public_release.py",
-      "sha256": "9e64feaa78393bb59d7a5fc2696b8fa838253f195f291c1c85c73061a65221c4"
+      "sha256": "d24e3b626bc2d7a02559853d0fb6df6ef31f1b841d3f7d9ed5fd7535b133d213"
     },
     {
       "path": "tests/test_publish_guard.py",
       "sha256": "86183914e9246c5170f03e9c578ee9356f9fbfddf96fc57b32124dded0fa1f0d"
+    },
+    {
+      "path": "tests/test_race_elevation.py",
+      "sha256": "746bb034a699b70baa60f94bc3cb62ca57a9304e533854646dbdad4f5152bc0b"
     },
     {
       "path": "tests/test_race_exports.py",

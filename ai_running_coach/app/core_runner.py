@@ -15,14 +15,22 @@ def race_operation(workspace, operation):
         with redirect_stdout(sys.stderr):
             if operation == 'race_parse':
                 from race_gpx import parse_gpx
-                value = parse_gpx(payload['gpx'].encode('utf-8'), name=payload['filename'], sport='running')
+                raw = base64.b64decode(payload['gpx_base64'], validate=True) if 'gpx_base64' in payload else payload['gpx'].encode('utf-8')
+                value = parse_gpx(raw, name=payload['filename'], sport='running')
             elif operation == 'race_read':
                 from race_planner import read_saved_race_plan
                 value = read_saved_race_plan(workspace, payload['route_hash'])
             elif operation == 'race_export':
                 from race_exports import course_fit, course_gpx
-                data = course_fit(payload['route'], strategy=payload.get('strategy')) if payload['format'] == 'fit' else course_gpx(payload['route'])
+                if payload['format'] == 'source':
+                    from race_elevation import source_notes
+                    data = source_notes(payload['route']).encode('utf-8')
+                else:
+                    data = course_fit(payload['route'], strategy=payload.get('strategy')) if payload['format'] == 'fit' else course_gpx(payload['route'])
                 value = base64.b64encode(data).decode('ascii')
+            elif operation == 'race_elevation':
+                from race_elevation import enrich_missing_elevations
+                value = enrich_missing_elevations(payload['route'], workspace / '.race-elevation-cache', current_route=payload.get('current_route'))
             elif operation == 'race_review':
                 from race_planner import run_race_review
                 value = run_race_review(workspace, payload['route'], payload['question'],
@@ -35,7 +43,8 @@ def race_operation(workspace, operation):
         # deliberately not returned or logged by the wrapper.
         code = getattr(error, 'code', 'invalid_input' if isinstance(error, ValueError) else 'race_unavailable')
         allowed = {'daily_budget', 'input_too_large', 'provider_auth', 'provider_rate_limit', 'provider_unavailable',
-                   'provider_request', 'response_invalid', 'route_discontinuous', 'busy', 'invalid_input', 'race_unavailable'}
+                   'provider_request', 'response_invalid', 'route_discontinuous', 'busy', 'invalid_input', 'race_unavailable',
+                   'elevation_unavailable', 'elevation_rate_limit', 'elevation_invalid_response', 'elevation_no_data', 'elevation_too_fragmented', 'elevation_no_improvement'}
         envelope = {'ok': False, 'code': code if code in allowed else 'race_unavailable'}
     print(json.dumps(envelope, allow_nan=False))
     return 0
@@ -49,7 +58,7 @@ def main():
         raise ValueError('Invalid internal coach approval.')
     sys.path.insert(0, str(workspace))
     os.chdir(workspace)
-    if operation in ('race_parse', 'race_read', 'race_review', 'race_export'):
+    if operation in ('race_parse', 'race_read', 'race_review', 'race_export', 'race_elevation'):
         if approval:
             raise ValueError('Race planning does not use a manual-extra approval.')
         return race_operation(workspace, operation)

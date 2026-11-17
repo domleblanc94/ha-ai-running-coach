@@ -206,18 +206,22 @@ class ReleaseArchiveTests(unittest.TestCase):
             sentinel='private-fixture-'+os.urandom(16).hex()
             prepare_release.build_release(ROOT,seed)
             for relative in ('.env','athlete.md','data.sqlite','examples/.env',
-                             'examples/private.sqlite','dashboard_assets/.strava_tokens.json'):
+                             'examples/private.sqlite','dashboard_assets/.strava_tokens.json',
+                             '.race-elevation-cache/private.json','race-course.json'):
                 path=seed/relative;path.parent.mkdir(parents=True,exist_ok=True)
                 path.write_text(sentinel,encoding='utf-8')
             archive=prepare_release.build_release(seed,output)
             with zipfile.ZipFile(archive) as package:
                 names=package.namelist()
                 self.assertIn('public/.env.example',names)
+                self.assertIn('public/race_elevation.py',names)
                 for name in names:
                     self.assertFalse(sentinel.encode() in package.read(name),name)
                 self.assertNotIn('public/examples/.env',names)
                 self.assertNotIn('public/examples/private.sqlite',names)
                 self.assertNotIn('public/athlete.md',names)
+                self.assertNotIn('public/.race-elevation-cache/private.json',names)
+                self.assertNotIn('public/race-course.json',names)
                 self.assertNotIn('public/dashboard_assets/.strava_tokens.json',names)
 
     def test_release_rejects_symlinked_source_before_copying_target_contents(self):

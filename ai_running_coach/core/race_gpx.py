@@ -110,7 +110,7 @@ def _measure(points, name, sport):
     sections = [{'id': index + 1, 'start_m': round(distance * index / count, 2),
                  'end_m': round(distance * (index + 1) / count, 2),
                  'distance_m': round(distance / count, 2), '_gain': 0.0, '_loss': 0.0,
-                 '_known': 0.0, '_net': 0.0} for index in range(count)]
+                 '_known': 0.0, '_net': 0.0, '_missing': False} for index in range(count)]
     known_distance, gain, loss = 0.0, 0.0, 0.0
     for index in range(1, len(points)):
         previous, current = points[index - 1], points[index]
@@ -132,18 +132,21 @@ def _measure(points, name, sport):
                 section['_gain'] += max(delta, 0) * overlap / length
                 section['_loss'] += max(-delta, 0) * overlap / length
                 section['_net'] += delta * overlap / length
+            elif overlap:
+                section['_missing'] = True
     coverage = min(1.0, known_distance / distance)
     for section in sections:
-        complete = section['_known'] >= section['distance_m'] - .05
+        complete = not section['_missing'] and section['_known'] >= section['distance_m'] - .05
         section.update(ascent_m=round(section['_gain'], 1) if complete else None,
                        descent_m=round(section['_loss'], 1) if complete else None,
                        net_grade_pct=round(100 * section['_net'] / section['distance_m'], 2) if complete else None,
                        elevation_coverage=round(min(1.0, section['_known'] / section['distance_m']), 3))
-        for key in ('_known', '_gain', '_loss', '_net'):
+        for key in ('_known', '_gain', '_loss', '_net', '_missing'):
             del section[key]
     warnings = ['Distances follow the uploaded GPS polyline; surfaces, weather and aid-station delays are not inferred.',
                 'Elevation uses 25 m distance sampling, five-sample median smoothing and a 5 m vertical deadband. Small features can be lost; it is not terrain-corrected.']
-    if coverage < .999:
+    complete_elevation = all(value is not None for value in elevations)
+    if not complete_elevation:
         warnings.append('Elevation is missing on part or all of the course. Total ascent/descent are unknown; missing height is not flat terrain.')
     if noisy:
         warnings.append('Isolated elevation spikes were smoothed. Climb totals remain approximate; check the course source.')
@@ -151,10 +154,12 @@ def _measure(points, name, sport):
         warnings.append('The GPX has disconnected track segments. Missing gaps are not joined; upload a continuous course before pacing or FIT export.')
     if max_gap > 500:
         warnings.append('GPS points are sparse in places; distance and gradients between those points are approximate.')
-    summary = dict(distance_m=round(distance, 2), ascent_m=round(gain, 1) if coverage >= .999 else None,
-                   descent_m=round(loss, 1) if coverage >= .999 else None, elevation_coverage=round(coverage, 3),
+    summary = dict(distance_m=round(distance, 2), ascent_m=round(gain, 1) if complete_elevation else None,
+                   descent_m=round(loss, 1) if complete_elevation else None, elevation_coverage=round(coverage, 3),
                    point_count=len(points), segment_count=len({p['segment'] for p in points}),
                    discontinuities=discontinuities, max_point_gap_m=round(max_gap, 2), warnings=warnings, sections=sections)
+    summary['missing_elevation_points'] = sum(value is None for value in elevations)
+    summary['derived_elevation_points'] = 0
     digest = hashlib.sha256(json.dumps({'sport': sport, 'points': points}, sort_keys=True, separators=(',', ':'), allow_nan=False).encode()).hexdigest()
     # Include endpoints; presentation must use segment IDs rather than connect separate parts.
     indices = sorted({round(i * (len(points) - 1) / min(255, len(points) - 1)) for i in range(min(256, len(points)))})
@@ -241,6 +246,9 @@ def validate_route(route):
         clean.append({'lat': _number(point.get('lat'), -90, 90, 'latitude'), 'lon': _number(point.get('lon'), -180, 180, 'longitude'),
                       'elevation_m': _number(elevation, -500, 9000, 'elevation') if elevation is not None else None, 'segment': segment})
     measured = _measure(clean, route.get('name'), 'running')
+    if 'elevation_enrichment' in route:
+        from race_elevation import validate_enrichment
+        return validate_enrichment(route, measured)
     if route.get('route_hash') != measured['route_hash']:
         raise ValueError('Race course changed; upload it again before planning.')
     return measured

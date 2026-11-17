@@ -50,7 +50,7 @@
   }
 
   function controls() {
-    const busy = Boolean(latestStatus.running || latestStatus.queued);
+    const busy = Boolean(latestStatus.running || latestStatus.queued || saved?.busy);
     upload.querySelector("button").disabled = busy || uploading;
     field(upload, "gpx").disabled = busy || uploading;
     const discontinuous = Boolean(saved?.course?.summary?.discontinuities);
@@ -63,6 +63,7 @@
     const budget = latestStatus.request_budget;
     byId("race-budget").textContent = "Shared AI requests today: " + (budget?.used ?? "unknown") + " / " + (budget?.limit ?? "unknown")
       + ". Failed requests count. Uploading and downloading do not use an AI request.";
+    byId("race-elevation-retry").disabled = busy || uploading || requesting;
   }
 
   function renderStrategy(strategy, course, plan) {
@@ -111,7 +112,8 @@
     if (course) {
       byId("race-course-name").textContent = course.name;
       factsList([["Approximate distance", distance(course.summary.distance_m)], ["Ascent / descent", elevation(course.summary.ascent_m) + " / " + elevation(course.summary.descent_m)],
-        ["Elevation coverage", Math.round((course.summary.elevation_coverage || 0) * 100) + "% of route distance"], ["Track sections", String(course.summary.segment_count)]], byId("race-course-facts"));
+        ["Elevation coverage", "Approximately " + Math.round((course.summary.elevation_coverage || 0) * 100) + "% of route distance"
+          + (course.has_missing_elevation ? " · " + (Number.isInteger(course.summary.missing_elevation_points) ? course.summary.missing_elevation_points : "Some") + " point(s) still missing heights" : " · all points have heights")], ["Track sections", String(course.summary.segment_count)]], byId("race-course-facts"));
       list(byId("race-course-warnings"), course.summary.warnings);
       byId("race-quality-notes").hidden = !course.summary.warnings?.length;
       if (course.summary.discontinuities) byId("race-quality-notes").open = true;
@@ -123,10 +125,30 @@
         ? "Distance shown: " + distance(Math.min(...elevationPoints.map(p => p.distance_m))) + "–" + distance(Math.max(...elevationPoints.map(p => p.distance_m)))
           + ". Known preview height: " + elevation(Math.min(...elevationPoints.map(p => p.elevation_m))) + "–" + elevation(Math.max(...elevationPoints.map(p => p.elevation_m))) + "."
         : "Course distance: 0.00 km–" + distance(course.summary.distance_m) + ". Elevation scale: unknown.";
-      byId("race-elevation-note").textContent = hasElevation ? "GPX elevations are approximate. Missing points leave gaps; noisy elevations can affect ascent and pacing." : "This file has too little elevation data to plot. Elevation is unknown, not zero.";
+      byId("race-elevation-note").textContent = hasElevation ? "Course elevations are approximate. Missing points leave gaps; noisy elevations can affect ascent and pacing." : "This course has too little elevation data to plot. Elevation is unknown, not zero.";
+      const elevationBusy = saved.elevation_pending || latestStatus.running?.action === "race_elevation" || latestStatus.queued?.action === "race_elevation";
+      const elevationRun = saved.elevation_last_run;
+      byId("race-elevation-status").textContent = elevationBusy ? "Retrieving missing heights from Open-Meteo. No AI request is used…"
+        : elevationRun?.message || (course.has_missing_elevation ? "The elevation profile is incomplete. Missing heights remain unknown." : "All course points have elevation data.");
+      byId("race-elevation-status").classList.toggle("error", !elevationBusy && ["failed", "interrupted"].includes(elevationRun?.status));
+      byId("race-elevation-retry").hidden = !course.has_missing_elevation || elevationBusy;
+      const source = course.summary.elevation_source;
+      const credit = byId("race-elevation-source"); credit.replaceChildren();
+      if (source) {
+        credit.append(document.createTextNode("Estimated surface elevations: Open-Meteo / Copernicus DEM 2021 GLO-90 (approximately 90 m resolution). Sample spacing: " + Math.round(source.sample_spacing_m) + " m; " + source.sample_count + " sampled points. Trees, buildings and bridges can differ from the running surface. "));
+        for (const [label, href] of [["Open-Meteo", "https://open-meteo.com/en/docs/elevation-api"], ["Copernicus DEM", "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM"], ["CC BY 4.0", "https://creativecommons.org/licenses/by/4.0/"]]) {
+          const link = text("a", label); link.href = href; link.target = "_blank"; link.rel = "noopener noreferrer"; credit.append(link, document.createTextNode(" · "));
+        }
+        credit.append(document.createTextNode("Provider heights are sampled and interpolated; original GPX heights are retained. Include the source notes when sharing an enriched course."));
+      } else credit.textContent = "Source: embedded GPX heights where available. No terrain heights are invented.";
       byId("race-fit-download").hidden = Boolean(course.summary.discontinuities);
       byId("race-fit-download").href = "./exports/race-course.fit?route_hash=" + encodeURIComponent(course.route_hash);
       byId("race-gpx-download").href = "./exports/race-course.gpx?route_hash=" + encodeURIComponent(course.route_hash);
+      byId("race-original-download").hidden = !course.has_original_gpx;
+      byId("race-original-download").href = "./exports/race-original.gpx?route_hash=" + encodeURIComponent(course.route_hash);
+      byId("race-source-download").hidden = !source;
+      byId("race-source-download").href = "./exports/race-elevation-source.txt?route_hash=" + encodeURIComponent(course.route_hash);
+      window.CoachRouteMap?.display(course);
       if (loadedHash !== course.route_hash) {
         loadedHash = course.route_hash; dirty = false;
         field(review, "race_name").value = plan?.race_name || course.name;
@@ -186,12 +208,22 @@
     if (!file || file.size > 5 * 1024 * 1024) { result.textContent = "Choose a GPX file no larger than 5 MB."; return; }
     uploading = true; controls(); result.textContent = "Inspecting the GPX locally…"; result.classList.remove("error");
     try {
-      saved = await api("race/course", {filename: file.name, gpx: await file.text()});
-      loadedHash = ""; render(); result.textContent = "Course saved. No AI request was used.";
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      let binary = "";
+      for (let offset = 0; offset < bytes.length; offset += 32768) binary += String.fromCharCode(...bytes.subarray(offset, offset + 32768));
+      saved = await api("race/course", {filename: file.name, gpx_base64: btoa(binary)});
+      loadedHash = ""; render(); result.textContent = saved.course?.has_missing_elevation ? "Course saved. Missing-height lookup is queued; no AI request is used." : "Course saved. All heights came from the GPX; no AI request was used.";
     } catch (error) { result.textContent = error.message; result.classList.add("error"); }
     finally { uploading = false; controls(); }
   });
   review.addEventListener("input", () => { dirty = true; });
+  byId("race-elevation-retry").addEventListener("click", async () => {
+    if (!saved?.course || requesting) return;
+    requesting = true; controls();
+    try { const next = await api("race/elevation", {route_hash: saved.course.route_hash}); draw(next); await load(); }
+    catch (error) { byId("race-elevation-status").textContent = error.message; byId("race-elevation-status").classList.add("error"); }
+    finally { requesting = false; controls(); }
+  });
   review.addEventListener("submit", async event => {
     event.preventDefault();
     if (requesting || !saved?.course) return;
@@ -207,7 +239,7 @@
     show: load,
     updateStatus(next) {
       latestStatus = next; controls();
-      const current = JSON.stringify([next.queued, next.running, next.race_last_run]);
+      const current = JSON.stringify([next.queued, next.running, next.race_last_run, next.race_elevation_last_run]);
       if (!byId("race-panel").hidden && current !== signature) { signature = current; load(); }
     },
   };

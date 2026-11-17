@@ -19,7 +19,7 @@ from ai_running_coach.app.storage import atomic_json
 
 def course():
     return {'schema_version': 1, 'route_hash': 'a' * 64, 'name': '<script>Fictional course</script>', 'sport': 'running',
-            'points': [{'lat': 51, 'lon': -1, 'elevation_m': None, 'distance_m': 0, 'segment': 0}],
+            'points': [{'lat': 51, 'lon': -1, 'elevation_m': 100, 'distance_m': 0, 'segment': 0}],
             'summary': {'distance_m': 10000, 'ascent_m': None, 'descent_m': None, 'elevation_coverage': 0,
                         'point_count': 2, 'segment_count': 1, 'discontinuities': 0, 'max_point_gap_m': 100,
                         'warnings': ['Elevation unknown'], 'sections': []},
@@ -70,11 +70,13 @@ class RaceRuntimeTests(unittest.TestCase):
         self.assertIn('preview', status['course'])
         self.assertEqual(self.app._state()['schedule'], before['schedule'])
         self.assertFalse((self.app.workspace / 'ai_coach_master.sqlite').exists())
-        self.assertEqual(json.loads((self.app.data / 'race-course.json').read_bytes())['points'], course()['points'])
+        stored = json.loads((self.app.data / 'race-course.json').read_bytes())
+        self.assertEqual(stored['active']['points'], course()['points'])
+        self.assertEqual(stored['original_gpx'], '<gpx/>')
         with patch.object(self.app, '_race_call', side_effect=RaceFailure('invalid_input')):
             with self.assertRaises(RaceFailure):
                 self.app.save_race_course({'gpx': '<invalid>', 'filename': 'bad.gpx'})
-        self.assertEqual(json.loads((self.app.data / 'race-course.json').read_bytes())['route_hash'], 'a' * 64)
+        self.assertEqual(self.app._race_course()['route_hash'], 'a' * 64)
         with self.assertRaises(ValueError):
             self.app.save_race_course({'gpx': 'a' * (GPX_LIMIT + 1), 'filename': 'large.gpx'})
 

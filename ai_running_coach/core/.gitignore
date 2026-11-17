@@ -291,3 +291,7 @@ last-good-dashboard.html
 
 .garmin_personal_history.json
 ..garmin_personal_history.json*
+
+# Private sampled terrain cache (never publish route-derived data)
+.race-elevation-cache/
+race-course.json

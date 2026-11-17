@@ -1,6 +1,6 @@
 # AI Multisport Coach
 
-**Version 1.2** is available as a Home Assistant app or a standalone Python application. Both run on your own system; this is not a hosted coaching service or an automatic watch-sync service.
+**Version 1.3** is available as a Home Assistant app or a standalone Python application. Both run on your own system; this is not a hosted coaching service or an automatic watch-sync service.
 
 AI Multisport Coach is a self-hosted coach for running, cycling, swimming and triathlon that combines AI-authored training plans with local activity analysis and a mobile-friendly HTML dashboard. Running remains the default for existing installations. Run it manually or on a schedule; optionally publish the page to Home Assistant using your existing SSH transport.
 
@@ -10,7 +10,7 @@ AI Multisport Coach is a self-hosted coach for running, cycling, swimming and tr
 | [Install the Home Assistant app](https://github.com/domleblanc94/ha-ai-running-coach#readme) | Home Assistant OS with app support. Setup forms, scheduling and dashboard viewing in HA. |
 | [Install standalone](docs/STANDALONE.md) | A Windows, macOS or Linux computer, Python 3.11+ and a terminal. Includes step-by-step setup and optional scheduling. |
 
-For standalone installation, [download the 1.2 source ZIP](https://github.com/domleblanc94/ai-running-coach/releases/download/v1.2.0/ai-multisport-coach-1.2.0.zip) and follow the guide. The configuration and operational reference below covers the same standalone application.
+For standalone installation, [download the 1.3 source ZIP](https://github.com/domleblanc94/ai-running-coach/releases/download/v1.3.0/ai-multisport-coach-1.3.0.zip) and follow the guide. The configuration and operational reference below covers the same standalone application.
 
 The AI decides training progression, recovery, intensity and plan adjustments. Python calculates and compresses activity evidence, validates returned changes, stores versioned plans and renders the dashboard. It does not substitute a fixed training policy for the model's decisions.
 
@@ -23,7 +23,7 @@ The AI decides training progression, recovery, intensity and plan adjustments. P
 | FIT workout downloads | Experimental. Offline encoding/decoder checks passed; physical Forerunner 965 transfer/execution remains untested. Files need manual transfer; no automatic watch upload or deletion. |
 | Mobile browser / HA use | Static dashboard with an optional status channel; download behavior varies by browser. No authenticated feedback form or watch companion. |
 
-Version 1.2 does not certify every provider account or watch. See the [release review](docs/RELEASE_REVIEW.md) for the validation scope. Report problems through [the public repository](https://github.com/domleblanc94/ai-running-coach) with the version, Python/OS, provider/model and sanitized error; do not attach keys, real databases, profiles or request snapshots.
+Version 1.3 does not certify every provider account or watch. See the [release review](docs/RELEASE_REVIEW.md) for the validation scope. Report problems through [the public repository](https://github.com/domleblanc94/ai-running-coach) with the version, Python/OS, provider/model and sanitized error; do not attach keys, real databases, profiles or request snapshots.
 
 ## What it does
 
@@ -35,7 +35,7 @@ Version 1.2 does not certify every provider account or watch. See the [release r
 - Supports Gemini, OpenAI and Anthropic through an explicitly selected provider. There is no automatic switch between providers.
 - Tracks actual model attempts and usage, caches identical completed evidence, and limits automatic request spending.
 - Keeps local check-ins and activity notes available for subsequent reviews.
-- In the Home Assistant app, plans running/trail races from an uploaded GPX with conservative and conditional ambitious strategies. See [race planning and Garmin course exports](docs/RACE_PLANNING.md) for elevation handling, shared request limits and the distinction between a course FIT and native PacePro.
+- In the Home Assistant app, shows uploaded running/trail courses on a map, automatically fills missing elevation from terrain data, and plans conservative and conditional ambitious race strategies. Map viewing and missing-height lookup use external services disclosed before upload. See [race planning and Garmin course exports](docs/RACE_PLANNING.md) for elevation handling, shared request limits and the distinction between a course FIT and native PacePro.
 
 ## First try: no account or API call
 

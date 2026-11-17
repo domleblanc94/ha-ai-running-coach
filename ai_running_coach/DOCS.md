@@ -1,6 +1,6 @@
 # AI Multisport Coach
 
-**Version 1.2.0** is the community release of AI Multisport Coach for Home Assistant. It serves one athlete and opens its setup and private dashboard through Home Assistant ingress.
+**Version 1.3.0** is the community release of AI Multisport Coach for Home Assistant. It serves one athlete and opens its setup and private dashboard through Home Assistant ingress.
 
 ## Choose a route or preview the dashboard
 
@@ -38,13 +38,17 @@ New interval and strides sessions must explain warm-up, work repetitions and dur
 
 ## Race planning
 
-Open **Race planning** and upload a running or trail-race GPX (up to 5 MB and 50,000 points). Uploading and inspecting the local course preview costs no AI request. The app shows approximate distance, elevation coverage and terrain sections. Missing elevation stays unknown, noisy GPX elevations are treated as approximate, and disconnected tracks must be corrected before pacing or FIT export.
+Open **Race planning** and upload a running or trail-race GPX (up to 5 MB and 50,000 points). The map displays OpenStreetMap tiles with your route drawn locally, and every import includes an elevation profile. Supplied valid GPX heights are preserved; missing heights automatically start an Open-Meteo terrain lookup. Your original upload is retained. Uploading, terrain lookup and course downloads use no AI or Garmin request and leave the training plan unchanged.
+
+Before Upload, the page explains that OpenStreetMap receives map-tile requests for the area you view and Open-Meteo receives sampled route locations when heights are missing. The free Open-Meteo service is for personal, noncommercial use; its API logs may retain coordinates for up to 90 days. It uses Copernicus GLO-90 approximate 90 m surface heights, which may include trees and buildings. Terrain data is CC BY 4.0 and source/derivation notices accompany enriched courses. Full-height GPX files do not contact the elevation service. The browser sends the map service only your site origin as referrer, excluding the private ingress path.
+
+If terrain lookup fails, the valid imported course remains saved and the profile reports incomplete coverage; select **Retry missing elevation** when ready. An older saved course with missing heights can also be retried. Opening it alone does not make an elevation request. The local outline/profile still work if map tiles cannot load. Unknown heights stay unknown, disconnected tracks must be corrected before pacing or FIT export, and all elevation totals are approximate. Changing course evidence requires a new explicit race review before using an older strategy with the updated course. [Provider terms, privacy, attribution and precision details](https://github.com/domleblanc94/ai-running-coach/blob/main/docs/RACE_PLANNING.md#map-and-elevation-profile).
 
 Enter the race name, optional date and what you want to discuss. **Generate race strategies** makes at most one model request using the shared daily allowance and your saved athlete/activity evidence. It does not sync Garmin or change the training calendar. The coach compares a conservative approach with a more ambitious option whose later pickup depends on conditions. If evidence is too weak for numerical pacing, the plan provides effort guidance instead. Read the dated evidence and limitations alongside any finish-time range.
 
-Change your question and select **Refine strategies** to discuss the saved race plan. Each new review uses the same allowance as training reviews; an identical completed request can reuse its cached result without another model call. Failed requests retain the previous valid race plan and do not retry automatically. Only one coaching action runs at a time. The raw GPS points stay in private app storage; the AI receives compact route/terrain summaries instead.
+Change your question and select **Refine strategies** to discuss the saved race plan. Each new review uses the same allowance as training reviews; an identical completed request can reuse its cached result without another model call. Failed requests retain the previous valid race plan and do not retry automatically. Only one coaching action runs at a time. The full GPX is retained in private app storage. The AI receives compact route/terrain summaries instead of coordinates; the separate missing-height service receives the sampled locations disclosed above.
 
-**Course GPX** and **Course FIT starter** downloads do not call a model. A strategy with supported numerical timing also offers a timed course FIT reference. These are course files, not native PacePro plans. A timed course cannot detect how you feel or switch to the ambitious strategy automatically.
+**Course GPX** and **Course FIT starter** downloads do not call a model. Enriched GPX embeds terrain-source metadata. FIT does not embed those notices, so retain the adjacent **Elevation source notes** download with any FIT you share. **Download original GPX** preserves the literal upload for new imports; old imports without the original file retain their parsed course. A strategy with supported numerical timing also offers a timed course FIT reference. These are course files, not native PacePro plans. A timed course cannot detect how you feel or switch to the ambitious strategy automatically.
 
 On a Forerunner 965, load the course through your Garmin workflow, choose an outdoor running activity, then **Navigation → Courses → your course → PacePro → Create New**, and enter your chosen goal time or pace. Garmin creates its own splits, which may differ from the coach's estimates. Follow [Garmin's PacePro instructions](https://www8.garmin.com/manuals/webhelp/GUID-0221611A-992D-495E-8DED-1DD448F7A066/EN-US/GUID-27B26831-3708-46EA-BF15-18039D28EC3A.html). Course files have offline decoder checks; physical watch transfer/execution remains unverified.
 
@@ -127,12 +131,12 @@ Include this app in a Home Assistant backup before updating. The Supervisor stop
 
 ## Moving from the standalone installation
 
-Version 1.2 has no guided migration from a standalone installation. The existing installation and this app have independent databases, Garmin binding and request ledgers. Keep the app schedule disabled until you have verified the migration.
+Version 1.3 has no guided migration from a standalone installation. The existing installation and this app have independent databases, Garmin binding and request ledgers. Keep the app schedule disabled until you have verified the migration.
 
 A future cutover needs a consistent source backup and one active scheduler. The migration needs to preserve the athlete profile and plans, SQLite request history for daily limits, and the exact Garmin account binding and source provenance. Copying only the athlete profile, or starting a new database against the same account on the same day, loses that continuity. Verify the restored files and review state with the schedule disabled. Keep the original installation and backup available for rollback. Stop the app schedule before resuming the standalone scheduler.
 
 ## Garmin key replacement
 
-Garmin account binding is preserved if a key changes. Version 1.2 has no in-app confirmation for key rotation. Back up the app and pause its schedule before rotating a key. Ask the maintainer for the same-account recovery procedure, and keep the sync checkpoint with its matching database. An account or region change requires a new workspace.
+Garmin account binding is preserved if a key changes. Version 1.3 has no in-app confirmation for key rotation. Back up the app and pause its schedule before rotating a key. Ask the maintainer for the same-account recovery procedure, and keep the sync checkpoint with its matching database. An account or region change requires a new workspace.
 
 FIT workout export remains experimental and requires manual transfer to a compatible watch.

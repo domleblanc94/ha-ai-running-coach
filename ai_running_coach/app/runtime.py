@@ -201,6 +201,7 @@ class Runtime(RaceRuntime):
             'running_session_conflicts': self._running_session_conflicts(local_day),
             'request_budget': self._request_budget(config['daily_request_limit'], state),
             'race_last_run': state.get('race_last_run'),
+            'race_elevation_last_run': state.get('race_elevation_last_run'),
         }
 
     def _request_budget(self, limit, state, now=None):
@@ -420,6 +421,8 @@ class Runtime(RaceRuntime):
                     'issues': ['Saved app state is unavailable. Check the app storage and restart.']}
         last = self._last_run(state) or {}
         running = state['running']
+        if running and running.get('action') in ('race_review', 'race_elevation'):
+            running = None  # Course work does not become a daily pipeline attempt.
         result = last.get('status')
         success = state['last_success_at']
         status = 'running' if running else {'success': 'ok', 'failed': 'error', 'interrupted': 'warning'}.get(result, 'unknown')
@@ -440,7 +443,7 @@ class Runtime(RaceRuntime):
         check_tree(self.workspace)
         allowed = {'PATH', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP', 'TMPDIR', 'LANG', 'SSL_CERT_FILE', 'SSL_CERT_DIR'}
         env = {key: value for key, value in os.environ.items() if key.upper() in allowed}
-        coaching = action not in ('validate_profile', 'baseline_feedback', 'race_parse', 'race_read', 'race_export')
+        coaching = action not in ('validate_profile', 'baseline_feedback', 'race_parse', 'race_read', 'race_export', 'race_elevation')
         if coaching:
             env.update(self._env())
         env.update(COACH_PUBLISH_ENABLED='false', PYTHONIOENCODING='utf-8', PYTHONDONTWRITEBYTECODE='1', TZ=timezone_name)
@@ -619,9 +622,12 @@ class Runtime(RaceRuntime):
         with file_lock(self.state_lock):
             state = self._state()
             if state['running']:
-                race = state['running'].get('action') == 'race_review'
-                state['race_last_run' if race else 'last_run'] = dict(state['running'], status='interrupted', code='interrupted',
-                                         finished_at=now.isoformat(), message=RACE_MESSAGES['interrupted'] if race else 'A previous run was interrupted. Check the saved plan and retry manually.')
+                race = state['running'].get('action') in ('race_review', 'race_elevation')
+                elevation = state['running'].get('action') == 'race_elevation'
+                target = 'race_elevation_last_run' if elevation else 'race_last_run' if race else 'last_run'
+                code = 'elevation_interrupted' if elevation else 'interrupted'
+                state[target] = dict(state['running'], status='interrupted', code=code,
+                                     finished_at=now.isoformat(), message=RACE_MESSAGES[code] if race else 'A previous run was interrupted. Check the saved plan and retry manually.')
                 state['running'] = None
                 if not race:
                     state['schedule']['enabled'] = False
@@ -657,6 +663,8 @@ class Runtime(RaceRuntime):
                     return False
                 if action['action'] == 'race_review':
                     return self._tick_race(action, started)
+                if action['action'] == 'race_elevation':
+                    return self._tick_elevation(action, started)
                 attempts = None
                 try:
                     self.command_failure = None

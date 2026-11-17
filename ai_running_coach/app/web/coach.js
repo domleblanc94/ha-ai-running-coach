@@ -344,10 +344,10 @@ function draw(next) {
     title = "Coach worker needs attention";
     detail = next.worker_error || "Restart the app from Home Assistant.";
   } else if (next.running) {
-    title = next.running.action === "race_review" ? "Race coach is working" : "Coach is running";
+    title = next.running.action === "race_elevation" ? "Preparing course elevation" : next.running.action === "race_review" ? "Race coach is working" : "Coach is running";
     detail = "This page checks for updates automatically.";
   } else if (next.queued) {
-    title = "Coach run queued";
+    title = next.queued.action === "race_elevation" ? "Course elevation lookup queued" : "Coach run queued";
     detail = "Your request is waiting for the worker.";
   } else if (!next.setup_ready || !next.profile_ready) {
     title = "Setup needs attention";
@@ -807,6 +807,7 @@ function selectView(view) {
   for (const name of ["dashboard", "settings", "athlete", "race"]) byId(name + "-tab").setAttribute("aria-pressed", String(view === name));
   if (view === "athlete") showAthlete();
   if (view === "race") window.CoachRace?.show();
+  else window.CoachRouteMap?.deactivate();
   updateDashboard();
 }
 byId("dashboard-tab").addEventListener("click", () => selectView("dashboard"));

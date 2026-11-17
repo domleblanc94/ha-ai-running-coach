@@ -19,3 +19,7 @@ options.json
 athlete.md
 training_plan.*
 .garmin_personal_*
+
+# Private sampled terrain cache
+.race-elevation-cache/
+race-course.json
