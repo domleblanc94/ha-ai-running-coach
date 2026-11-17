@@ -1,6 +1,6 @@
 # AI Multisport Coach for Home Assistant
 
-**Community release 1.0.0.** AI Multisport Coach plans and reviews running, cycling, swimming and triathlon training for one athlete. This Home Assistant app includes the coaching engine, setup screens, a private dashboard and a daily scheduler.
+**Community release 1.1.0.** AI Multisport Coach plans and reviews running, cycling, swimming and triathlon training for one athlete. This Home Assistant app includes the coaching engine, setup screens, a private dashboard and a daily scheduler.
 
 [Explore the synthetic live demo](https://domleblanc94.github.io/ai-running-coach/) to see the dashboard with a fictitious athlete and activities. The demo makes no AI or Garmin requests.
 
@@ -14,6 +14,10 @@
 Both routes use the same coaching engine and maintain their own private data. Home Assistant is optional for the standalone route.
 
 ## What the Home Assistant app includes
+
+- Choose concise, standard or detailed activity coaching, with complete instructions for new interval workouts.
+- Upload a running/trail GPX in **Race planning**, inspect elevation coverage and compare conservative and conditional ambitious strategies. Refine the separate race plan using the same AI request allowance.
+- Download GPX/course FIT starters and, when supported by the evidence, a timed course reference. These are course files for your Garmin workflow, not native PacePro plans. [Race planning and export details](ai_running_coach/DOCS.md#race-planning)
 
 - Install on Home Assistant OS on amd64 or aarch64. Supervisor pulls the prebuilt image for your architecture from GitHub Container Registry.
 - Open setup and the training dashboard through Home Assistant ingress. The app stores its data privately and needs no exposed host port.
@@ -37,7 +41,7 @@ Previously called AI Running Coach. The app slug and repository URLs are unchang
 
 [Setup, privacy, backups and standalone migration](ai_running_coach/DOCS.md)
 
-If an earlier installation failed while fetching a Debian package, refresh the app store and check that it offers **1.0.0**, then retry installation. The new installation downloads the prebuilt image. Home Assistant needs HTTPS access to GitHub and GitHub Container Registry.
+If an earlier installation failed while fetching a Debian package, refresh the app store and check that it offers **1.1.0**, then retry installation. The new installation downloads the prebuilt image. Home Assistant needs HTTPS access to GitHub and GitHub Container Registry.
 
 ## Development
 

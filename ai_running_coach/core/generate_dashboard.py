@@ -79,7 +79,7 @@ def read_database(path, start, end):
         tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         if "coach_review_jobs" in tables:
             job_columns = {row[1] for row in conn.execute("PRAGMA table_info(coach_review_jobs)")}
-            policy_filter = " AND prompt_version IN ('autonomous-coach-v2','autonomous-coach-v3','autonomous-coach-v4-starter-week','autonomous-coach-v5-availability','autonomous-coach-v5-availability-starter-week','autonomous-coach-v6-schedule','autonomous-coach-v6-schedule-starter-week','autonomous-coach-v7-new-plan','autonomous-coach-v7-new-plan-starter-week','autonomous-coach-v8-multisport','autonomous-coach-v8-multisport-starter-week')" if "prompt_version" in job_columns else ""
+            policy_filter = " AND prompt_version IN ('autonomous-coach-v2','autonomous-coach-v3','autonomous-coach-v4-starter-week','autonomous-coach-v5-availability','autonomous-coach-v5-availability-starter-week','autonomous-coach-v6-schedule','autonomous-coach-v6-schedule-starter-week','autonomous-coach-v7-new-plan','autonomous-coach-v7-new-plan-starter-week','autonomous-coach-v8-multisport','autonomous-coach-v8-multisport-starter-week','autonomous-coach-v9-detail','autonomous-coach-v9-detail-starter-week')" if "prompt_version" in job_columns else ""
             reviewed_ids = set()
             for saved in conn.execute("SELECT response_json FROM coach_review_jobs WHERE status='complete' AND response_json IS NOT NULL" + policy_filter):
                 try:
@@ -268,12 +268,16 @@ def build_dashboard(db_path=None, plan_file=None, output_html=None, today=None, 
             ids[session["date"]+'|'+session["workout_type"]].append(session["id"])
     partial=sum(item['unknown_sessions'] for key,item in (overview or {}).get('planned_weeks',{}).items() if key in {week.isoformat() for week in weeks})
     other='<p class="text-xs text-slate-400">Weekly chart: distances stay separate by sport; combined totals use recorded timer minutes only (which can include rests). Running comparison uses known planned km. '+esc(partial)+' time-only, alternative or unclassified planned sessions excluded; no completion inference.</p>'+other
+    from session_instructions import workout_instruction_lines, quality_details_issue, is_quality_session
     workout_payload = {}
     pool = profile.get('sport_settings', {}).get('swimming', {})
     for session in canonical['sessions'] if canonical else []:
         item = dict(session)
         item['display_sport'] = session_sport(session)
         item['sport_label'] = sport_label(session)
+        item['instruction_lines'] = workout_instruction_lines(session)
+        item['details_issue'] = quality_details_issue(session)
+        item['requires_structured_workout'] = is_quality_session(session)
         if session_sport(session) == 'swimming':
             for field in ('pool_length_metres', 'pool_length_unit'):
                 item[field] = pool.get(field)

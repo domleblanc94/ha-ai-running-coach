@@ -108,7 +108,7 @@ class PlanningTests(unittest.TestCase):
         self.assertEqual(len(parse_plan(text,p)['sessions']),35)
 
     def test_automatic_patch_version_commit_and_rollback(self):
-        changed=dict(self.plan['sessions'][1],workout_type='Tempo intervals',amount='7 km',target='Coach-selected tempo effort; recoveries easy.')
+        changed=dict(self.plan['sessions'][1],workout_type='Tempo intervals',amount='7 km',target='Warm-up: 10 min easy; 4 x 3 min at controlled tempo effort; Recovery: 2 min easy jog between reps; Cooldown: 10 min easy.')
         payload=dict(self.response,trajectory='on_track',plan_changes=[{'op':'update','session_id':changed['id'],'session':changed,'reason':'Recent training and athlete request support this change.'}])
         validate_review(payload,self.evidence,self.plan,'2026-10-26',self.profile)
         next_plan=apply_plan_changes(self.plan,payload['plan_changes'],self.profile,'2026-10-26')
@@ -195,7 +195,7 @@ class PlanningTests(unittest.TestCase):
                 self.assertEqual(db.execute('SELECT status FROM coach_review_jobs').fetchone()[0],'pending')
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM daily_coach_reviews').fetchone()[0],0)
                 db.execute("UPDATE coach_review_jobs SET attempts=2,updated_at='2000-01-01'");db.commit();db.close()
-                replacement=dict(self.plan['sessions'][1],sport='running',amount='6 km',target='AI-selected running session based on the athlete request.')
+                replacement=dict(self.plan['sessions'][1],sport='running',amount='6 km',target='Warm-up: 10 min easy; 4 x 30 s controlled fast; Recovery: 60 s easy jog between efforts; Cooldown: 10 min easy.')
                 revised=dict(self.response,trajectory='on_track',plan_changes=[{'op':'update','session_id':replacement['id'],'session':replacement,'reason':'Adapt upcoming session to the athlete request and training evidence.'}])
                 api.models.generate_content=lambda **kw: types.SimpleNamespace(text=json.dumps(revised),usage_metadata=None)
                 result=ai_coach.run_daily_coach_check(today='2026-10-27')

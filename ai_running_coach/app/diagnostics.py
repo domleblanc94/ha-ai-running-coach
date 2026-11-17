@@ -15,6 +15,7 @@ MESSAGES = {
     'provider_config': 'Check the selected AI provider, model and key in Settings.',
     'provider_truncated': 'The AI response reached its output limit and could not be applied.',
     'response_invalid': 'The AI response did not pass validation. The app kept the saved plan state.',
+    'workout_details': 'The AI interval workout was missing clear warm-up, repetitions, effort, recovery or cooldown instructions. The saved plan was retained; ask for a complete workout when your request allowance permits.',
     'new_plan_operations': 'The AI supplied unsupported instructions for replacing the upcoming plan, so the app kept the saved plan.',
     'session_id_conflict': 'The AI reused an existing or retired session ID for a new session, so the app kept the saved plan.',
     'availability_conflict': 'The AI plan scheduled training outside your selected days, so it was not applied. Review your saved training days and generate a new plan when your request allowance permits.',
@@ -49,7 +50,7 @@ def failure_stage(code):
         return 'activities'
     if code.startswith('provider_') or code in {
         'daily_budget', 'review_budget', 'input_too_large', 'response_invalid', 'manual_extra_expired', 'manual_extra_unavailable',
-        'profile_invalid', 'source_provenance', 'availability_conflict', 'multiple_runs_conflict', 'new_plan_operations', 'session_id_conflict', 'race_day_conflict', 'pool_workout_conflict',
+        'profile_invalid', 'source_provenance', 'availability_conflict', 'multiple_runs_conflict', 'new_plan_operations', 'session_id_conflict', 'race_day_conflict', 'pool_workout_conflict', 'workout_details',
     }:
         return 'coaching'
     if code == 'dashboard_render_failed':
@@ -107,6 +108,8 @@ def command_failure(stderr):
 
 def request_failure(status, error):
     if status == 'invalid':
+        if isinstance(error, str) and error.startswith('Incomplete workout instructions:'):
+            return 'workout_details'
         if isinstance(error, str) and error.startswith('Race-day session conflict:'):
             return 'race_day_conflict'
         if error == 'Pool workout length must match the explicitly configured athlete pool length.':

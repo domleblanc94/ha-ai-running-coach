@@ -6,6 +6,7 @@
   <title>AI Multisport Coach</title>
   <link rel="stylesheet" href="./assets/coach.css">
   <script src="./assets/coach.js" defer></script>
+  <script src="./assets/race.js" defer></script>
 </head>
 <body>
   <header class="masthead">
@@ -25,9 +26,39 @@
     <nav aria-label="Coach views" class="tabs">
       <button id="dashboard-tab" type="button" aria-pressed="false" disabled>Training dashboard</button>
       <button id="athlete-tab" type="button" aria-pressed="false" disabled>Athlete profile</button>
+      <button id="race-tab" type="button" aria-pressed="false">Race planning</button>
       <button id="settings-tab" type="button" aria-pressed="true">Setup &amp; settings</button>
     </nav>
     <p id="download-result" class="hint" role="status" hidden></p>
+    <section id="race-panel" hidden>
+      <section class="card">
+        <p class="eyebrow">PLAN YOUR RACE</p><h2>Understand the course. Choose your approach.</h2>
+        <p>Upload a running or trail-race GPX, then work with your coach on two strategies using your saved profile and activity history.</p>
+        <p class="hint">Course analysis and downloads are local. Generate or refine uses at most one AI request from the same daily allowance as training reviews. An identical completed request can reuse its saved result.</p>
+        <form id="race-upload-form">
+          <label>Race course GPX<input name="gpx" type="file" accept=".gpx,application/gpx+xml" required><small>Up to 5 MB. GPS points stay in this app; the coach receives a compact terrain summary.</small></label>
+          <div class="actions"><button type="submit">Upload and inspect course</button><span id="race-upload-result" class="form-result" role="status"></span></div>
+        </form>
+      </section>
+      <p id="race-load-result" class="hint" role="status"></p>
+      <section id="race-course-card" class="card" hidden>
+        <h2 id="race-course-name">Course</h2><dl id="race-course-facts" class="profile-facts"></dl><details id="race-quality-notes"><summary>Course data quality</summary><ul id="race-course-warnings"></ul></details>
+        <div class="race-plots"><figure><figcaption>Course outline · no external map service</figcaption><svg id="race-route-plot" viewBox="0 0 520 220" role="img" aria-label="Course outline"></svg></figure><figure><figcaption>Elevation profile</figcaption><svg id="race-elevation-plot" viewBox="0 0 520 220" role="img" aria-label="Course elevation" aria-describedby="race-elevation-scale race-elevation-note"></svg><p id="race-elevation-scale" class="hint"></p><p id="race-elevation-note" class="hint"></p></figure></div>
+        <div class="actions"><a id="race-gpx-download" class="download-link" href="./exports/race-course.gpx" download="race-course.gpx">Download course GPX</a><a id="race-fit-download" class="download-link" href="./exports/race-course.fit" download="race-course.fit">Course FIT starter</a></div>
+        <details class="race-garmin-help"><summary>Use this course with PacePro on a Forerunner 965</summary><p>This is a course FIT, not a native PacePro plan. Import or transfer the course to your watch, then choose an outdoor running activity → Navigation → Courses → your course → PacePro → Create New. Enter your chosen goal time or pace after reviewing the coach’s assumptions. Garmin creates the PacePro strategy.</p><p>Garmin’s pacing may differ from these coaching suggestions. The course contains route/elevation data, not the conditional second-half decision. Transfer and watch execution require your own check.</p><a href="https://www8.garmin.com/manuals/webhelp/GUID-0221611A-992D-495E-8DED-1DD448F7A066/EN-US/GUID-27B26831-3708-46EA-BF15-18039D28EC3A.html" target="_blank" rel="noopener noreferrer">Garmin’s PacePro instructions</a></details>
+      </section>
+      <form id="race-review-form" class="card" hidden>
+        <p class="eyebrow">WORK WITH YOUR COACH</p><h2>Compare two race strategies</h2>
+        <div class="grid"><label>Race name<input name="race_name" maxlength="120" required></label><label>Race date (optional)<input name="race_date" type="date"></label><label class="full">What should the coach consider?<textarea name="question" maxlength="2000" rows="4" placeholder="For example: I want a comfortable first half, then an optional push if I am recovering well. Mention terrain, cut-offs, experience or aid stations you know."></textarea></label></div>
+        <p id="race-readiness" class="hint"></p><p id="race-budget" class="hint"></p>
+        <div class="actions"><button id="race-generate" type="submit">Generate race strategies · 1 AI request</button><span id="race-action-result" class="form-result" role="status"></span></div>
+        <p class="hint">This saves a separate race plan. It does not replace your training calendar. Estimates depend on available fitness and elevation evidence; effort guidance stays useful when a reliable finish-time estimate is unavailable.</p>
+      </form>
+      <section id="race-saved-plan" hidden>
+        <div class="card"><p class="eyebrow">SAVED RACE PLAN</p><h2 id="race-plan-name"></h2><p id="race-plan-date" class="hint"></p><p id="race-plan-summary" class="race-copy"></p><h3>Evidence and confidence</h3><p id="race-fitness-confidence"></p><ul id="race-fitness-evidence"></ul><ul id="race-fitness-limits"></ul></div>
+        <div id="race-strategies" class="race-strategies"></div>
+      </section>
+    </section>
     <section id="athlete-panel" hidden>
       <div class="card">
         <p class="eyebrow">YOUR SAVED PROFILE</p><h2 id="athlete-name">Athlete profile</h2>
@@ -63,6 +94,7 @@
           <label>Athlete name<input name="name" maxlength="100" required autocomplete="off"></label>
           <label>Training focus<select name="training_mode"><option value="running">Running</option><option value="cycling">Cycling</option><option value="swimming">Swimming</option><option value="triathlon">Triathlon</option></select><small>Changing focus keeps your existing goals and saved sport settings. Generate a new plan when you are ready to change the upcoming block.</small></label>
           <label>Training goal<input name="goal" maxlength="500" placeholder="Build consistency or prepare for a race"></label>
+          <label>Coaching detail<select name="review_detail"><option value="concise">Concise</option><option value="standard" selected>Standard</option><option value="detailed">Detailed</option></select><small>Detailed asks for more activity interpretation, coaching comments and practical next steps within your existing model limits. Applies on the next review; saving this does not make an AI request.</small></label>
           <label>Training experience<textarea name="experience" maxlength="500" rows="3" placeholder="Recent training, experience in each sport, or time away"></textarea></label>
           <label>Current injury or training constraints<textarea name="injuries" maxlength="500" rows="3" placeholder="Optional"></textarea></label>
           <fieldset class="full"><legend>Available training days</legend><div id="days" class="days"></div><p class="hint">Choose the days you can train. Leaving every day blank means availability is not set and the coach may choose days.</p></fieldset>

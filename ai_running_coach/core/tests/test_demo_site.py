@@ -17,6 +17,7 @@ from build_demo_site import build_demo_site
 from demo_data import SAMPLE_DATE,populate_demo
 from planning_engine import parse_profile,apply_plan_changes
 from prepare_release import build_release
+from session_instructions import quality_details_issue
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -92,6 +93,9 @@ with patch.object(socket.socket,'connect',side_effect=AssertionError('No network
             self.assertEqual(sum(step['duration']['metres'] for step in pool['steps']),1200)
             self.assertEqual(pool['poolLengthMetres'],25)
             self.assertFalse((root/'.env').exists())
+            strides=next(row for row in plan['sessions'] if row['id']=='demo-run')
+            self.assertIsNone(quality_details_issue(strides))
+            self.assertEqual(strides['amount'],'25 min')
 
     @unittest.skipUnless(shutil.which('node') and os.getenv('COACH_FIT_SDK_MODULE'),'Node and official FIT SDK required for sample-file decoding')
     def test_downloadable_samples_decode_with_official_garmin_sdk(self):

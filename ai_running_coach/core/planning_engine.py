@@ -12,6 +12,8 @@ from training_calendar import (calendar_profile, training_days, training_day_con
 from sports import (TRAINING_MODES, ENDURANCE_SPORTS, session_sport, effective_goal_sport,
                     activity_sport, activity_sub_sport, validate_session_sport, validate_bricks,
                     sport_label, parse_sport_label)
+from coaching_detail import review_detail
+from session_instructions import validate_quality_session, workout_instruction_lines
 
 POLICY_VERSION = 4
 SESSION_FIELDS = {'id', 'date', 'workout_type', 'amount', 'target', 'goal_priority', 'workout', 'sport', 'sub_sport', 'brick'}
@@ -95,7 +97,7 @@ def parse_profile(text):
         match = re.search(r'\*\*' + re.escape(label) + r':\*\*\s*([^\n]+)',text)
         if match: facts[label] = match[1].strip()
     tone = text.split('**Tone Rules:**',1)[-1].strip() if '**Tone Rules:**' in text else ''
-    return {'schema_version': 1, 'training_mode':mode, 'sport_settings':_sport_settings(text,calendar,zones,mode),
+    return {'schema_version': 1, 'training_mode':mode, 'review_detail':review_detail(_profile_field(text,'Review Detail')), 'sport_settings':_sport_settings(text,calendar,zones,mode),
             'zones': zones, 'zone_method': 'not configured' if not zones else 'profile-configured running zones; not independently validated',
             'goals': calendar['goals'], 'active_injuries': injury[1].strip() if injury else 'unknown',
             'preferences': calendar['preferences'], 'athlete_facts': facts, 'communication_preferences': tone[:2000], 'source_hash': hashlib.sha256(text.encode()).hexdigest(),
@@ -251,6 +253,13 @@ def render_plan(plan):
         for legs in bricks.values():
             ordered=sorted(legs,key=lambda session:session['brick']['order'])
             lines.append('- '+ordered[0]['date']+': '+' → '.join(sport_label(leg)+' — '+leg['workout_type'] for leg in ordered))
+    explicit=[(session,workout_instruction_lines(session)) for session in plan['sessions'] if session.get('workout')]
+    if explicit:
+        lines+=['','## Workout instructions','']
+        for session,instructions in explicit:
+            lines+=['### '+session['date']+' - '+session['workout_type']+' ('+session['id']+')','']
+            lines.extend('- '+line.replace('\n',' ').replace('\r',' ').replace(' · ','; ') for line in instructions)
+            lines.append('')
     return '\n'.join(lines) + '\n'
 
 
@@ -452,6 +461,7 @@ def apply_plan_changes(plan, changes, profile, today):
             if not str(today)<=d.isoformat() <= (date.fromisoformat(str(today))+timedelta(days=366)).isoformat():
                 raise ValueError('Changed session outside supported future window.')
             validate_session_sport(session)
+            validate_quality_session(session)
             # Enforce configured zone definitions, without deciding the training intensity.
             if configured_zone_conflicts(session['target'],profile,session_sport(session)):
                 raise ValueError('Coach may choose zones but cannot redefine profile zone boundaries.')
@@ -557,8 +567,16 @@ def validate_review(payload, evidence, plan, today, profile=None, require_explic
         raise ValueError('Invalid review envelope.')
     if payload['trajectory'] not in {'insufficient_evidence','on_track','ahead','behind'}:
         raise ValueError('Invalid trajectory.')
-    if not isinstance(payload['summary'],str) or not 1<=len(payload['summary'])<=2000 or '\n' in payload['summary']:
-        raise ValueError('Summary must be one short paragraph.')
+    def coaching_text(value,maximum):
+        if not isinstance(value,str) or not value.strip() or len(value)>maximum:
+            return False
+        if any((ord(character)<32 and character not in '\n\r\t') or ord(character)==127 for character in value):
+            return False
+        try:value.encode('utf-8')
+        except UnicodeEncodeError:return False
+        return True
+    if not coaching_text(payload['summary'],2000):
+        raise ValueError('Summary must be useful text of at most 2000 characters; short paragraphs are allowed.')
     activities={r['activity_id'] for r in evidence['recent_7d']}
     seen=set()
     if not isinstance(payload['reviews'],list) or len(payload['reviews'])>len(activities):
@@ -566,7 +584,7 @@ def validate_review(payload, evidence, plan, today, profile=None, require_explic
     for review in payload['reviews']:
         if not isinstance(review,dict) or set(review)!={'activity_id','feedback'} or type(review['activity_id']) is not int or review['activity_id'] not in activities or review['activity_id'] in seen:
             raise ValueError('Unknown/duplicate activity ID.')
-        if not isinstance(review['feedback'],str) or not 1<=len(review['feedback'])<=500:
+        if not coaching_text(review['feedback'],1800):
             raise ValueError('Invalid activity feedback.')
         seen.add(review['activity_id'])
     def text(value,maximum):

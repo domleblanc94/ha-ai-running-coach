@@ -49,7 +49,8 @@ def original_sessions():
 
 def moved_sessions():
     before = original_sessions()
-    return [change(dict(before[1], date='2026-11-07')), change(dict(before[3], date='2026-11-10'))]
+    return [change(dict(before[1], date='2026-11-07')), change(dict(before[3], date='2026-11-10',
+        target='Warm-up: 2 km easy; 5 x 1 km controlled effort; Recovery: 250 m easy jog between repetitions; Cooldown: 1 km easy.'))]
 
 
 class RunningScheduleTests(unittest.TestCase):

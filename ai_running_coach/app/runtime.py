@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 from dotenv import dotenv_values
 
 from . import diagnostics, hr_learning
+from .race_runtime import RaceRuntime, MESSAGES as RACE_MESSAGES
 from .scheduler import due_date, validate_schedule
 from .storage import (
     LockBusy, atomic_json, atomic_write, check_tree, checked, checked_root, file_lock,
@@ -100,7 +101,11 @@ def read_json(path):
     return json.loads(checked(path).read_bytes())
 
 
-class Runtime:
+class Runtime(RaceRuntime):
+    @staticmethod
+    def _now():
+        return utc_now()
+
     def __init__(self, data_dir, core_dir=None):
         self.data = private_directory(checked_root(data_dir))
         self.workspace = private_directory(self.data / 'workspace')
@@ -195,6 +200,7 @@ class Runtime:
             'training_day_conflicts': self._training_day_conflicts(local_day),
             'running_session_conflicts': self._running_session_conflicts(local_day),
             'request_budget': self._request_budget(config['daily_request_limit'], state),
+            'race_last_run': state.get('race_last_run'),
         }
 
     def _request_budget(self, limit, state, now=None):
@@ -430,26 +436,28 @@ class Runtime:
             'last_pipeline_success_at': success, 'last_publish_success_at': success,
         }
 
-    def _command(self, action, *, input_text=None, timeout=2500, timezone_name='UTC', manual_extra=None):
+    def _command(self, action, *, input_text=None, timeout=2500, timezone_name='UTC', manual_extra=None, capture=False):
         check_tree(self.workspace)
         allowed = {'PATH', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP', 'TMPDIR', 'LANG', 'SSL_CERT_FILE', 'SSL_CERT_DIR'}
         env = {key: value for key, value in os.environ.items() if key.upper() in allowed}
-        coaching = action not in ('validate_profile', 'baseline_feedback')
+        coaching = action not in ('validate_profile', 'baseline_feedback', 'race_parse', 'race_read', 'race_export')
         if coaching:
             env.update(self._env())
-        env.update(COACH_PUBLISH_ENABLED='false', PYTHONIOENCODING='utf-8', TZ=timezone_name)
-        # The isolated interpreter ignores PYTHONIOENCODING; UTF-8 mode also covers stdin.
-        command = [sys.executable, '-I', '-X', 'utf8', str(Path(__file__).with_name('core_runner.py').resolve()), str(self.workspace.resolve()), action]
+        env.update(COACH_PUBLISH_ENABLED='false', PYTHONIOENCODING='utf-8', PYTHONDONTWRITEBYTECODE='1', TZ=timezone_name)
+        if action == 'race_review':
+            env['COACH_MAX_ATTEMPTS'] = '1'
+        # Isolation ignores PYTHON* flags; set UTF-8 and avoid workspace bytecode explicitly.
+        command = [sys.executable, '-I', '-B', '-X', 'utf8', str(Path(__file__).with_name('core_runner.py').resolve()), str(self.workspace.resolve()), action]
         if manual_extra is not None:
             command += ['--manual-extra-attempt', manual_extra['approved_day'], '--manual-reason', manual_extra['reason']]
         options = {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == 'nt' else {'start_new_session': True}
         try:
             with subprocess.Popen(command, cwd=self.workspace, env=env,
                                   stdin=subprocess.PIPE if input_text is not None else subprocess.DEVNULL,
-                                  text=True, encoding='utf-8', errors='replace', stdout=subprocess.DEVNULL,
+                                  text=True, encoding='utf-8', errors='replace', stdout=subprocess.PIPE if capture else subprocess.DEVNULL,
                                   stderr=subprocess.PIPE if coaching else subprocess.DEVNULL, **options) as process:
                 try:
-                    _, stderr = process.communicate(input_text, timeout=timeout)
+                    output, stderr = process.communicate(input_text, timeout=timeout)
                 except subprocess.TimeoutExpired:
                     if os.name == 'nt':
                         try:
@@ -468,14 +476,14 @@ class Runtime:
                     process.communicate()
                     if coaching:
                         self.command_failure = 'command_timeout'
-                    return 1
+                    return (1, None) if capture else 1
                 if coaching and process.returncode:
                     self.command_failure = diagnostics.command_failure(stderr)
-                return process.returncode
+                return (process.returncode, output) if capture else process.returncode
         except OSError as error:
             if coaching:
                 self.command_failure = 'workspace_permissions' if isinstance(error, PermissionError) else 'core_startup_failed'
-            return 1
+            return (1, None) if capture else 1
 
     def _publish(self, started):
         if checked(self.workspace / '.plan-commit.json').exists():
@@ -611,10 +619,12 @@ class Runtime:
         with file_lock(self.state_lock):
             state = self._state()
             if state['running']:
-                state['last_run'] = dict(state['running'], status='interrupted', code='interrupted',
-                                         finished_at=now.isoformat(), message='A previous run was interrupted. Check the saved plan and retry manually.')
+                race = state['running'].get('action') == 'race_review'
+                state['race_last_run' if race else 'last_run'] = dict(state['running'], status='interrupted', code='interrupted',
+                                         finished_at=now.isoformat(), message=RACE_MESSAGES['interrupted'] if race else 'A previous run was interrupted. Check the saved plan and retry manually.')
                 state['running'] = None
-                state['schedule']['enabled'] = False
+                if not race:
+                    state['schedule']['enabled'] = False
                 self._write_state(state)
                 return None
             action = state['queued']
@@ -645,6 +655,8 @@ class Runtime:
                 action = self._claim(started)
                 if not action:
                     return False
+                if action['action'] == 'race_review':
+                    return self._tick_race(action, started)
                 attempts = None
                 try:
                     self.command_failure = None

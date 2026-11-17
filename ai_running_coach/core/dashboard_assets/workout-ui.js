@@ -10,6 +10,8 @@
   function poolOf(s){const w=s.workout||{};return {subSport:'lap_swimming',poolLengthMetres:w.poolLengthMetres===undefined?s.pool_length_metres:w.poolLengthMetres,poolLengthUnit:w.poolLengthUnit===undefined?s.pool_length_unit:w.poolLengthUnit};}
   function unsupportedReason(s){
     if(!s)return '';const sport=sportOf(s),w=s.workout;
+    if(s.details_issue)return 'This saved interval session needs clearer instructions. Ask the coach to clarify it before exporting; missing steps have not been guessed.';
+    if(s.requires_structured_workout&&!w)return 'Read the written interval instructions above. A watch download needs complete structured steps from the coach; a single continuous workout would lose the repetitions.';
     if(sport==='multisport')return 'This multisport session is plan-only. Download each separately planned brick leg as its own workout; automatic watch transitions are not included.';
     if(!sportLabels[sport])return '';
     if(w&&w.sport!==sport)return 'Workout sport does not match this session. Ask the coach to correct its steps before exporting.';

@@ -6,7 +6,7 @@ Want to see the interface first? [Open the fictional example](https://domleblanc
 
 ## 1. Download and prepare
 
-Install [Python](https://www.python.org/downloads/) **3.11 or newer**. Automated checks cover 3.11–3.13; Python 3.13 is a straightforward choice. Windows users can select the Python launcher during installation. Download [the version 1.0 source ZIP](https://github.com/domleblanc94/ai-running-coach/releases/download/v1.0.0/ai-multisport-coach-1.0.0.zip), extract it to a private folder and open a terminal in the extracted folder containing `setup_coach.py`. Keep its scripts, examples and dashboard assets together.
+Install [Python](https://www.python.org/downloads/) **3.11 or newer**. Automated checks cover 3.11–3.13; Python 3.13 is a straightforward choice. Windows users can select the Python launcher during installation. Download [the version 1.1 source ZIP](https://github.com/domleblanc94/ai-running-coach/releases/download/v1.1.0/ai-multisport-coach-1.1.0.zip), extract it to a private folder and open a terminal in the extracted folder containing `setup_coach.py`. Keep its scripts, examples and dashboard assets together.
 
 Create a private Python environment. On **Windows PowerShell**:
 
@@ -129,4 +129,4 @@ On Windows, Task Scheduler can run `.venv\Scripts\python.exe` with argument `cro
 
 Before updating, privately back up your project data, including `.env`, `athlete.md`, `training_plan.*`, `ai_coach_master.sqlite`, hidden runtime files and activity folders. Stop your scheduler during the update, replace public code/assets from the release and rerun the doctor check. Do not replace your data with the synthetic example.
 
-Version 1.0 labels the packaged application, not universal provider or device certification. OpenAI/Anthropic/custom endpoint compatibility remains experimental beyond mocked tests. FIT files have independent decoder checks, but physical watch transfer/execution remains unverified. Transfers are manual; this release does not automatically upload or delete workouts on a watch. See the [release review](RELEASE_REVIEW.md) for the evidence and limitations, and report sanitized problems in the [standalone project](https://github.com/domleblanc94/ai-running-coach/issues).
+Version 1.1 labels the packaged application, not universal provider or device certification. OpenAI/Anthropic/custom endpoint compatibility remains experimental beyond mocked tests. FIT files have independent decoder checks, but physical watch transfer/execution remains unverified. Transfers are manual; this release does not automatically upload or delete workouts on a watch. See the [release review](RELEASE_REVIEW.md) for the evidence and limitations, and report sanitized problems in the [standalone project](https://github.com/domleblanc94/ai-running-coach/issues).

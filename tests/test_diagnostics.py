@@ -183,7 +183,9 @@ def _fixture_post(self, path, payload, headers):
         review['plan_changes'] = [
             {'op': 'add' if mode == 'four_runs' else 'update', 'session_id': sid,
              'session': {'id': sid, 'date': (_FixtureDate.today() + _FixtureDelta(days=offset)).isoformat(),
-                         'sport': 'running', 'workout_type': kind, 'amount': amount, 'target': 'Comfortable conversational effort'},
+                         'sport': 'running', 'workout_type': kind, 'amount': amount,
+                         'target': ('Warm-up 2 km easy; 5 x 1 km at controlled hard effort; 250 m easy jog recovery between reps (4 recoveries); cooldown 1 km easy.'
+                                    if kind == 'interval_run' else 'Comfortable conversational effort')},
              'reason': 'Synthetic move to an already occupied running day'}
             for sid, offset, kind, amount in entries]
     return {'candidates': [{'content': {'parts': [{'text': _fixture_json.dumps(review)}]},
@@ -315,6 +317,7 @@ ProviderClient._post = _fixture_post
         self.assertFalse(self.app.tick())
         self.assertEqual(self.app.status()['request_budget']['used'], 3)
         self.assertFalse(self.app.status()['request_budget']['extra_available'])
+        self.assertEqual(list(self.app.workspace.rglob('*.pyc')), [])
 
     def test_actual_manual_extra_reviews_existing_plan_with_learning(self):
         self.fixture_provider('success')
@@ -370,6 +373,8 @@ ProviderClient._post = _fixture_post
         self.fixture_provider('four_runs')
         self.app.enqueue('new_plan')
         self.assertTrue(self.app.tick())
+        initial = self.app.status()['last_run']
+        self.assertEqual(initial['status'], 'success', initial)
         paths = [self.app.workspace / name for name in ('athlete.md', 'training_plan.json', 'training_plan.md')]
         before = {path: path.read_bytes() for path in paths}
         dashboard = self.app.dashboard()

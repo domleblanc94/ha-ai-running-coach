@@ -441,7 +441,7 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
             const dayCard = document.createElement('div');
             dayCard.className = `p-4 rounded-xl border flex flex-col justify-between shadow-sm hover:border-slate-600 transition min-h-[160px] relative ${{badgeClass}} ${{isCompleted ? 'ring-2 ring-emerald-500/50' : ''}}`;
             const activityReviewHtml = dbActivities.map(activity => {{
-                const feedback = activity.comment ? (activity.feedback_current ? `<div class="text-slate-300 italic whitespace-normal break-words leading-tight">${{escapeHtml(activity.comment)}}</div>` : `<details><summary class="cursor-pointer">Historical feedback (previous policy)</summary><div>${{escapeHtml(activity.comment)}}</div></details>`) : '';
+                const feedback = activity.comment ? (activity.feedback_current ? `<div class="text-slate-300 italic whitespace-pre-line break-words leading-relaxed">${{escapeHtml(activity.comment)}}</div>` : `<details><summary class="cursor-pointer">Historical feedback (previous policy)</summary><div>${{escapeHtml(activity.comment)}}</div></details>`) : '';
                 return `<div class="mt-3 text-[11px] bg-slate-900/80 p-2 rounded border border-emerald-500/30 space-y-1"><div class="text-emerald-400 font-bold"><i class="fa-solid fa-circle-check"></i> Recorded: ${{escapeHtml(activity.name)}} (${{escapeHtml(activity.amount_label)}})</div><div>${{escapeHtml(activity.type)}} · ${{escapeHtml(activity.rate_label || '')}}</div>${{feedback}}</div>`;
             }}).join('');
 
@@ -465,6 +465,18 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
                     ${{isPast ? activityReviewHtml + `<details class="text-[11px] mt-3 text-slate-400"><summary class="cursor-pointer">Original planned session</summary><p class="mt-2">${{escapeHtml(workoutType)}} &middot; ${{escapeHtml(distOrDuration)}}</p><p class="mt-1">${{escapeHtml(target)}}</p></details>` : (target ? `<div class="mt-2 text-[11px] opacity-75 border-t border-slate-700/40 pt-1.5 break-words whitespace-normal leading-snug">${{escapeHtml(target)}}</div>` : '') + activityReviewHtml}}
                 </div>
             `;
+            if (session.instruction_lines && session.instruction_lines.length) {{
+                const details=document.createElement('details');
+                details.className='text-xs mt-3 space-y-2';
+                const summary=document.createElement('summary');summary.className='cursor-pointer font-semibold';summary.textContent='Workout instructions';details.appendChild(summary);
+                const list=document.createElement('ol');list.className='space-y-2 leading-relaxed';
+                session.instruction_lines.forEach(line=>{{const item=document.createElement('li');item.textContent=line;list.appendChild(item);}});
+                details.appendChild(list);dayCard.appendChild(details);
+            }}
+            if (!isPast && session.details_issue) {{
+                const note=document.createElement('p');note.className='mt-3 text-xs text-amber-300';
+                note.textContent='This saved session needs clearer instructions. Ask the coach to clarify it before following it; missing steps have not been guessed.';dayCard.appendChild(note);
+            }}
             dayCard.dataset.sessionId = cardId;
             dayCard.dataset.sport = sport;
             if(brick) {{dayCard.dataset.brickId=brick.id;dayCard.dataset.brickOrder=brick.order;}}

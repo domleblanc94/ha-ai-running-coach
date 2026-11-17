@@ -3,7 +3,8 @@
 Replace every example before requesting a real plan. Enter your own configured zones and explain their measurement method/date in prose. Setup explicitly leaves HR zones unknown; effort-based coaching is available. Add your own measured/configured Zone 1-5 fields only when known.
 
 **Athlete Name:** YOUR NAME
-**Coaching Style:** Collaborative and concise; explain changes and uncertainty.
+**Coaching Style:** Collaborative; explain changes and uncertainty.
+**Review Detail:** standard
 **Training Mode:** running
 **Heart Rate Zones:** Not configured
 

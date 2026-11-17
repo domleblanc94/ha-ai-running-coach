@@ -1,6 +1,6 @@
 # AI Multisport Coach
 
-**Version 1.0.0** is the community release of AI Multisport Coach for Home Assistant. It serves one athlete and opens its setup and private dashboard through Home Assistant ingress.
+**Version 1.1.0** is the community release of AI Multisport Coach for Home Assistant. It serves one athlete and opens its setup and private dashboard through Home Assistant ingress.
 
 ## Choose a route or preview the dashboard
 
@@ -29,6 +29,24 @@ If you installed from the documented repository URL, you can jump to the app pag
 Provider integrations use a common request budget. Gemini remains the primary live-tested route; compatibility of other providers and models with a particular account requires verification and remains experimental. Offline transport tests do not guarantee every model supports the same request options.
 
 Local summary import is currently available through the [standalone project](https://github.com/domleblanc94/ai-running-coach/blob/main/docs/STANDALONE.md). Use the Home Assistant app logs to diagnose startup failures. Keep credentials, athlete data and model response snapshots out of support reports.
+
+## Activity review detail
+
+In **Setup & settings → Athlete**, choose **Coaching detail**: Concise, Standard or Detailed. Detailed asks for more interpretation of the recorded activity, useful coaching comments, uncertainty and practical next steps. It applies to the next successful review; saved historical comments are not rewritten just by changing the setting. Saving the preference makes no model request, and the existing request/output limits remain in effect.
+
+New interval and strides sessions must explain warm-up, work repetitions and duration or distance, effort, recovery and cooldown. Existing incomplete sessions stay saved until a valid coaching update replaces them. A rejected incomplete response retains your last valid plan and shows a specific reason in Coach Status.
+
+## Race planning
+
+Open **Race planning** and upload a running or trail-race GPX (up to 5 MB and 50,000 points). Uploading and inspecting the local course preview costs no AI request. The app shows approximate distance, elevation coverage and terrain sections. Missing elevation stays unknown, noisy GPX elevations are treated as approximate, and disconnected tracks must be corrected before pacing or FIT export.
+
+Enter the race name, optional date and what you want to discuss. **Generate race strategies** makes at most one model request using the shared daily allowance and your saved athlete/activity evidence. It does not sync Garmin or change the training calendar. The coach compares a conservative approach with a more ambitious option whose later pickup depends on conditions. If evidence is too weak for numerical pacing, the plan provides effort guidance instead. Read the dated evidence and limitations alongside any finish-time range.
+
+Change your question and select **Refine strategies** to discuss the saved race plan. Each new review uses the same allowance as training reviews; an identical completed request can reuse its cached result without another model call. Failed requests retain the previous valid race plan and do not retry automatically. Only one coaching action runs at a time. The raw GPS points stay in private app storage; the AI receives compact route/terrain summaries instead.
+
+**Course GPX** and **Course FIT starter** downloads do not call a model. A strategy with supported numerical timing also offers a timed course FIT reference. These are course files, not native PacePro plans. A timed course cannot detect how you feel or switch to the ambitious strategy automatically.
+
+On a Forerunner 965, load the course through your Garmin workflow, choose an outdoor running activity, then **Navigation → Courses → your course → PacePro → Create New**, and enter your chosen goal time or pace. Garmin creates its own splits, which may differ from the coach's estimates. Follow [Garmin's PacePro instructions](https://www8.garmin.com/manuals/webhelp/GUID-0221611A-992D-495E-8DED-1DD448F7A066/EN-US/GUID-27B26831-3708-46EA-BF15-18039D28EC3A.html). Course files have offline decoder checks; physical watch transfer/execution remains unverified.
 
 ## Coaching request allowance
 
@@ -101,12 +119,12 @@ Include this app in a Home Assistant backup before updating. The Supervisor stop
 
 ## Moving from the standalone installation
 
-Version 1.0 has no guided migration from a standalone installation. The existing installation and this app have independent databases, Garmin binding and request ledgers. Keep the app schedule disabled until you have verified the migration.
+Version 1.1 has no guided migration from a standalone installation. The existing installation and this app have independent databases, Garmin binding and request ledgers. Keep the app schedule disabled until you have verified the migration.
 
 A future cutover needs a consistent source backup and one active scheduler. The migration needs to preserve the athlete profile and plans, SQLite request history for daily limits, and the exact Garmin account binding and source provenance. Copying only the athlete profile, or starting a new database against the same account on the same day, loses that continuity. Verify the restored files and review state with the schedule disabled. Keep the original installation and backup available for rollback. Stop the app schedule before resuming the standalone scheduler.
 
 ## Garmin key replacement
 
-Garmin account binding is preserved if a key changes. Version 1.0 has no in-app confirmation for key rotation. Back up the app and pause its schedule before rotating a key. Ask the maintainer for the same-account recovery procedure, and keep the sync checkpoint with its matching database. An account or region change requires a new workspace.
+Garmin account binding is preserved if a key changes. Version 1.1 has no in-app confirmation for key rotation. Back up the app and pause its schedule before rotating a key. Ask the maintainer for the same-account recovery procedure, and keep the sync checkpoint with its matching database. An account or region change requires a new workspace.
 
 FIT workout export remains experimental and requires manual transfer to a compatible watch.

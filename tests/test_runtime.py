@@ -133,6 +133,8 @@ class RuntimeTests(unittest.TestCase):
             self.assertTrue(Runtime(self.data).tick())
         environment = launch.call_args.kwargs['env']
         self.assertEqual(environment['TZ'], 'Pacific/Auckland')
+        self.assertEqual(environment['PYTHONDONTWRITEBYTECODE'], '1')
+        self.assertEqual(launch.call_args.args[0][:5], [sys.executable, '-I', '-B', '-X', 'utf8'])
         self.assertEqual(launch.call_args.args[0][-1], 'new_plan')
         if sys.platform.startswith('linux'):
             epoch = datetime(2026, 11, 5, 12, tzinfo=timezone.utc).timestamp()

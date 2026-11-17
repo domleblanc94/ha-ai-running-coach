@@ -291,7 +291,7 @@ async function showAthlete() {
     card("Your training", [["Training focus", sportNames[data.training_mode || "running"]], ["Training goal", data.goal], ["Experience", data.experience],
       ["Training days", data.days.length ? data.days.join(", ") : availability || "Not specified - coach may choose days"],
       ["Preferred long-run days", data.long_run_preference_text || (data.long_run_days?.length ? data.long_run_days.join(", ") + " (alternative days)" : "No preference")],
-      ["Injuries and constraints", data.injuries]]);
+      ["Injuries and constraints", data.injuries], ["Coaching detail", data.review_detail || "standard"]]);
     for (const [priority, label] of goals) {
       const goal = data.goals?.[priority];
       if (!goal?.event) continue;
@@ -344,7 +344,7 @@ function draw(next) {
     title = "Coach worker needs attention";
     detail = next.worker_error || "Restart the app from Home Assistant.";
   } else if (next.running) {
-    title = "Coach is running";
+    title = next.running.action === "race_review" ? "Race coach is working" : "Coach is running";
     detail = "This page checks for updates automatically.";
   } else if (next.queued) {
     title = "Coach run queued";
@@ -441,6 +441,7 @@ function draw(next) {
   if (initialized && ready && !setupWasReady) selectView("dashboard");
   setupWasReady = ready;
   updateDashboard();
+  window.CoachRace?.updateStatus(next);
 }
 
 function drawBaseline(learning, busy) {
@@ -507,6 +508,7 @@ async function refresh() {
         field(profile, key).value = saved[key] || "";
       }
       field(profile, "training_mode").value = saved.training_mode || "running";
+      field(profile, "review_detail").value = saved.review_detail || "standard";
       savedGoals = saved.goals || {};
       for (const [priority] of goals) {
         const savedGoal = saved.goals?.[priority] || {};
@@ -671,6 +673,7 @@ formAction(profile, "profile", () => {
   const payload = {};
   for (const key of ["name", "goal", "experience", "injuries"]) payload[key] = field(profile, key).value;
   payload.training_mode = field(profile, "training_mode").value;
+  payload.review_detail = field(profile, "review_detail").value;
   const sportSettings = sportSettingsPayload();
   if (Object.keys(sportSettings).length) payload.sport_settings = sportSettings;
   payload.goals = {};
@@ -800,13 +803,16 @@ function selectView(view) {
   byId("settings").hidden = view !== "settings";
   byId("dashboard-panel").hidden = view !== "dashboard";
   byId("athlete-panel").hidden = view !== "athlete";
-  for (const name of ["dashboard", "settings", "athlete"]) byId(name + "-tab").setAttribute("aria-pressed", String(view === name));
+  byId("race-panel").hidden = view !== "race";
+  for (const name of ["dashboard", "settings", "athlete", "race"]) byId(name + "-tab").setAttribute("aria-pressed", String(view === name));
   if (view === "athlete") showAthlete();
+  if (view === "race") window.CoachRace?.show();
   updateDashboard();
 }
 byId("dashboard-tab").addEventListener("click", () => selectView("dashboard"));
 byId("settings-tab").addEventListener("click", () => selectView("settings"));
 byId("athlete-tab").addEventListener("click", () => selectView("athlete"));
+byId("race-tab").addEventListener("click", () => selectView("race"));
 byId("edit-athlete").addEventListener("click", () => { selectView("settings"); profile.scrollIntoView({behavior: "smooth"}); });
 byId("first-dashboard-plan").addEventListener("click", () => byId("new-plan").click());
 for (const link of document.querySelectorAll("a.download-link[download]")) {

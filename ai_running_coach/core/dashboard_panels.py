@@ -72,13 +72,14 @@ def coach_payload(conn):
     tables={row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     if 'coach_review_jobs' not in tables:return {}
     import json
-    row=conn.execute("SELECT response_json FROM coach_review_jobs WHERE status='complete' AND prompt_version IN ('autonomous-coach-v2','autonomous-coach-v3','autonomous-coach-v4-starter-week','autonomous-coach-v5-availability','autonomous-coach-v5-availability-starter-week','autonomous-coach-v6-schedule','autonomous-coach-v6-schedule-starter-week','autonomous-coach-v7-new-plan','autonomous-coach-v7-new-plan-starter-week','autonomous-coach-v8-multisport','autonomous-coach-v8-multisport-starter-week') ORDER BY updated_at DESC LIMIT 1").fetchone()
+    row=conn.execute("SELECT response_json FROM coach_review_jobs WHERE status='complete' AND prompt_version IN ('autonomous-coach-v2','autonomous-coach-v3','autonomous-coach-v4-starter-week','autonomous-coach-v5-availability','autonomous-coach-v5-availability-starter-week','autonomous-coach-v6-schedule','autonomous-coach-v6-schedule-starter-week','autonomous-coach-v7-new-plan','autonomous-coach-v7-new-plan-starter-week','autonomous-coach-v8-multisport','autonomous-coach-v8-multisport-starter-week','autonomous-coach-v9-detail','autonomous-coach-v9-detail-starter-week') ORDER BY updated_at DESC LIMIT 1").fetchone()
     try:
         payload=json.loads(row[0]) if row and row[0] else {}
         return payload if isinstance(payload,dict) else {}
     except (ValueError,TypeError):return {}
 
 def build_panels(plan,activities,coach,today):
+    from session_instructions import workout_instruction_lines, quality_details_issue
     today=date.fromisoformat(today) if isinstance(today,str) else today
     scheduled=sorted(plan.get('sessions',[]),key=session_order)
     today_sessions=[s for s in scheduled if s['date']==today.isoformat()]
@@ -87,7 +88,10 @@ def build_panels(plan,activities,coach,today):
     today_records=len(activities.get(today.isoformat(),[]))
     agenda+='<p class="text-xs text-slate-400 mt-2">Today: '+esc(', '.join(s['workout_type'] for s in today_sessions) or 'No session scheduled')+' &middot; '+str(today_records)+' recorded activities. A recording does not confirm a scheduled session was completed.</p><div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">'
     for session in upcoming:
-        agenda+='<article data-workout-session="'+esc(session['id'])+'" class="rounded-lg bg-slate-900/60 border border-slate-700 p-3 text-sm"><time class="text-xs text-slate-400">'+esc(session['date'])+' &middot; '+esc(sport_label(session))+(' &middot; Brick leg '+esc(session['brick']['order']) if session.get('brick') else '')+(' &middot; Today' if session['date']==today.isoformat() else '')+'</time><h3 class="font-semibold mt-1">'+esc(session['workout_type'])+'</h3><p class="text-sky-300 text-xs mt-1">'+esc(session['amount'])+'</p><details class="text-xs text-slate-300 mt-2"><summary class="cursor-pointer">Effort &amp; preparation</summary><p class="mt-2">'+esc(session['target'])+'</p><p class="text-slate-500 mt-2">Planned ascent is not specified unless included in the coach guidance.</p></details></article>'
+        instructions=workout_instruction_lines(session)
+        detail_list='<ol class="space-y-2 mt-3">'+''.join('<li>'+esc(line)+'</li>' for line in instructions)+'</ol>' if instructions else ''
+        missing='<p class="text-amber-300 mt-2">Saved interval instructions are incomplete; ask the coach to clarify them. No missing steps have been guessed.</p>' if quality_details_issue(session) else ''
+        agenda+='<article data-workout-session="'+esc(session['id'])+'" class="rounded-lg bg-slate-900/60 border border-slate-700 p-3 text-sm"><time class="text-xs text-slate-400">'+esc(session['date'])+' &middot; '+esc(sport_label(session))+(' &middot; Brick leg '+esc(session['brick']['order']) if session.get('brick') else '')+(' &middot; Today' if session['date']==today.isoformat() else '')+'</time><h3 class="font-semibold mt-1">'+esc(session['workout_type'])+'</h3><p class="text-sky-300 text-xs mt-1">'+esc(session['amount'])+'</p><details class="text-xs text-slate-300 mt-2"><summary class="cursor-pointer">Workout instructions &amp; preparation</summary><p class="mt-2">'+esc(session['target'])+'</p>'+detail_list+missing+'<p class="text-slate-500 mt-2">Planned ascent is not specified unless included in the coach guidance.</p></details></article>'
     if not upcoming:agenda+='<p class="text-slate-400">No upcoming workout saved. The next successful coach review can extend the plan.</p>'
     monday=today-timedelta(days=today.weekday());sunday=monday+timedelta(days=6)
     recorded=[item for day,items in activities.items() if monday.isoformat()<=day<=today.isoformat() for item in items]

@@ -26,7 +26,8 @@ GOAL='**A-Race:** Autumn event\n**Date:** 2026-11-08\n**Target Time:** Finish\n'
 
 
 def session(sid,sport='running',day='2026-11-07',**extra):
-    return dict(id=sid,date=day,sport=sport,workout_type='Intervals',amount='30 min',target='Coach-selected effort',**extra)
+    return dict(id=sid,date=day,sport=sport,workout_type='Intervals',amount='30 min',
+                target='Warm-up: 10 min easy; 3 x 2 min controlled effort; Recovery: 2 min easy between efforts; Cooldown: 10 min easy.',**extra)
 
 
 def plan(profile,sessions):
@@ -38,7 +39,9 @@ def add(value):
 
 
 def workout(sport='running',**extra):
-    return {'name':'Coach workout','sport':sport,'steps':[{'intensity':'active','duration':{'type':'time','seconds':600},'target':{'type':'open'}}],**extra}
+    def step(kind,seconds):
+        return {'intensity':kind,'duration':{'type':'time','seconds':seconds},'target':{'type':'open'},'notes':'Controlled effort' if kind=='active' else 'Easy effort'}
+    return {'name':'Coach workout','sport':sport,'steps':[step('warmup',600),step('active',120),step('recovery',120),step('active',120),step('recovery',120),step('active',120),step('cooldown',600)],**extra}
 
 
 class MultisportProfileTests(unittest.TestCase):

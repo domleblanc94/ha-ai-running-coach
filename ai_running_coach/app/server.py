@@ -11,7 +11,7 @@ from pathlib import Path
 import re
 import secrets
 import threading
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 from .dashboard_view import saved_dashboard
 from . import profile_sports
@@ -20,11 +20,13 @@ from . import profile_sports
 WEB = Path(__file__).with_name("web")
 INGRESS_PEER = "172.30.32.2"
 BODY_LIMIT = 16 * 1024
+GPX_BODY_LIMIT = 12 * 1024 * 1024  # JSON escaping may expand a 5 MB XML file.
 COOKIE = "coach_ingress_session"
 ASSETS = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/assets/coach.css": ("coach.css", "text/css; charset=utf-8"),
     "/assets/coach.js": ("coach.js", "text/javascript; charset=utf-8"),
+    "/assets/race.js": ("race.js", "text/javascript; charset=utf-8"),
 }
 WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 PROFILE_FIELDS = {
@@ -47,6 +49,8 @@ def profile_fields(markdown):
         match = re.search(r"^\*\*" + re.escape(label) + r":\*\*[ \t]*(.*)$", markdown, re.M)
         fields[key] = match[1] if match else ""
     fields["goal"] = fields["goal"].partition("Training goal: ")[2]
+    detail = re.search(r'^\*\*Review Detail:\*\*[ \t]*(.*)$', markdown, re.M)
+    fields['review_detail'] = detail[1].strip().lower() if detail and detail[1].strip().lower() in ('concise', 'standard', 'detailed') else 'standard'
     fields["goals"] = {}
     for priority in PRIORITIES:
         race = re.search(r"^\*\*" + priority + r"-Race:\*\*[ \t]*(.*)(?:\n(?!\*\*[ABC]-Race:\*\*).*)*", markdown, re.M | re.I)
@@ -104,7 +108,7 @@ def profile_view(markdown):
 
 
 def profile_markdown(data, existing=""):
-    if set(data) - {*PROFILE_FIELDS, *GOAL_FIELDS, "goals", "days", "long_run_days", "zones", "zone_mode", "training_mode", "sport_settings"}:
+    if set(data) - {*PROFILE_FIELDS, *GOAL_FIELDS, "goals", "days", "long_run_days", "zones", "zone_mode", "training_mode", "sport_settings", "review_detail"}:
         raise ValueError("Unknown athlete profile field.")
     fields = {}
     for key in PROFILE_FIELDS:
@@ -115,6 +119,9 @@ def profile_markdown(data, existing=""):
     if not fields["name"]:
         raise ValueError("Enter an athlete name.")
     saved = profile_fields(existing)
+    review_detail = data.get('review_detail', saved['review_detail'])
+    if review_detail not in ('concise', 'standard', 'detailed'):
+        raise ValueError('Choose concise, standard or detailed coaching comments.')
     goal_updates = data.get("goals", {})
     if not isinstance(goal_updates, dict) or set(goal_updates) - set(PRIORITIES):
         raise ValueError("Choose A, B or C for each goal.")
@@ -187,6 +194,7 @@ def profile_markdown(data, existing=""):
     if zones_edited and zone_mode == "known" and "2" not in zones:
         raise ValueError("Enter your configured Zone 2 or choose unknown zones.")
     lines = ["# Athlete profile", f"**Athlete Name:** {fields['name']}"]
+    lines.append('**Review Detail:** ' + review_detail)
     style = re.search(r"^\*\*Coaching Style:\*\*[ \t]*(.*)$", existing, re.M)
     previous_style = style[1].partition("Training goal: ")[0].strip() if style else ""
     for key in ("experience", "goal", "injuries"):
@@ -216,6 +224,7 @@ def profile_markdown(data, existing=""):
         if zones_edited:
             lines.append(f"**Zone {number} ({ZONE_NAMES[int(number)-1]}):** {bounds[0]} - {bounds[1]} bpm")
     known = set(PROFILE_FIELDS.values())
+    known.add('Review Detail')
     if 'days' in data:
         known.add("Weekly Availability")
     if zones_edited:
@@ -390,6 +399,29 @@ class CoachHandler(BaseHTTPRequestHandler):
             markdown = runtime.profile()
             visible = '\n'.join(line for line in markdown.splitlines() if not line.startswith(GOAL_METADATA))
             self.send_json(200, {"profile": profile_view(markdown), "markdown": visible})
+        elif path == '/api/race':
+            try:
+                self.send_json(200, runtime.race_status())
+            except RuntimeError as error:
+                self.send_json(409, {'error': str(error)})
+        elif path in ('/exports/race-course.fit', '/exports/race-course.gpx', '/exports/race-course-conservative.fit', '/exports/race-course-ambitious.fit'):
+            kind = path.rsplit('.', 1)[1]
+            strategy = 'conservative' if path.endswith('-conservative.fit') else 'ambitious' if path.endswith('-ambitious.fit') else None
+            try:
+                parameters = parse_qs(urlsplit(self.path).query, keep_blank_values=True, max_num_fields=4)
+                expected = {'route_hash', 'request_id'} if strategy else {'route_hash'}
+                if set(parameters) != expected or any(len(values) != 1 for values in parameters.values()):
+                    raise ValueError('Refresh Race planning before downloading the displayed course.')
+                identifier = parameters.get('request_id', [''])[0]
+                if strategy and not re.fullmatch(r'[1-9][0-9]{0,18}', identifier):
+                    raise ValueError('Refresh Race planning before downloading the displayed strategy.')
+                content = runtime.race_export(kind, strategy, route_hash=parameters['route_hash'][0], request_id=int(identifier) if strategy else None)
+            except FileNotFoundError:
+                self.send_json(404, {'error': 'Upload a GPX course before downloading it.'})
+            except (ValueError, RuntimeError) as error:
+                self.send_json(409, {'error': str(error)})
+            else:
+                self.respond(200, content, 'application/octet-stream' if kind == 'fit' else 'application/gpx+xml', download='race-' + (strategy + '-' if strategy else '') + 'course.' + kind)
         elif path in ("/exports/athlete.md", "/exports/training_plan.md", "/exports/training_calendar.pdf"):
             filename = path.rsplit('/', 1)[1]
             try:
@@ -424,6 +456,8 @@ class CoachHandler(BaseHTTPRequestHandler):
             "/api/baseline-feedback": lambda payload: runtime.save_baseline_feedback(payload),
             "/api/action": lambda payload: self.run_action(runtime, payload),
             "/api/schedule": lambda payload: self.save_schedule(runtime, payload),
+            '/api/race/course': runtime.save_race_course,
+            '/api/race/action': runtime.enqueue_race,
         }
         if path not in actions:
             self.send_json(404, {"error": "Action not found."})
@@ -433,7 +467,7 @@ class CoachHandler(BaseHTTPRequestHandler):
             self.send_json(400, {"error": "Invalid request length."})
             return
         length = int(lengths[0])
-        if length > BODY_LIMIT:
+        if length > (GPX_BODY_LIMIT if path == '/api/race/course' else BODY_LIMIT):
             self.send_json(413, {"error": "Request is too large."})
             return
         if self.headers.get_content_type() != "application/json":

@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "release": "1.0.0",
+  "release": "1.1.0",
   "license_status": "selected",
   "files": [
     {
@@ -25,11 +25,11 @@
     },
     {
       "path": "README.md",
-      "sha256": "3d5db386539daabf5aa57152cd90a0ca02e754c20ea81bf603ee23b431ae3071"
+      "sha256": "353135aa81f4030aaf74b6fbd7eeb505b2a871752efde233faead08d7235948f"
     },
     {
       "path": "ai_coach.py",
-      "sha256": "cc6546cf253e967c43e01e674b8f7141330c17a0ec52f7797eecaef840e3eb02"
+      "sha256": "bb99eaa12d9662ff226e34f0ef27dc181a0246c21fc3ffe610dc9e9a7a2a54da"
     },
     {
       "path": "build_demo_site.py",
@@ -38,6 +38,10 @@
     {
       "path": "coach_checkin.py",
       "sha256": "fc795638f0614855a5f92c5f860ed4003084515636cf04cc544a9659a42a1ea7"
+    },
+    {
+      "path": "coaching_detail.py",
+      "sha256": "4beb356b689cff025408b9bd7e6d2c51b7a988fe041f9b5d351eda47736f03f2"
     },
     {
       "path": "coaching_eval.py",
@@ -113,15 +117,15 @@
     },
     {
       "path": "dashboard_assets/workout-ui.js",
-      "sha256": "02ea434b744493c2e508b88b4ce72f8b7eee9d50d86b9812eef1213bb0e129a4"
+      "sha256": "ba630b16bd38f7f18d69c6fb0dddee848887808fc3a18f0eedc4c9591d03e930"
     },
     {
       "path": "dashboard_panels.py",
-      "sha256": "2148b1b0f29639c402a2a06e47a0e02e565d1ffbe653d02d5c7b813ed4752fce"
+      "sha256": "7af076f80754d870e977198dd75dd5359eccfaed5cc8cc3aa99183d158a4657a"
     },
     {
       "path": "dashboard_template.py",
-      "sha256": "f7251799ef40835926de347c81a60b1f1ca1baa66a6709c8a26fbccd2fad4174"
+      "sha256": "7f660ec619fb13bca58cd96912d0e8bd1e1b5a5b78e46f54b0fbfc6421913658"
     },
     {
       "path": "database_manager.py",
@@ -129,15 +133,19 @@
     },
     {
       "path": "demo_data.py",
-      "sha256": "626036f4bec1e4bed11e71961af5d57ed79316187ad06d2ca1b8f45382c36b77"
+      "sha256": "83db91ec0423eba3446f3cffe007da64dc5a46b9958d327d00fb97bec1503e0c"
+    },
+    {
+      "path": "docs/RACE_PLANNING.md",
+      "sha256": "959731318005c62c483d7363a23e1dfa88ccbf6483fbc41a26d2b4c8c39c6996"
     },
     {
       "path": "docs/RELEASE_REVIEW.md",
-      "sha256": "a5b11b85ee5780a2cc6684d3ed197fc5abb104038cba4961e58e5cd380f77236"
+      "sha256": "7ca28bcd7073a1d6bdcd2f88a59116f9667026877a04a3282a5734601e02e14f"
     },
     {
       "path": "docs/STANDALONE.md",
-      "sha256": "67924cca7975d340aa0bb845dd1e776da66edf746c5b2705ced673c813ec96fe"
+      "sha256": "8d9454cece5a5d83872a428e7ceb0611e08aa216b7dba4d4b0118c5faae538e3"
     },
     {
       "path": "docs/THIRD_PARTY.md",
@@ -157,7 +165,7 @@
     },
     {
       "path": "examples/athlete.template.md",
-      "sha256": "94ca5a95875c23fe8f43435c432d5c4dc031a6aae3f6b4453e7a82c19b73cf1d"
+      "sha256": "0210d00bf6fded79fe7eeed36c9028bfac821d5349ad9174fd93d4a449d7f48d"
     },
     {
       "path": "garmin_personal_api.py",
@@ -169,7 +177,7 @@
     },
     {
       "path": "generate_dashboard.py",
-      "sha256": "ac54d9a30a7e8b2d84527fd1743d82535b42b959616cf987941a9b9743aaef96"
+      "sha256": "e1e9429c76856d7a97c7007b9eb90a1578ac4e074cc308d3eed3bce41e716af0"
     },
     {
       "path": "health_status.py",
@@ -193,11 +201,11 @@
     },
     {
       "path": "planning_engine.py",
-      "sha256": "2065750d6e86d121d36da55334bc8172e858861191ba0cbe82acd9c337a46c86"
+      "sha256": "0af4fe1f3c4d577a085a9eb44c78d1559e53007306802b2e8d8e8660ac3edbcc"
     },
     {
       "path": "prepare_release.py",
-      "sha256": "06231ebc6adda40824414bcd5f5ca302d9f62dd255184cab66849caa055de2c2"
+      "sha256": "b912e44ac280dd128c5a0a10c8174b2c513c4fafa178f9d0e431ae65f605c0a4"
     },
     {
       "path": "publish_if_ready.py",
@@ -205,7 +213,19 @@
     },
     {
       "path": "pyproject.toml",
-      "sha256": "af76aa60d62963b20635f3832d7ed9291e600ce7612e78814f63ed1a3f0522ed"
+      "sha256": "8bf7c755732a5db3732c248f2c85e6e9f18eb9b7f12aa23c649e5937e1317863"
+    },
+    {
+      "path": "race_exports.py",
+      "sha256": "f3374eeba9780cae7649921685102301f7d99b3d920658fb9b24f3a7bb7c818f"
+    },
+    {
+      "path": "race_gpx.py",
+      "sha256": "48d0a53c6021ecc28550cc9cacc72add6ed361ee83b4136564add72417f42cb7"
+    },
+    {
+      "path": "race_planner.py",
+      "sha256": "0ed6924dc99cc51d049982cb2ba42b4d37b17919c047cd8d8919c17548ac0c76"
     },
     {
       "path": "requirements.txt",
@@ -214,6 +234,10 @@
     {
       "path": "run_offline_tests.py",
       "sha256": "377601b44481c36d5eb3b6005686d9a2fb2fe85ea65dfa145ee698071b624a2f"
+    },
+    {
+      "path": "session_instructions.py",
+      "sha256": "1cc8a2c5c7a89d4e3a8a7f4d3009a7e9b527ecffbc1c8bbcf6bba73dbab49f89"
     },
     {
       "path": "setup_coach.py",
@@ -230,6 +254,10 @@
     {
       "path": "tests/test_calendar_layout.py",
       "sha256": "9cf645a656d6898a30281deb1ffeb0e9784a0c55cd21bfd16841e4603a80dd4d"
+    },
+    {
+      "path": "tests/test_coaching_detail.py",
+      "sha256": "2c14eaaca23a94cc405ff1b323a3c15683a3ae3230fe75cf678a8943ed1ff498"
     },
     {
       "path": "tests/test_coaching_extensions.py",
@@ -257,7 +285,7 @@
     },
     {
       "path": "tests/test_demo_site.py",
-      "sha256": "af79c9e90c6ceb51728149ac02264ee329cdca888c8ffa59b03bd07a7f37b70b"
+      "sha256": "b6bd1584e409b2de66db8f879ca613889a5125226aeea28f966b13d919c4473b"
     },
     {
       "path": "tests/test_feedback_workflow.py",
@@ -289,7 +317,7 @@
     },
     {
       "path": "tests/test_model_providers.py",
-      "sha256": "d10f4279d5302c3b3f142d8d99906fdb986d00479899e855120bb804c86c7b11"
+      "sha256": "0f4f91a30c843970ed93b4022134f7974a667750490c3408c21010b9abc84259"
     },
     {
       "path": "tests/test_multisport_dashboard.py",
@@ -297,7 +325,7 @@
     },
     {
       "path": "tests/test_multisport_planning.py",
-      "sha256": "cf4887f35d572ffb3738b975999d4466da70355e76b99cd0bf2694373bad9531"
+      "sha256": "ca4b4a4a65a3f700d8c267f6a3bae54a56285f9baae584ff66cbead58882e9d5"
     },
     {
       "path": "tests/test_multisport_workout_editor.py",
@@ -317,7 +345,7 @@
     },
     {
       "path": "tests/test_planning_engine.py",
-      "sha256": "291861d4a945edb841f9ee1ccb3da186829255a1f619096fbcbc5026b46a9b6f"
+      "sha256": "cb22f7903bf4f40767dc028e6a48e51614c42b98e39de4080199a2277b03b5fb"
     },
     {
       "path": "tests/test_public_release.py",
@@ -326,6 +354,18 @@
     {
       "path": "tests/test_publish_guard.py",
       "sha256": "86183914e9246c5170f03e9c578ee9356f9fbfddf96fc57b32124dded0fa1f0d"
+    },
+    {
+      "path": "tests/test_race_exports.py",
+      "sha256": "ede5c9901cd49a4636e321db699a999a3412629154b5fceb4a9db26674cf97e3"
+    },
+    {
+      "path": "tests/test_race_gpx.py",
+      "sha256": "ae8672a0c9ea8860d134371049a4b777feeec4143eca752784cdf15c9cc08622"
+    },
+    {
+      "path": "tests/test_race_planner.py",
+      "sha256": "bd2dff0f22d37e517748f2cacf2a86795b6f6743a663a752ff62f81e94abbcda"
     },
     {
       "path": "tests/test_real_artifacts.py",
@@ -337,7 +377,7 @@
     },
     {
       "path": "tests/test_running_schedule.py",
-      "sha256": "2e25ebf08a173cdf8462ede05f42ee982ec1f486ee2d7ff6643665c77a2af2be"
+      "sha256": "91b8295dcf89be6cdbcbf26d07a8f66b472826521dd3eb3f687ff8050d790a5e"
     },
     {
       "path": "tests/test_running_types.py",

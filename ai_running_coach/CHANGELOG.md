@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0
+
+- Add a private Race planning tab: upload a running/trail GPX, inspect distance and elevation coverage, and ask the coach for conservative and conditional ambitious strategies based on current recorded evidence.
+- Keep race requests within the shared daily AI allowance, preserve the training plan, and retain the previous race strategy when a response fails validation.
+- Download GPX or FIT course files as a starting point for Garmin Connect PacePro; these files are not native PacePro strategies.
+- Add concise, standard and detailed coaching preferences, with richer activity comments and bounded multi-paragraph summaries.
+- Require complete new interval/strides instructions, show saved structured steps directly, and explain when missing steps prevent a reliable workout download.
+
 ## 1.0.0
 
 - Publish the first numbered release as **AI Multisport Coach**, with clear Home Assistant and standalone installation routes and links between the projects.
