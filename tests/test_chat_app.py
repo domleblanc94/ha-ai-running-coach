@@ -1,13 +1,15 @@
 """Private desktop bridge and human-reviewed plan integration."""
 import http.client
 import json
+import subprocess
+import sys
 from pathlib import Path
 import tempfile
 import threading
 import unittest
 from unittest.mock import patch
 
-from ai_running_coach.app.chat_bridge import ChatBridgeServer, REQUEST_LIMIT
+from ai_running_coach.app.chat_bridge import ChatBridgeServer, REQUEST_LIMIT, RESPONSE_LIMIT
 from ai_running_coach.app.chat_runtime import ChatFailure
 from ai_running_coach.app.runtime import Runtime
 from ai_running_coach.app.storage import atomic_write
@@ -48,6 +50,60 @@ class ChatTests(unittest.TestCase):
         with patch.object(self.runtime, '_command', return_value=(0, '{"ok":true,"value":{}}')) as command:
             self.runtime.chat_dispatch('list_proposals', {})
         self.assertEqual(command.call_args.kwargs['timezone_name'], 'Pacific/Auckland')
+
+    def test_activity_details_uses_bounded_local_dispatch(self):
+        payload = {'activity_id': -42, 'include_streams': True, 'offset': 100, 'limit': 50}
+        details = {'activity': {'activity_id': -42}, 'streams': {'status': 'available', 'items': []}}
+        envelope = json.dumps({'ok': True, 'value': details})
+        with patch.object(self.runtime, '_command', return_value=(0, envelope)) as command:
+            self.assertEqual(self.runtime.chat_dispatch('activity_details', payload, remote=True), details)
+        self.assertEqual(command.call_args.args, ('chat_dispatch',))
+        self.assertEqual(json.loads(command.call_args.kwargs['input_text']),
+                         {'action': 'activity_details', 'payload': payload})
+        self.assertEqual(command.call_args.kwargs['timeout'], 20)
+        with self.assertRaises(ValueError):
+            self.runtime.chat_dispatch('activity_details', payload)
+        for code in ('not_found', 'invalid_input', 'source_policy', 'unavailable'):
+            with self.subTest(code=code):
+                envelope = json.dumps({'ok': False, 'code': code, 'message': 'private provider response'})
+                with patch.object(self.runtime, '_command', return_value=(0, envelope)):
+                    with self.assertRaises(ChatFailure) as caught:
+                        self.runtime.chat_dispatch('activity_details', payload, remote=True)
+                self.assertEqual(caught.exception.code, code)
+                self.assertNotIn('private provider response', str(caught.exception))
+
+    def test_bundled_activity_details_read_saved_data_without_plan_or_profile(self):
+        seed = """
+import json, sqlite3
+from database_manager import ensure_schema
+with sqlite3.connect('ai_coach_master.sqlite') as conn:
+    ensure_schema(conn)
+    conn.execute('INSERT INTO activities(id,source,type,start_date,distance_m,avg_heartrate,raw_splits_json,downsampled_streams_json) VALUES (?,?,?,?,?,?,?,?)',
+                 (-42,'local:fixture','Run','2026-11-25',5000,150,
+                  json.dumps([{'split':1,'distance':1000,'latitude':'GPS-SECRET'}, {'split':2,'distance':1000}]),
+                  json.dumps([{'time':0,'heartrate':140,'token':'PRIVATE-SECRET'}, {'time':30,'heartrate':150,'latlng':['GPS-SECRET']}])) )
+"""
+        subprocess.check_call([sys.executable, '-B', '-c', seed], cwd=self.runtime.workspace, timeout=20)
+        database = self.runtime.workspace / 'ai_coach_master.sqlite'
+        before = database.read_bytes()
+        self.assertFalse((self.runtime.workspace / 'athlete.md').exists())
+        self.assertFalse((self.runtime.workspace / 'training_plan.json').exists())
+        result = self.runtime.chat_dispatch('activity_details',
+                                            {'activity_id': -42, 'include_streams': True, 'limit': 1}, remote=True)
+        self.assertEqual(result['activity']['distance_m'], 5000)
+        self.assertEqual(result['splits']['next_offset'], 1)
+        self.assertEqual(result['streams']['next_offset'], 1)
+        self.assertEqual(result['laps']['status'], 'not_stored')
+        page = self.runtime.chat_dispatch('activity_details',
+                                          {'activity_id': -42, 'include_streams': True, 'offset': 1, 'limit': 1}, remote=True)
+        self.assertEqual(page['streams']['items'][0]['heartrate_bpm'], 150)
+        self.assertIsNone(page['streams']['next_offset'])
+        self.assertNotIn('GPS-SECRET', json.dumps(result) + json.dumps(page))
+        self.assertNotIn('PRIVATE-SECRET', json.dumps(result) + json.dumps(page))
+        self.assertEqual(database.read_bytes(), before)
+        with self.assertRaises(ChatFailure) as caught:
+            self.runtime.chat_dispatch('activity_details', {'activity_id': 999}, remote=True)
+        self.assertEqual(caught.exception.code, 'not_found')
 
     def test_applied_plan_result_survives_dashboard_render_or_publish_failure(self):
         atomic_write(self.runtime.public / 'dashboard.html', b'last good page')
@@ -109,6 +165,27 @@ class ChatTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(value, {'ok': True, 'value': {'shared': 'context'}})
         dispatch.assert_called_once_with('context', {}, remote=True)
+        details_request = json.dumps({'action': 'activity_details', 'payload': {'activity_id': 42}})
+        with patch.object(self.runtime, 'chat_dispatch', return_value={'activity': {'activity_id': 42}}) as dispatch:
+            self.assertEqual(request(details_request)[0], 401)
+            dispatch.assert_not_called()
+            status, value = request(details_request, authorization=token)
+        self.assertEqual(status, 200)
+        self.assertEqual(value, {'ok': True, 'value': {'activity': {'activity_id': 42}}})
+        dispatch.assert_called_once_with('activity_details', {'activity_id': 42}, remote=True)
+        for code in ('not_found', 'invalid_input', 'source_policy', 'unavailable'):
+            with self.subTest(code=code):
+                with patch.object(self.runtime, 'chat_dispatch', side_effect=ChatFailure(code)):
+                    status, value = request(details_request, authorization=token)
+                self.assertEqual(status, 409)
+                self.assertEqual(value['code'], code)
+                self.assertFalse(value['ok'])
+        with patch.object(self.runtime, 'chat_dispatch', side_effect=Exception('private database path and token')):
+            status, value = request(details_request, authorization=token)
+        self.assertEqual((status, value), (500, {'ok': False, 'code': 'unavailable'}))
+        with patch.object(self.runtime, 'chat_dispatch', return_value={'activity': 'x' * RESPONSE_LIMIT}):
+            status, value = request(details_request, authorization=token)
+        self.assertEqual((status, value), (500, {'ok': False, 'code': 'unavailable'}))
         self.runtime.configure_chat({'action': 'disable'})
         self.assertEqual(request(authorization=token)[0], 401)
 

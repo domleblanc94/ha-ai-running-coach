@@ -1,6 +1,6 @@
 # AI Multisport Coach
 
-**Version 1.3.1** is the community release of AI Multisport Coach for Home Assistant. It serves one athlete and opens its setup and private dashboard through Home Assistant ingress.
+**Version 1.5.0** is the community release of AI Multisport Coach for Home Assistant. It serves one athlete and opens its setup and private dashboard through Home Assistant ingress.
 
 ## Choose a route or preview the dashboard
 
@@ -35,6 +35,14 @@ Local summary import is currently available through the [standalone project](htt
 In **Setup & settings → Athlete**, choose **Coaching detail**: Concise, Standard or Detailed. Detailed asks for more interpretation of the recorded activity, useful coaching comments, uncertainty and practical next steps. It applies to the next successful review; saved historical comments are not rewritten just by changing the setting. Saving the preference makes no model request, and the existing request/output limits remain in effect.
 
 New interval and strides sessions must explain warm-up, work repetitions and duration or distance, effort, recovery and cooldown. Existing incomplete sessions stay saved until a valid coaching update replaces them. A rejected incomplete response retains your last valid plan and shows a specific reason in Coach Status.
+
+## Desktop MCP activity details
+
+The optional desktop MCP companion can request full details for a saved activity by its activity ID. It returns the stored activity metrics, source provenance and units, plus paginated splits. Sensor streams are included only when requested and are paginated separately. Missing measurements remain unknown; the response identifies missing streams and laps that are not stored. It does not fetch new Garmin data or invent missing records.
+
+Enable the private connection and create its dedicated token through Home Assistant ingress, then configure the desktop companion using the [MCP setup guide](https://github.com/domleblanc94/ai-running-coach/blob/main/docs/CHAT_WITH_COACH.md). The LAN port is unassigned and the connection is disabled by default. The same token and source-policy checks protect detail requests. Shared details exclude raw GPS coordinates, credentials and private connection tokens.
+
+Reading details makes no AI request, uses no coach request allowance and does not change your profile or saved plan. The companion can retrieve further pages when a long activity has more splits or samples. Details reflect the records already saved in the app; they do not guarantee that every measurement available from a device has been imported.
 
 ## Race planning
 

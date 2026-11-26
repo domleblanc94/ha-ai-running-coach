@@ -1,6 +1,6 @@
 # AI Multisport Coach release review
 
-Status: **release 1.4.0**, intended for one athlete running a personal installation. Choose the [standalone setup guide](STANDALONE.md) or the [Home Assistant app](https://github.com/domleblanc94/ha-ai-running-coach). Repository, package and runtime identifiers remain unchanged. The version does not establish universal provider, model or watch compatibility; the evidence and remaining limits are recorded below. A separate personal Linux installation was backed up, migrated and checked against the official Garmin Personal API.
+Status: **release 1.5.0**, intended for one athlete running a personal installation. Choose the [standalone setup guide](STANDALONE.md) or the [Home Assistant app](https://github.com/domleblanc94/ha-ai-running-coach). Repository, package and runtime identifiers remain unchanged. The version does not establish universal provider, model or watch compatibility; the evidence and remaining limits are recorded below. A separate personal Linux installation was backed up, migrated and checked against the official Garmin Personal API.
 
 ## Release 1.4 additions
 
@@ -105,3 +105,7 @@ Map and elevation tests use synthetic courses and mocked services. They verify r
 5. Replace the retained Tailwind browser runtime with compiled CSS and test supported mobile browsers when a public hosting/build workflow is chosen. Preserve the existing UI and vendored notices.
 
 The AI still owns training decisions. Structural validation, offline checks and positive trajectory text do not certify medical suitability or race readiness.
+
+## Activity detail read (1.5.0)
+
+Adds a bounded, read-only MCP activity detail tool for saved measurements, HR zones, split summaries and optional 30-second stream averages. Only approved stored evidence is read; no provider or model request occurs. Coordinates and arbitrary provider fields are excluded. Current ingestion does not retain individual laps or raw sample streams; missing detail is explicit.

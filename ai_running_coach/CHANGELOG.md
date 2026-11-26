@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0
+
+- Add on-demand full stored activity details to the desktop MCP companion: activity metrics, provenance, units and paginated splits, with optional paginated sensor streams.
+- Report missing data explicitly, including unavailable streams and laps that are not stored. Detail reads make no Garmin refresh or AI request and preserve the saved plan and request allowance.
+- Keep raw GPS coordinates, credentials and private tokens outside activity details, with the existing token authentication, source policy and bounded private LAN bridge.
+
 ## 1.4.0
 
 - Add an opt-in Advanced planning mode with a larger bounded evidence and response allowance, dated planning focus, reasoning, adaptations and review points in the dashboard and exports. Economical remains the default; saving settings makes no AI request and daily request limits are unchanged.

@@ -6,7 +6,7 @@ A proposal does not change your plan. Review its exact before/after sessions in 
 
 ## Choose where the data lives
 
-- **Home Assistant:** keep HA as the live source. Run the small stdio connector on a desktop and relay its six bounded actions to the HA bridge. Do not use an old desktop copy of the plan as the workspace.
+- **Home Assistant:** keep HA as the live source. Run the small stdio connector on a desktop and relay its seven bounded actions to the HA bridge. Do not use an old desktop copy of the plan as the workspace.
 - **Standalone:** pass the explicit local data directory to `--workspace`. This directory must contain `athlete.md`, `training_plan.json` and `ai_coach_master.sqlite` with approved activity provenance.
 
 The old VM does not need to run. No command here enables public hosting, port forwarding, a tunnel, or a user account automatically.
@@ -86,7 +86,7 @@ Use `--reject-proposal` with the same displayed hash to reject instead. These te
 
 ## Data and limits
 
-The six remote actions are context, plan, recent activities, saved race context, save feedback and propose adjustment. Upcoming plans span at most 366 days; recent activities cover at most 56 days and 50 records. Requests are limited to 128 KiB and results to 512 KiB (520 KiB including the HA envelope).
+The seven remote actions are context, plan, recent activities, activity details, saved race context, save feedback and propose adjustment. Upcoming plans span at most 366 days; recent activities cover at most 56 days and 50 records. Requests are limited to 128 KiB and results to 512 KiB (520 KiB including the HA envelope).
 
 The connector shares selected profile facts, training sessions, measured activity summaries, athlete reports and saved race strategies with the chat provider you select. It does not provide API keys, tokens, arbitrary file access, raw GPS tracks or route coordinates. Unapproved or unidentified activity provenance blocks all actions. Treat free text in saved records as evidence rather than instructions.
 
@@ -102,3 +102,31 @@ Proposals use existing workout/calendar/sport validators, the shared coach lock 
 - **Context too large:** request fewer plan days or activities. Optional SDK failures do not prevent normal core coaching.
 
 No live chat account, tunnel, bridge port mapping or public deployment is required to run the offline test suite.
+
+## Inspect one saved activity
+
+Ask: "Read the full saved details for activity 123 and explain the intervals, measured effort and missing evidence."
+`get_activity_details(activity_id, include_streams=False, offset=0, limit=100)` reads one internal activity ID
+from `get_recent_activities`, including stored scalar measurements, provenance, HR zone seconds/percentages and recorded zone configurations,
+provider effort codes and split summaries. It is not restricted to the recent-activity date window.
+Unknown IDs return `not_found`; missing measurements are null and listed in `unknown_fields`.
+This action needs a saved database, but does not need a plan or profile to exist.
+
+Splits preserve stored order and can be grouped Garmin split summaries, not individual laps. The current
+schema retains no separate lap records or raw streams. Current Garmin imports store summary/detail
+measurements and split summaries when supplied; they do not fetch or retain sample streams. Offline summary
+imports also cannot create missing detail. Missing cadence, pace, power or elevations must never be invented.
+
+Set `include_streams=True` to request any already stored 30-second stream averages (time, distance,
+heart rate, speed, power, cadence, elevation, grade and moving sample fraction). These are bucket averages, not raw
+samples; the moving value is the fraction of samples flagged moving. Cadence units remain source dependent. Speed is metres/second, not pace. Each returned section
+has its own `total`, `offset`, `limit` and `next_offset`; the same offset/limit applies independently to
+splits and requested streams. Follow each section's `next_offset` separately until null to retrieve all pages.
+Default page size is 100, maximum 200; offset is 0-1,000,000. Sections report `not_stored`,
+`not_requested`, `invalid_stored_data` or `too_large` rather than fabricating values. Stored JSON sections
+over 4 MiB are withheld and the existing 512 KiB response cap still applies.
+
+Only explicit measurement keys are returned. GPS coordinates, route geometry, arbitrary provider extensions,
+credentials and arbitrary files are excluded. Saved athlete text remains evidence, not instructions.
+The read obeys approved Garmin/offline provenance policy and performs no Garmin refresh, paid model request
+or nested AI call. Per-provider effort codes have an unspecified scale and are not athlete-reported RPE.

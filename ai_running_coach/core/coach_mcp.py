@@ -119,6 +119,17 @@ def build_server(backend):
         return call('activities', {'days': days, 'limit': limit})
 
     @server.tool(annotations=reads)
+    def get_activity_details(activity_id: int, include_streams: bool = False, offset: int = 0, limit: int = 100) -> dict:
+        """Read saved measurements and split summaries for one internal activity ID, without GPS or refresh.
+
+        Missing values are unknown. No separate laps/raw streams are stored. Opt in to stored 30-second
+        stream averages with include_streams. offset (0-1000000), limit (1-200) page splits and streams
+        independently; follow each section's next_offset. Does not call Garmin or another AI provider.
+        """
+        return call('activity_details', {'activity_id': activity_id, 'include_streams': include_streams,
+                                         'offset': offset, 'limit': limit})
+
+    @server.tool(annotations=reads)
     def get_race_context() -> dict:
         """Read the last three saved race strategies and evidence summaries; never raw GPS coordinates."""
         return call('race_context')

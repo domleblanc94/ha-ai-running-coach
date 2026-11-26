@@ -216,17 +216,28 @@ class RelayTests(unittest.TestCase):
 
 @unittest.skipUnless(importlib.util.find_spec('mcp'), 'Optional MCP SDK is not installed')
 class OfficialSDKTests(unittest.IsolatedAsyncioTestCase):
-    async def test_real_sdk_discovers_only_six_bounded_tools_and_calls_backend(self):
+    async def test_real_sdk_discovers_only_seven_bounded_tools_and_calls_backend(self):
         from mcp import Client
         from coach_mcp import build_server
         backend = Mock()
         backend.dispatch.return_value = {'revision':3}
         async with Client(build_server(backend)) as client:
             tools = (await client.list_tools()).tools
-            self.assertEqual({tool.name for tool in tools}, {'get_coach_context','get_training_plan','get_recent_activities','get_race_context','save_athlete_feedback','propose_plan_adjustment'})
+            self.assertEqual({tool.name for tool in tools}, {'get_coach_context','get_training_plan','get_recent_activities','get_activity_details','get_race_context','save_athlete_feedback','propose_plan_adjustment'})
             result = await client.call_tool('get_training_plan',{'days':2})
             self.assertEqual(json.loads(result.content[0].text),{'ok':True,'value':{'revision':3}})
             backend.dispatch.assert_called_once_with('plan',{'days':2})
+
+    async def test_real_sdk_activity_details_dispatches_bounded_options(self):
+        from mcp import Client
+        from coach_mcp import build_server
+        backend = Mock()
+        backend.dispatch.return_value = {'activity': {'id': 123}, 'splits': {'status': 'not_stored'}}
+        async with Client(build_server(backend)) as client:
+            result = await client.call_tool('get_activity_details', {'activity_id':123, 'include_streams':True, 'offset':2, 'limit':3})
+            envelope = json.loads(result.content[0].text)
+            self.assertEqual(envelope['value']['activity']['id'],123)
+            backend.dispatch.assert_called_once_with('activity_details', {'activity_id':123, 'include_streams':True, 'offset':2, 'limit':3})
 
     async def test_real_stdio_process_discovery_and_sanitized_not_ready(self):
         from mcp import Client
@@ -236,7 +247,7 @@ class OfficialSDKTests(unittest.IsolatedAsyncioTestCase):
                 args=['-B',str(Path(__file__).resolve().parents[1]/'coach_mcp.py'),'--workspace',directory])
             async with Client(transport, read_timeout_seconds=15) as client:
                 tools = (await client.list_tools()).tools
-                self.assertEqual(len(tools),6)
+                self.assertEqual(len(tools),7)
                 result = await client.call_tool('get_coach_context',{})
                 envelope = json.loads(result.content[0].text)
                 self.assertEqual(envelope['code'],'not_ready')

@@ -8,7 +8,7 @@ import secrets
 
 from .storage import atomic_write, checked, file_lock
 
-REMOTE_ACTIONS = frozenset({'context', 'plan', 'activities', 'race_context', 'save_feedback', 'propose_adjustment'})
+REMOTE_ACTIONS = frozenset({'context', 'plan', 'activities', 'activity_details', 'race_context', 'save_feedback', 'propose_adjustment'})
 REVIEW_ACTIONS = frozenset({'list_proposals', 'get_proposal', 'apply_proposal', 'reject_proposal'})
 CHAT_MESSAGES = {
     'invalid_input': 'The chat request is invalid. Check its fields and try again.',
@@ -16,7 +16,7 @@ CHAT_MESSAGES = {
     'busy': 'Another coach action is using the workspace. Wait for it to finish.',
     'source_policy': 'The saved data source cannot be used for this chat request.',
     'stale_proposal': 'Your profile or plan has changed. Ask the chat coach for a new proposal.',
-    'not_found': 'This proposal is unavailable. Refresh the proposal list.',
+    'not_found': 'The requested saved item is unavailable.',
     'conflict': 'The proposal conflicts with the saved plan. Ask for a revised proposal.',
     'unavailable': 'Coach chat is temporarily unavailable. Your saved plan is retained.',
 }

@@ -1,6 +1,6 @@
 """Bounded coach context, athlete reports and human-approved chat plan changes.
 
-No provider calls, credentials, arbitrary files, activity streams or GPS are exposed.
+No provider calls, credentials, arbitrary files, raw activity streams or GPS are exposed.
 The caller's chat model supplies suggestions; the existing coach validates them.
 """
 from contextlib import closing, contextmanager, redirect_stdout
@@ -22,7 +22,7 @@ from source_policy import assert_coaching_sources
 from training_phases import PHASES_UNSET
 from coaching_mode import OVERVIEW_UNSET
 
-REMOTE_ACTIONS = frozenset({'context', 'plan', 'activities', 'race_context',
+REMOTE_ACTIONS = frozenset({'context', 'plan', 'activities', 'activity_details', 'race_context',
                             'save_feedback', 'propose_adjustment'})
 LOCAL_ACTIONS = REMOTE_ACTIONS | {'list_proposals', 'get_proposal', 'apply_proposal', 'reject_proposal'}
 REQUEST_LIMIT = 128 * 1024
@@ -230,6 +230,10 @@ class CoachChatService:
         return {'from': start, 'through': self._date(), 'limit': limit, 'activities': rows,
                 'units': {'distance_m': 'metres', 'moving_time_s': 'seconds', 'timer_duration_s': 'seconds; may include rests',
                           'elevation_gain_m': 'metres', 'avg_heartrate': 'bpm', 'avg_watts': 'watts'}}
+
+    def _activity_details(self, conn, payload):
+        from activity_details import activity_details
+        return activity_details(conn, payload, ChatError)
 
     def _race_context(self, conn, payload):
         _fields(payload)
