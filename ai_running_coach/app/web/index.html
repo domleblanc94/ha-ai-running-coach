@@ -24,17 +24,18 @@
       <p>Set up your coach, check your plan, and see what’s scheduled next.</p>
     </section>
     <section class="card run-card" aria-labelledby="run-title">
-      <div><p class="eyebrow">COACH STATUS</p><h2 id="run-title">Checking setup</h2><p id="run-detail" role="status" aria-live="polite">Connecting to the coach…</p><p id="run-diagnostic" class="hint" hidden></p><p id="first-plan-hint" class="hint" hidden></p><ul id="issues" hidden></ul></div>
-      <div class="actions"><button id="new-plan" type="button" disabled>Generate new plan</button><button id="run-now" type="button" class="secondary" disabled>Run now</button><button id="run-extra" type="button" class="secondary" hidden disabled>Run once anyway</button></div>
-      <div class="request-budget"><p id="request-budget" class="hint"></p><p id="extra-availability" class="hint"></p></div>
+      <div><h2 id="run-title">Checking setup</h2><p id="run-detail" role="status" aria-live="polite">Connecting to the coach…</p><p id="run-diagnostic" class="hint" hidden></p><p id="first-plan-hint" class="hint" hidden></p><ul id="issues" hidden></ul></div>
+      <div class="actions"><button id="run-now" type="button" disabled>Review current plan</button><button id="new-plan" type="button" class="secondary" disabled>Generate new plan</button><button id="run-extra" type="button" class="secondary" hidden disabled>Run once anyway</button></div>
+      <details id="request-details" class="request-budget"><summary id="request-summary">AI request allowance</summary><div><p id="request-budget" class="hint"></p><p id="extra-availability" class="hint"></p></div></details>
     </section>
     <nav aria-label="Coach views" class="tabs">
-      <button id="dashboard-tab" type="button" aria-pressed="false" disabled>Training dashboard</button>
-      <button id="athlete-tab" type="button" aria-pressed="false" disabled>Athlete profile</button>
+      <button id="dashboard-tab" type="button" aria-pressed="false" disabled>Training</button>
+      <button id="athlete-tab" type="button" aria-pressed="false" disabled>Athlete</button>
       <button id="race-tab" type="button" aria-pressed="false">Race planning</button>
       <button id="chat-tab" type="button" aria-pressed="false">Coach chat</button>
-      <button id="settings-tab" type="button" aria-pressed="true">Setup &amp; settings</button>
+      <button id="settings-tab" type="button" aria-pressed="true">Settings</button>
     </nav>
+    <p class="nav-hint">Swipe to switch views</p>
     <p id="download-result" class="hint" role="status" hidden></p>
     <section id="race-panel" hidden>
       <section class="card">
@@ -115,19 +116,18 @@
             <label>Garmin account region<select name="garmin_region"><option value="global">Global</option><option value="china">China</option></select></label>
           </div>
         </div>
-        <p id="planning-mode-hint" class="hint" role="status"></p>
-        <p class="hint">Saving these settings makes no AI request. They apply to your next review or new plan. Advanced can use more tokens and cost more per request; your daily request allowance stays the same.</p>
+        <p class="hint">Saving makes no AI request. Advanced may cost more per request; your daily allowance stays the same.</p>
+        <details class="usage-help"><summary>Planning limits and API usage</summary><p id="planning-mode-hint" class="hint" role="status"></p><p class="hint">Saved settings apply to your next review or new plan. Offline mode skips Garmin sync. Generating or reviewing a plan uses your selected model API.</p></details>
         <details id="openai-help" hidden><summary>Set up an OpenAI API key</summary>
           <ol>
             <li>Sign in to the <a href="https://platform.openai.com/" target="_blank" rel="noopener noreferrer">OpenAI API platform</a> and choose a project for your coach.</li>
             <li>Check <a href="https://platform.openai.com/settings/organization/billing/overview" target="_blank" rel="noopener noreferrer">API billing</a> and add API credit or a payment method if required. API usage is billed separately from ChatGPT; check your account for any eligible API credits.</li>
             <li>Open <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">API keys</a>, create a new secret key for that project, and paste it into Provider API key above. Keep the key private.</li>
             <li>Enter a model identifier available to your API project that supports Chat Completions and JSON output. Check the <a href="https://developers.openai.com/api/docs/models" target="_blank" rel="noopener noreferrer">model catalogue</a> and <a href="https://openai.com/api/pricing/" target="_blank" rel="noopener noreferrer">token prices</a>.</li>
-            <li>Save connection, then use Run now or Generate new plan when ready. Check API usage and set the project spending controls you need in the platform.</li>
+            <li>Save connection, then use Review current plan or Generate new plan when ready. Check API usage and set the project spending controls you need in the platform.</li>
           </ol>
           <p class="hint">Your saved key is never shown on this page. Leave the field blank to retain it. Your selected model receives the coaching data needed for each request.</p>
         </details>
-        <p class="hint">Offline mode skips Garmin sync. Generating or reviewing a plan uses your selected model API.</p>
         <div class="actions"><button type="submit">Save connection</button><span class="form-result" role="status"></span></div>
       </form>
       <form id="profile-form" class="card">
@@ -141,7 +141,7 @@
           <label>Current injury or training constraints<textarea name="injuries" maxlength="500" rows="3" placeholder="Optional"></textarea></label>
           <fieldset class="full"><legend>Available training days</legend><div id="days" class="days"></div><p class="hint">Choose the days you can train. Leaving every day blank means availability is not set and the coach may choose days.</p></fieldset>
           <fieldset id="running-preferences" class="full"><legend>Preferred long-run days (optional)</legend><div id="long-run-days" class="days"></div><p id="long-run-hint" class="hint">Leave all blank for no preference. Multiple days give the coach alternative days for your long run; they do not request extra long runs.</p><p id="long-run-saved-note" class="hint" hidden></p><button id="clear-long-run-days" type="button" class="secondary">No preference</button></fieldset>
-          <fieldset class="full"><legend>Goal priorities</legend><p class="hint">Add a race or training goal at each priority. Dates and targets are optional.</p><div id="goal-fields" class="goal-grid"></div></fieldset>
+          <details class="full optional-section"><summary>Race and training goal priorities <span class="optional">· optional</span></summary><p class="hint">Add a race or training goal at each priority. Dates and targets are optional.</p><div id="goal-fields" class="goal-grid"></div></details>
           <label id="running-zone-mode-label">Running heart rate zones<select name="zone_mode"><option value="unknown">Unknown / use effort</option><option value="known">Enter configured ranges</option><option value="learn">Learn HR zones from baseline runs</option></select></label>
           <p id="zone-learn-hint" class="hint full" hidden>Start with easy runs guided by effort and the talk test. The coach can review your observations while your saved ranges stay in place.</p>
           <fieldset id="zones" class="full" hidden><legend>Configured ranges in bpm</legend><p class="hint">Enter Zone 2 and any other ranges you know. Leave unknown ranges blank.</p><div id="zone-fields" class="zone-grid"></div></fieldset>
@@ -172,21 +172,20 @@
         </div>
         <div class="actions"><button type="submit">Save schedule</button><span class="form-result" role="status"></span></div>
       </form>
-      <section class="card">
-        <p class="eyebrow">QUICK ACCESS</p><h2>Add to Home Assistant sidebar</h2>
+      <details class="card"><summary>Add to Home Assistant sidebar</summary>
         <p>Open this app’s Info page in Home Assistant and turn on <strong>Show in sidebar</strong>.</p>
         <a href="https://my.home-assistant.io/redirect/supervisor_app/?app=ce7ba695_ai_running_coach" target="_blank" rel="noopener noreferrer">Open app info in Home Assistant</a>
-      </section>
+      </details>
     </div>
     <section id="dashboard-panel" hidden>
       <section id="running-conflict-warning" class="card attention" hidden><h2>Saved plan needs review</h2><p id="running-conflict-detail"></p><p>Check your training days and optional long-run preferences, then generate a new plan when you are ready. The saved plan remains in place until the coach produces a valid replacement.</p></section>
       <section id="availability-warning" class="card attention" hidden><h2>Training days have changed</h2><p id="availability-detail"></p><p>The saved plan stays in place until the coach produces a valid replacement. Generate a new plan to apply your saved availability.</p></section>
       <section id="dashboard-empty" class="card" hidden><h2>Your training dashboard starts here</h2><p>Your setup is saved. Generate your first plan to see your calendar and download workouts.</p><button id="first-dashboard-plan" type="button">Generate new plan</button></section>
-      <section id="plan-downloads" class="card" hidden>
-        <h2>Download your saved plan</h2>
-        <div class="actions"><a class="download-link" href="./exports/training_calendar.pdf" download="training_calendar.pdf">Download PDF calendar</a><a class="download-link" href="./exports/training_plan.md" download="training_plan.md">Download training_plan.md</a></div>
+      <details id="plan-downloads" class="plan-downloads" hidden>
+        <summary>Download your saved plan</summary>
+        <div class="actions"><a class="download-link" href="./exports/training_calendar.pdf" download="training_calendar.pdf">Download PDF calendar</a><a class="download-link" href="./exports/training_plan.md" download="training_plan.md">Training plan (Markdown)</a></div>
         <p class="hint">Exports use the current saved plan. If dashboard publication failed, the dashboard below may show an older version. The PDF includes a weekly calendar, saved training phases and full session details.</p>
-      </section>
+      </details>
       <p class="hint">The coach status above reflects current runs. The dashboard shows the last saved plan.</p>
       <iframe id="dashboard" title="Saved running plan and workout downloads" sandbox="allow-scripts allow-downloads"></iframe>
     </section>

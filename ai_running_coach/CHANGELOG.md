@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.1
+
+- Put the upcoming sessions and training calendar ahead of optional charts and planning detail, with full coach reviews and training trends available to expand.
+- Simplify the app header, make reviewing the current plan the main action, and keep request allowance details, optional goal priorities, downloads and setup help in expandable sections.
+- Improve phone navigation while retaining visible setup and run errors, direct first-time setup, and access to all saved coaching detail. This update changes presentation without spending an AI request or modifying the saved plan.
+
 ## 1.5.0
 
 - Add on-demand full stored activity details to the desktop MCP companion: activity metrics, provenance, units and paginated splits, with optional paginated sensor streams.

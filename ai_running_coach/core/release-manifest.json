@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "release": "1.5.0",
+  "release": "1.5.1",
   "license_status": "selected",
   "files": [
     {
@@ -137,11 +137,11 @@
     },
     {
       "path": "dashboard_panels.py",
-      "sha256": "60ac1fa06d2854ac52a9ae9e03eec21d828dc2f5ae08848324e2a8534a92ea32"
+      "sha256": "e4eb5932c630b76fbbb8f1030092fe3b5e4d1d466d082a808ef3897a5bf879d3"
     },
     {
       "path": "dashboard_template.py",
-      "sha256": "0a1c2be46d6e927dfc45afdb737d8f1c48fc35347f52967a0b32a1884fa8c2a0"
+      "sha256": "9f4fa358e229b52d75f12a492c071585f0bb6fa34f7792b7921da5fddb088b7f"
     },
     {
       "path": "database_manager.py",
@@ -165,7 +165,7 @@
     },
     {
       "path": "docs/RELEASE_REVIEW.md",
-      "sha256": "d4e2aa20ad85031b670fbf6e37fa2ca48f3f1dcece5f66417ad16277080ca8a6"
+      "sha256": "1e5156e2e9225450ab7d50e147191346ad9f553ce5cbb54d6caba0b514e2b14a"
     },
     {
       "path": "docs/STANDALONE.md",
@@ -201,7 +201,7 @@
     },
     {
       "path": "generate_dashboard.py",
-      "sha256": "53b5d1298f1428f6b9741f7db368bb95f5eb291ead5b333150ed52e7411f3762"
+      "sha256": "7c8b3b054e31860155b9c9f60e5eebbea4057ac4d3b4ce7fa25656480f633833"
     },
     {
       "path": "health_status.py",
@@ -229,7 +229,7 @@
     },
     {
       "path": "prepare_release.py",
-      "sha256": "e31daac1126953d43378beba924c3c08ab45a5535419435f0fdd6f3a53820425"
+      "sha256": "4f8895decbf3f19e87bb4ebc6f0cff0eaa385a3a7f96f35784d4e2d9aab6f430"
     },
     {
       "path": "publish_if_ready.py",
@@ -237,7 +237,7 @@
     },
     {
       "path": "pyproject.toml",
-      "sha256": "406ff8cfe345e1fd4a1f878e91e855e75d1d5c943d0e0794b4ec68c54d761273"
+      "sha256": "bac408915b4f2c38bbea1ee664e37bc2718f26d0db82d91f4644cfc2a04a6b47"
     },
     {
       "path": "race_elevation.py",

@@ -1,6 +1,6 @@
 # AI Multisport Coach for Home Assistant
 
-**Community release 1.3.1.** AI Multisport Coach plans and reviews running, cycling, swimming and triathlon training for one athlete. This Home Assistant app includes the coaching engine, setup screens, a private dashboard and a daily scheduler.
+**Community release 1.5.1.** AI Multisport Coach plans and reviews running, cycling, swimming and triathlon training for one athlete. This Home Assistant app includes the coaching engine, setup screens, a private dashboard and a daily scheduler.
 
 [Explore the synthetic live demo](https://domleblanc94.github.io/ai-running-coach/) to see the dashboard with a fictitious athlete and activities. The demo makes no AI or Garmin requests.
 
@@ -42,7 +42,7 @@ Previously called AI Running Coach. The app slug and repository URLs are unchang
 
 [Setup, privacy, backups and standalone migration](ai_running_coach/DOCS.md)
 
-If an earlier installation failed while fetching a Debian package, refresh the app store and check that it offers **1.3.1**, then retry installation. The new installation downloads the prebuilt image. Home Assistant needs HTTPS access to GitHub and GitHub Container Registry.
+If an earlier installation failed while fetching a Debian package, refresh the app store and check that it offers **1.5.1**, then retry installation. The new installation downloads the prebuilt image. Home Assistant needs HTTPS access to GitHub and GitHub Container Registry.
 
 ## Development
 

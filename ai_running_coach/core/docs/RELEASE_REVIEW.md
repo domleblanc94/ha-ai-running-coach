@@ -1,6 +1,13 @@
 # AI Multisport Coach release review
 
-Status: **release 1.5.0**, intended for one athlete running a personal installation. Choose the [standalone setup guide](STANDALONE.md) or the [Home Assistant app](https://github.com/domleblanc94/ha-ai-running-coach). Repository, package and runtime identifiers remain unchanged. The version does not establish universal provider, model or watch compatibility; the evidence and remaining limits are recorded below. A separate personal Linux installation was backed up, migrated and checked against the official Garmin Personal API.
+Status: **release 1.5.1**, intended for one athlete running a personal installation. Choose the [standalone setup guide](STANDALONE.md) or the [Home Assistant app](https://github.com/domleblanc94/ha-ai-running-coach). Repository, package and runtime identifiers remain unchanged. The version does not establish universal provider, model or watch compatibility; the evidence and remaining limits are recorded below. A separate personal Linux installation was backed up, migrated and checked against the official Garmin Personal API.
+
+## Release 1.5.1 dashboard cleanup
+
+- Put the weekly calendar before analytics, following upcoming workouts and a short saved coach priority or review excerpt. Keep workflow warnings, sync times and review status visible.
+- Group full coaching review and priorities behind a native disclosure. Keep training phases and Advanced planning overviews accessible below the calendar.
+- Collapse training trends and recorded activity totals until requested; preserve sport filters, metric controls and evidence coverage. Resize the chart after opening its section.
+- Existing dashboard and calendar tests pass against fictional data. Desktop/mobile visual inspection remains pending; no live athlete data or installation was used for this change.
 
 ## Release 1.4 additions
 

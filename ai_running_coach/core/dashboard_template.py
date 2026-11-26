@@ -1,5 +1,5 @@
 """Original dashboard layout, preserved from the pre-upgrade project."""
-def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, activities_json, macro_review_json, last_updated_str, today_json, freshness_html, other_activities_html, session_ids_json, planned_json, agenda_html, focus_html, assessment_html, history_html, feedback_html, workout_sessions_json, sport_weeks_json="{}", training_mode_json='"running"', phase_overview_html='', phase_weeks_json='{}', demo_mode=False):
+def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, activities_json, macro_review_json, last_updated_str, today_json, freshness_html, other_activities_html, session_ids_json, planned_json, agenda_html, focus_html, assessment_html, history_html, feedback_html, workout_sessions_json, sport_weeks_json="{}", training_mode_json='"running"', phase_overview_html='', phase_weeks_json='{}', demo_mode=False, trends_html='', coach_summary_html=''):
     return f"""<!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -46,7 +46,7 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 font-sans min-h-screen p-4 md:p-8">
-    <div class="max-w-7xl mx-auto space-y-8">
+    <div class="max-w-7xl mx-auto space-y-5">
         {'''<section id="syntheticDemoNotice" role="note" class="border border-amber-500/60 bg-amber-950 text-amber-100 rounded-xl p-5 space-y-3">
             <h2 class="text-xl font-bold">SYNTHETIC DEMO · AI Multisport Coach</h2>
             <p>All athletes, activities, plans and reviews here are fictional examples, not personalized training advice. No live AI or Garmin account is connected. “Today” is the fixed sample date shown below.</p>
@@ -60,13 +60,13 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
         </section>''' if demo_mode else ''}
 
         <!-- Header -->
-        <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-6">
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-slate-800 pb-4">
             <div>
-                <h1 class="text-3xl font-extrabold text-sky-400 flex items-center gap-3">
-                    <i class="fa-solid fa-calendar-days"></i> Training Plan Calendar
+                <h1 class="text-2xl font-bold text-sky-400 flex items-center gap-3">
+                    <i class="fa-solid fa-calendar-days"></i> Training calendar
                 </h1>
                 <div class="flex flex-wrap items-center gap-3 mt-1 text-slate-400 text-sm">
-                    <span>Interactive workout schedule, local run check-offs, and AI activity reviews</span>
+                    <span>Your week, workouts and coach guidance</span>
                     <span class="inline-flex items-center gap-1.5 bg-slate-800 border border-slate-700/80 text-emerald-400 text-xs px-2.5 py-0.5 rounded-full font-mono">
                         <i class="fa-solid fa-clock text-[10px]"></i> Updated: {last_updated_str}
                     </span>
@@ -78,60 +78,25 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
         <section id="liveHealthBanner" role="status" class="border border-slate-700 bg-slate-800/60 rounded-xl p-3 text-xs text-slate-300">Live workflow status is loading. Saved sync and review times are shown below.</section>
         {agenda_html}
         {freshness_html}
-        <!-- MACRO COACHING FEEDBACK BANNER -->
-        <div id="macroCoachBanner" class="hidden bg-slate-850 border border-amber-500/40 rounded-xl p-5 shadow-lg relative overflow-hidden">
-            <div class="flex items-center gap-3 mb-3 text-amber-400 font-bold text-lg border-b border-slate-700/60 pb-2">
-                <i class="fa-solid fa-user-ninja"></i> AI Multisport Coach Daily Review & Focus
-            </div>
-            {assessment_html}
-            <div id="macroCoachContent" class="text-xs md:text-sm text-slate-300 space-y-2 prose prose-invert prose-sm max-w-none leading-relaxed"></div>
-        </div>
-
-        <!-- Analytics Overview -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="bg-slate-800/60 border border-slate-800 rounded-xl p-5 shadow-lg md:col-span-2">
-                <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
-                    <h2 class="text-base font-semibold text-slate-300 flex items-center gap-2">
-                        <i class="fa-solid fa-chart-simple text-sky-400"></i> Weekly Volume & Load
-                    </h2>
-                    <div class="flex flex-wrap gap-2">
-                        <label class="text-xs text-slate-400">Sport <select id="chartSport" class="bg-slate-900 border border-slate-600 rounded p-1"><option value="running">Running</option><option value="cycling">Cycling</option><option value="swimming">Swimming</option><option value="other">Other activities</option><option value="all">All sports · duration</option></select></label>
-                        <button id="btnMinutes" onclick="switchChartMetric('minutes')" class="px-2.5 py-1 rounded text-xs border border-slate-700">Timer minutes</button>
-                        <button id="btnKm" onclick="switchChartMetric('km')" class="px-2.5 py-1 rounded text-xs font-semibold bg-sky-500/20 text-sky-400 border border-sky-500/40">Distance (km)</button>
-                        <button id="btnLoad" onclick="switchChartMetric('load')" class="px-2.5 py-1 rounded text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700 hover:text-slate-200">Garmin Load</button>
+        <!-- Saved coach guidance; details remain optional while the headline stays visible. -->
+        <section class="bg-slate-850 border border-slate-700 rounded-xl p-4 space-y-2">
+            <h2 class="font-semibold text-sky-300">Coach guidance</h2>
+            {coach_summary_html}
+            <p id="macroCoachSummary" class="hidden text-sm text-slate-300"></p>
+            <details id="coachReviewDetails" class="text-sm">
+                <summary class="cursor-pointer text-slate-400">Full review &amp; weekly priorities</summary>
+                <div class="mt-3 space-y-4">
+                    <div id="weeklyPriorities">{focus_html}</div>
+                    <div id="macroCoachBanner" class="hidden border-t border-slate-700 pt-3">
+                        {assessment_html}
+                        <div id="macroCoachContent" class="text-xs md:text-sm text-slate-300 space-y-2 prose prose-invert prose-sm max-w-none leading-relaxed"></div>
                     </div>
                 </div>
-                <div class="h-48">
-                    <canvas id="volumeChart"></canvas>
-                </div>
-                <p id="chartCoverage" class="text-xs text-slate-400 mt-3"></p>
-            </div>
-
-            <div class="bg-slate-800/60 border border-slate-800 rounded-xl p-5 shadow-lg flex flex-col justify-between">
-                <div>
-                    <h2 class="text-base font-semibold text-slate-300 mb-3 flex items-center gap-2">
-                        <i class="fa-solid fa-bullseye text-emerald-400"></i> This Week's Coaching Priorities
-                    </h2>
-                    <div id="weeklyPriorities">{focus_html}</div>
-                    <ul class="hidden text-xs text-slate-400 space-y-2">
-                        <li class="flex items-start gap-2"><span class="text-emerald-400 font-bold">•</span> Use week tabs to navigate training schedule blocks.</li>
-                        <li class="flex items-start gap-2"><span class="text-sky-400 font-bold">•</span> Checkboxes are local reminders; recorded activities are listed separately.</li>
-                        <li class="flex items-start gap-2"><span class="text-amber-400 font-bold">•</span> Follow the coach's session guidance and your practised fueling strategy.</li>
-                    </ul>
-                </div>
-                <div class="mt-4 pt-3 border-t border-slate-700/50 flex justify-between text-xs text-slate-400">
-                    <span>Legend:</span>
-                    <span class="text-emerald-400">Easy</span> |
-                    <span class="text-amber-400">Tempo</span> |
-                    <span class="text-sky-400">Long session</span> |
-                    <span class="text-slate-500">Rest</span>
-                </div>
-            </div>
-        </div>
+            </details>
+        </section>
 
         <!-- WEEKLY CALENDAR VIEW -->
         <div id="calendarView" class="space-y-6">
-            {phase_overview_html}
             <div class="flex flex-wrap items-center gap-3"><label class="text-sm text-slate-300">Show <select id="calendarSport" class="bg-slate-900 border border-slate-600 rounded px-2 py-1"><option value="all">All sessions</option><option value="running">Running</option><option value="cycling">Cycling</option><option value="swimming">Swimming</option><option value="multisport">Triathlon</option><option value="other">Strength, mobility &amp; other</option></select></label><p id="calendarSportSummary" class="text-xs text-slate-400"></p></div>
             <div class="flex items-center gap-2 overflow-x-auto pb-3 border-b border-slate-800/80" id="weekTabsContainer"></div>
             <section id="selectedWeekPhases" aria-label="Training phases for selected week" class="rounded-lg border border-slate-700 bg-slate-800/40 p-3 text-sm space-y-2"></section>
@@ -149,6 +114,31 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
             <div id="calendarGridContainer"></div>
         </div>
 
+        <details id="trainingTrends" class="border border-slate-700 rounded-xl p-4 bg-slate-800/30">
+            <summary class="cursor-pointer font-semibold text-sky-300">Training trends <span class="font-normal text-xs text-slate-400">· Volume, load and recorded totals</span></summary>
+            <div class="mt-4 space-y-4">
+                {trends_html}
+            <div class="bg-slate-800/60 border border-slate-800 rounded-xl p-5 shadow-lg">
+                <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+                    <h2 class="text-base font-semibold text-slate-300 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-simple text-sky-400"></i> Weekly Volume & Load
+                    </h2>
+                    <div class="flex flex-wrap gap-2">
+                        <label class="text-xs text-slate-400">Sport <select id="chartSport" class="bg-slate-900 border border-slate-600 rounded p-1"><option value="running">Running</option><option value="cycling">Cycling</option><option value="swimming">Swimming</option><option value="other">Other activities</option><option value="all">All sports · duration</option></select></label>
+                        <button id="btnMinutes" onclick="switchChartMetric('minutes')" class="px-2.5 py-1 rounded text-xs border border-slate-700">Timer minutes</button>
+                        <button id="btnKm" onclick="switchChartMetric('km')" class="px-2.5 py-1 rounded text-xs font-semibold bg-sky-500/20 text-sky-400 border border-sky-500/40">Distance (km)</button>
+                        <button id="btnLoad" onclick="switchChartMetric('load')" class="px-2.5 py-1 rounded text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700 hover:text-slate-200">Garmin Load</button>
+                    </div>
+                </div>
+                <div class="h-48">
+                    <canvas id="volumeChart"></canvas>
+                </div>
+                <p id="chartCoverage" class="text-xs text-slate-400 mt-3"></p>
+            </div>
+            </div>
+        </details>
+
+        {phase_overview_html}
         {history_html}
         {feedback_html}
         {other_activities_html}
@@ -263,6 +253,20 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
                 macroContent.innerHTML = safeMarkdown(parts.slice(2).join('\\n\\n')) + '<p class="text-sky-300 mt-2">' + escapeHtml((parts[1] || '').replace('on_track','On track').replace('insufficient_evidence','Insufficient evidence').replace('ahead','Ahead').replace('behind','Behind')) + '</p><details class="mt-3"><summary class="cursor-pointer text-amber-400">Applied changes and coaching rationale</summary><div class="whitespace-pre-wrap mt-2">' + escapeHtml(parts[0]) + '</div></details>';
             }} else {{
                 macroContent.innerHTML = macroReview.startsWith('Historical review') ? '<details><summary>Historical coach review (previous policy)</summary>' + safeMarkdown(macroReview) + '</details>' : safeMarkdown(macroReview);
+            }}
+            const headline = document.getElementById('macroCoachSummary');
+            const trajectory = macroReview.split('\\n\\n')[1];
+            if ((macroReview.startsWith('Applied plan changes') || macroReview.startsWith('Saved coaching changes')) && trajectory) {{
+                headline.textContent = trajectory.replace('on_track','On track').replace('insufficient_evidence','Insufficient evidence').replace('ahead','Ahead').replace('behind','Behind');
+                headline.classList.remove('hidden');
+            }}
+            const prioritySummary = document.getElementById('coachPrioritySummary');
+            if (prioritySummary && prioritySummary.dataset.priorityMissing === 'true') {{
+                const firstParagraph = macroContent.querySelector('p');
+                const excerpt = (firstParagraph ? firstParagraph.textContent : macroContent.textContent).replace(/\\s+/g, ' ').trim();
+                if (excerpt) {{
+                    prioritySummary.textContent = (macroReview.startsWith('Historical review') ? 'Historical review: ' : '') + excerpt.slice(0, 240) + (excerpt.length > 240 ? '…' : '');
+                }}
             }}
             macroBanner.classList.remove('hidden');
         }}
@@ -541,6 +545,11 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
                     x: {{ grid: {{ display: false }} }}
                 }}
             }}
+        }});
+        document.getElementById('trainingTrends').addEventListener('toggle', event=>{{
+            if (event.target.open) requestAnimationFrame(()=>{{
+                if (event.target.open) {{volumeChart.resize();volumeChart.update('none');}}
+            }});
         }});
         document.getElementById('chartSport').value=chartSport;
         switchChartMetric(chartSport==='all' ? 'minutes' : 'km');

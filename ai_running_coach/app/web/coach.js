@@ -397,8 +397,8 @@ function draw(next) {
   const firstPlan = byId("first-plan-hint");
   firstPlan.hidden = busy || !next.setup_ready || !next.profile_ready || next.plan_ready;
   firstPlan.textContent = next.hr_learning?.enabled
-    ? "Plan baseline runs to create your first plan and enable Run now."
-    : "Generate a new plan to create your first schedule and enable Run now.";
+    ? "Plan baseline runs to create your first plan and enable Review current plan."
+    : "Generate a new plan to create your first schedule and enable Review current plan.";
   const issues = byId("issues");
   issues.replaceChildren();
   for (const issue of next.setup_issues || []) {
@@ -410,11 +410,16 @@ function draw(next) {
   byId("new-plan").disabled = busy || working || next.worker_ok === false || !next.setup_ready || !next.profile_ready;
   byId("new-plan").textContent = next.hr_learning?.enabled ? "Plan baseline runs" : "Generate new plan";
   byId("run-now").disabled = byId("new-plan").disabled || !next.plan_ready;
+  byId("run-now").classList.toggle("secondary", !next.plan_ready);
+  byId("new-plan").classList.toggle("secondary", Boolean(next.plan_ready));
   const budget = next.request_budget;
   const used = Number.isSafeInteger(budget?.used) ? String(budget.used) : "Unknown";
   const reset = budget?.resets_at ? budget.resets_at.slice(0, 10) + " at 00:00 UTC" : "00:00 UTC";
   byId("request-budget").textContent = "AI requests today: " + used + " / " + (budget?.limit ?? "unknown")
     + " normal allowance · Resets " + reset + ". Includes failed requests and any extra request.";
+  byId("request-summary").textContent = "AI requests today: " + used + " / " + (budget?.limit ?? "unknown")
+    + (budget?.extra_available ? " · extra request available" : "");
+  if (["ledger_unavailable", "invalid_limit"].includes(budget?.extra_status)) byId("request-details").open = true;
   const extraMessages = {
     available: "One extra request is available with your confirmation. Provider quotas still apply.",
     used: "Today's extra request has been used or reserved. It cannot be retried automatically.",
@@ -813,13 +818,14 @@ function updateDashboard() {
 }
 
 function selectView(view) {
-  byId("setup-hero").hidden = view !== "settings";
+  byId("setup-hero").hidden = view !== "settings" || Boolean(state.setup_ready && state.profile_ready);
   byId("settings").hidden = view !== "settings";
   byId("dashboard-panel").hidden = view !== "dashboard";
   byId("athlete-panel").hidden = view !== "athlete";
   byId("race-panel").hidden = view !== "race";
   byId("chat-panel").hidden = view !== "chat";
   for (const name of ["dashboard", "settings", "athlete", "race", "chat"]) byId(name + "-tab").setAttribute("aria-pressed", String(view === name));
+  revealSelectedView();
   if (view === "athlete") showAthlete();
   if (view === "chat") window.CoachChat?.show();
   else window.CoachChat?.clearToken();
@@ -827,6 +833,19 @@ function selectView(view) {
   else window.CoachRouteMap?.deactivate();
   updateDashboard();
 }
+function revealSelectedView() {
+  const selectedTab = document.querySelector('.tabs button[aria-pressed="true"]');
+  const navigation = selectedTab.parentElement;
+  navigation.scrollLeft = selectedTab.offsetLeft - navigation.offsetLeft - (navigation.clientWidth - selectedTab.offsetWidth) / 2;
+}
+window.addEventListener("resize", revealSelectedView);
+
+// Reveal optional fields before native validation tries to focus them.
+document.addEventListener("invalid", event => {
+  for (let parent = event.target.parentElement; parent; parent = parent.parentElement) {
+    if (parent.tagName === "DETAILS") parent.open = true;
+  }
+}, true);
 byId("dashboard-tab").addEventListener("click", () => selectView("dashboard"));
 byId("settings-tab").addEventListener("click", () => selectView("settings"));
 byId("athlete-tab").addEventListener("click", () => selectView("athlete"));

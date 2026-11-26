@@ -128,15 +128,16 @@ def build_panels(plan,activities,coach,today):
     monday=today-timedelta(days=today.weekday());sunday=monday+timedelta(days=6)
     recorded=[item for day,items in activities.items() if monday.isoformat()<=day<=today.isoformat() for item in items]
     remaining=[item for item in scheduled if today.isoformat()<item['date']<=sunday.isoformat() and session_sport(item) != 'rest']
-    agenda+='</div><div class="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-slate-700 pt-3 mt-3">'
+    agenda+='</div><details class="mt-3 text-xs text-slate-400"><summary class="cursor-pointer">This week’s recorded activity totals</summary><div class="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-slate-700 pt-3 mt-3">'
     for sport, label in [('running','Running'),('cycling','Cycling'),('swimming','Swimming')]:
         rows=[item for item in recorded if activity_sport(item.get('type'))==sport]
         values=[item['distance_m'] for item in rows if number(item.get('distance_m'))]
         shown=(str(round(sum(values),1))+' m' if sport=='swimming' else str(round(sum(values)/1000,2))+' km') if values else 'Distance unavailable'
         agenda+='<p class="text-xs text-slate-400"><strong class="text-sky-300">'+label+' this week</strong><br>'+str(len(rows))+' recorded activities · '+shown+'<br>'+str(len(values))+'/'+str(len(rows))+' distances known</p>'
     timers=[item['timer_duration_s'] for item in recorded if number(item.get('timer_duration_s'))]
-    agenda+='</div><p class="text-xs text-slate-400 mt-3">All sports: '+(esc(duration(sum(timers)))+' known timer duration' if timers else 'timer duration unavailable')+' ('+str(len(timers))+'/'+str(len(recorded))+' known; may include rests). Still scheduled after today: '+str(len(remaining))+' non-rest sessions. No completion percentage is inferred.</p></section>'
+    agenda+='</div><p class="text-xs text-slate-400 mt-3">All sports: '+(esc(duration(sum(timers)))+' known timer duration' if timers else 'timer duration unavailable')+' ('+str(len(timers))+'/'+str(len(recorded))+' known; may include rests). Still scheduled after today: '+str(len(remaining))+' non-rest sessions. No completion percentage is inferred.</p></details></section>'
     priorities=coach.get('weekly_priorities') or []
+    summary='<p id="coachPrioritySummary" class="text-sm text-slate-300">'+esc(priorities[0].get('priority'))+'</p>' if priorities else '<p id="coachPrioritySummary" data-priority-missing="true" class="text-sm text-slate-400">No weekly priority supplied in the saved review yet.</p>'
     focus='<ul class="text-xs text-slate-300 space-y-3">'
     for item in priorities[:3]:
         focus+='<li><strong class="text-emerald-300">'+esc(item.get('priority'))+'</strong><p class="mt-1">'+esc(item.get('reason'))+'</p>'
@@ -168,4 +169,4 @@ def build_panels(plan,activities,coach,today):
             history+='<tr class="border-t border-slate-700"><td class="p-2">'+esc(str(item.get('start_date',''))[:10])+'<br>'+esc(item.get('name'))+'</td><td class="p-2">'+esc(item.get('type'))+'<br>'+esc(amount)+'</td><td class="p-2">'+esc(rate or 'Unavailable')+'</td><td class="p-2">'+esc(duration(item.get('timer_duration_s')))+'</td></tr>'
         history+='</tbody></table></div></details>'
     feedback='<details id="feedbackHelp" class="bg-slate-800/60 border border-slate-700 rounded-xl p-4"><summary class="font-semibold text-sky-300 cursor-pointer">Tell the coach how a session felt</summary><p class="text-sm text-slate-300 mt-3">Add a Garmin activity note/description and sync, or save a dated check-in using coach_checkin.py on the VM. The coach receives only notes returned by the Garmin API or saved locally. Browser checkboxes are reminders only.</p><p class="text-xs text-slate-400 mt-2">Use only fields you actually know; every field is optional. RPE uses 1-10; fatigue uses 0-10. Do not invent intake amounts.</p><pre class="text-xs whitespace-pre-wrap break-words bg-slate-900 p-3 rounded mt-3">[coach: rpe=4; fatigue=2; pain=none; recovery=normal; fueling=2 gels; fueling_tolerance=good]</pre><p class="text-xs text-slate-400 mt-2">Rest-day feedback can be saved through the provided coach_checkin.py command on the VM. This static page does not submit a form.</p></details>'
-    return {'agenda':agenda,'focus':focus,'assessment':explanation,'history':history,'feedback':feedback}
+    return {'summary':summary,'agenda':agenda,'focus':focus,'assessment':explanation,'history':history,'feedback':feedback}

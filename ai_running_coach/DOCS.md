@@ -1,6 +1,6 @@
 # AI Multisport Coach
 
-**Version 1.5.0** is the community release of AI Multisport Coach for Home Assistant. It serves one athlete and opens its setup and private dashboard through Home Assistant ingress.
+**Version 1.5.1** is the community release of AI Multisport Coach for Home Assistant. It serves one athlete and opens its setup and private dashboard through Home Assistant ingress.
 
 ## Choose a route or preview the dashboard
 
@@ -24,7 +24,7 @@ If you installed from the documented repository URL, you can jump to the app pag
 2. Choose your activity source. Offline mode skips Garmin sync and starts with the profile as its evidence. For Garmin mode, obtain your own official Personal API key and review the permitted use of your data. Configure the key and account region in the app. [Garmin developer program](https://developer.garmin.com/gc-developer-program/overview/)
 3. Select a model provider and enter its key. Generating or reviewing a plan uses that provider, including with the offline activity source. The default allowance is two coaching requests per UTC day, shared by manual and scheduled runs. Check your provider's account limits and pricing separately.
 4. Save your IANA timezone (for example, Europe/London) with scheduling unchecked. This controls plan dates and the daily review time. Request counts follow UTC days.
-5. Generate and review the first plan. Enable a local review time when you are ready for scheduled reviews. The app keeps the last saved dashboard if a review fails. The scheduler runs one review per local day. If it fails, use **Run now** after checking the cause. Manual runs still use the core request budget. A run interrupted by a restart pauses the schedule until you re-enable it.
+5. Generate and review the first plan. Enable a local review time when you are ready for scheduled reviews. The app keeps the last saved dashboard if a review fails. The scheduler runs one review per local day. If it fails, use **Review current plan** after checking the cause. Manual runs still use the core request budget. A run interrupted by a restart pauses the schedule until you re-enable it.
 
 Provider integrations use a common request budget. Gemini remains the primary live-tested route; compatibility of other providers and models with a particular account requires verification and remains experimental. Offline transport tests do not guarantee every model supports the same request options.
 
@@ -32,7 +32,7 @@ Local summary import is currently available through the [standalone project](htt
 
 ## Activity review detail
 
-In **Setup & settings → Athlete**, choose **Coaching detail**: Concise, Standard or Detailed. Detailed asks for more interpretation of the recorded activity, useful coaching comments, uncertainty and practical next steps. It applies to the next successful review; saved historical comments are not rewritten just by changing the setting. Saving the preference makes no model request, and the existing request/output limits remain in effect.
+In **Settings → Athlete**, choose **Coaching detail**: Concise, Standard or Detailed. Detailed asks for more interpretation of the recorded activity, useful coaching comments, uncertainty and practical next steps. It applies to the next successful review; saved historical comments are not rewritten just by changing the setting. Saving the preference makes no model request, and the existing request/output limits remain in effect.
 
 New interval and strides sessions must explain warm-up, work repetitions and duration or distance, effort, recovery and cooldown. Existing incomplete sessions stay saved until a valid coaching update replaces them. A rejected incomplete response retains your last valid plan and shows a specific reason in Coach Status.
 
@@ -66,7 +66,7 @@ On a Forerunner 965, load the course through your Garmin workflow, choose an out
 
 ## Coaching request allowance
 
-In **Setup & settings**, set **Daily AI request limit** from **1 to 20** requests. The default is **2**. Saving a different allowance does not start a coaching run or clear the requests already recorded today. Each app run still makes at most one coaching request; raising the daily limit does not add automatic retries. Coach Status shows **AI requests today** and the next reset at **00:00 UTC**, which may differ from midnight in your selected timezone. Failed provider attempts count towards the allowance; offline previews and reading the dashboard do not.
+In **Settings**, set **Daily AI request limit** from **1 to 20** requests. The default is **2**. Saving a different allowance does not start a coaching run or clear the requests already recorded today. Each app run still makes at most one coaching request; raising the daily limit does not add automatic retries. The status header shows **AI requests today**. Expand it for the next reset at **00:00 UTC**, which may differ from midnight in your selected timezone. Failed provider attempts count towards the allowance; offline previews and reading the dashboard do not.
 
 When the normal allowance is spent, **Run once anyway** lets you explicitly confirm one extra coaching request for that UTC day. Choose **Review current plan** or **Generate new plan**; with no saved plan, the action generates the first plan. The extra request leaves the normal allowance unchanged. It is spent when the AI request is reserved in the saved ledger, including an attempt that is interrupted or fails. A sync or preflight failure before that reservation, or reuse of a cached review without a new request, leaves the extra available for another explicit confirmation. There is no automatic retry. Restarting the app does not restore a spent extra, and a confirmation for a previous UTC day cannot spend a request on the new day. Scheduled runs cannot use this exception.
 
@@ -74,7 +74,9 @@ The allowance is an app limit, not a monetary spending cap. Increasing it or con
 
 ## Profile, training days and downloads
 
-After initial setup, the app opens on **Training dashboard**. Use **Athlete profile** to review your saved goals, available training days, training background and sport-specific settings. Use **Setup & settings** when you want to edit them.
+After initial setup, the app opens on **Training**. Use **Athlete** to review your saved goals, available training days, training background and sport-specific settings. Use **Settings** when you want to edit them. On a phone, swipe the view buttons to reach more views. Optional race and training goal priorities expand within the profile editor.
+
+Upcoming sessions and the calendar come first. Expand **Training trends** for charts, **Full review & weekly priorities** for the full saved coaching narrative, and the planning sections for the wider progression. The app header keeps setup and run failures visible. Expand the request allowance or **Download your saved plan** when you need their details; these panels do not start a coaching request.
 
 The calendar keeps dates in their Monday-to-Sunday columns, including a first week that starts partway through the week. **No session planned** means the saved plan has no entry for that date; it is distinct from a prescribed rest day. Multiple sessions on one date appear together. Compact mobile layouts omit empty gaps. Updating the app corrects the display of an existing dashboard without requiring a new coaching request or changing its saved session dates.
 
@@ -96,7 +98,7 @@ Upgrading does not rewrite existing plans or use an AI request. Existing plans r
 
 ## Running, cycling, swimming and triathlon
 
-**Setup & settings** offers a **Training focus** and optional availability for each sport. Sport days narrow the global training days; leave them blank to inherit the global setting. Preferred long-run and long-ride days are alternatives, not requests for several long sessions. Keep optional cycling FTP, swimming CSS, pool size and sport-specific HR ranges blank when unknown. Running ranges are not reused as cycling or swimming ranges. **Learn HR zones** applies to running baseline observations; it is not a cycling or swimming test protocol.
+**Settings** offers a **Training focus** and optional availability for each sport. Sport days narrow the global training days; leave them blank to inherit the global setting. Preferred long-run and long-ride days are alternatives, not requests for several long sessions. Keep optional cycling FTP, swimming CSS, pool size and sport-specific HR ranges blank when unknown. Running ranges are not reused as cycling or swimming ranges. **Learn HR zones** applies to running baseline observations; it is not a cycling or swimming test protocol.
 
 One coach review considers all enabled disciplines and their combined demands. The same daily request allowance and output limit apply; enabling triathlon does not add per-sport calls. The dashboard labels and filters disciplines, keeps distances and pace measures separate, and shows combined recorded timer duration with missing-data coverage. Composite Garmin activities without separate imported legs remain composite training time, not invented per-sport distances. The PDF includes sport labels and linked brick order.
 
@@ -124,7 +126,7 @@ Start with **Coach Status** in the app. A failed run shows its time, stage, reas
 
 - **Garmin or activity sync:** check the selected activity source and Garmin access. If Garmin is limiting requests, wait before trying again.
 - **Provider authentication or request:** check the selected provider and model in Settings, and confirm the key and model access with that provider.
-- **Daily budget:** wait until 00:00 UTC, change the normal allowance in **Setup & settings**, or confirm **Run once anyway** if today's extra request is still available.
+- **Daily budget:** wait until 00:00 UTC, change the normal allowance in **Settings**, or confirm **Run once anyway** if today's extra request is still available.
 - **Provider quota:** check the provider account or wait for its reset. The app's extra request cannot bypass a provider quota.
 - **Truncated or invalid response:** the app keeps the last valid plan. Check the reason and request allowance before retrying.
 - **Replacement instructions or session identifier conflict:** the AI response could not safely replace the upcoming plan. The saved plan stays available. Updating may explain an earlier failure more precisely, but it does not replay rejected responses or start another request.
@@ -133,7 +135,7 @@ Start with **Coach Status** in the app. A failed run shows its time, stage, reas
 
 For support, share the app version, failure time, stage, reason code and recorded model request count. If the code points to the provider, include its name and the model identifier. Keep keys, raw provider responses, prompts, profiles and activity records private.
 
-If the app has no saved plan yet, select **Generate new plan**, or **Plan baseline runs** in learn mode. **Run now** is available after the first plan is saved.
+If the app has no saved plan yet, select **Generate new plan**, or **Plan baseline runs** in learn mode. **Review current plan** is available after the first plan is saved.
 
 ## Data and backups
 
