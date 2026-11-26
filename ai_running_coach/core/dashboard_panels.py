@@ -24,6 +24,16 @@ def build_phase_display(plan, today, session_dates):
     else:
         overview += '<p class="text-sm text-slate-300 mt-3">The saved plan has no phase labels. They will appear when the coach adds them; no phases have been inferred from your workouts.</p>'
     overview += '</details>'
+    from coaching_mode import validate_overview
+    notes = validate_overview(plan.get('planning_overview', []))
+    if notes:
+        overview += '<details id="planningOverview" class="border border-slate-700 bg-slate-800/60 rounded-xl p-4 mt-3"><summary class="cursor-pointer font-semibold text-sky-300">Coaching plan overview</summary><ol class="space-y-4 mt-3">'
+        for item in notes:
+            overview += '<li class="break-words"><h3 class="font-semibold text-slate-200">' + html.escape(item['focus']) + '</h3><p class="text-xs text-slate-400">' + item['start_date'] + ' - ' + item['end_date'] + '</p>'
+            for key, label in (('rationale', 'Why this block'), ('adaptation', 'Adjust if needed'), ('review_trigger', 'Review when')):
+                overview += '<p class="text-sm text-slate-300 mt-2"><strong>' + label + ':</strong> ' + html.escape(item[key]) + '</p>'
+            overview += '</li>'
+        overview += '</ol></details>'
     weeks = {date.fromisoformat(value) - timedelta(days=date.fromisoformat(value).weekday()) for value in session_dates}
     return {'overview': overview, 'weeks': {week.isoformat(): phase_spans(plan, week.isoformat(), (week + timedelta(days=6)).isoformat()) for week in sorted(weeks)}}
 
@@ -94,7 +104,7 @@ def coach_payload(conn):
     tables={row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     if 'coach_review_jobs' not in tables:return {}
     import json
-    row=conn.execute("SELECT response_json FROM coach_review_jobs WHERE status='complete' AND prompt_version IN ('autonomous-coach-v2','autonomous-coach-v3','autonomous-coach-v4-starter-week','autonomous-coach-v5-availability','autonomous-coach-v5-availability-starter-week','autonomous-coach-v6-schedule','autonomous-coach-v6-schedule-starter-week','autonomous-coach-v7-new-plan','autonomous-coach-v7-new-plan-starter-week','autonomous-coach-v8-multisport','autonomous-coach-v8-multisport-starter-week','autonomous-coach-v9-detail','autonomous-coach-v9-detail-starter-week','autonomous-coach-v10-phases','autonomous-coach-v10-phases-starter-week') ORDER BY updated_at DESC LIMIT 1").fetchone()
+    row=conn.execute("SELECT response_json FROM coach_review_jobs WHERE status='complete' AND prompt_version IN ('autonomous-coach-v2','autonomous-coach-v3','autonomous-coach-v4-starter-week','autonomous-coach-v5-availability','autonomous-coach-v5-availability-starter-week','autonomous-coach-v6-schedule','autonomous-coach-v6-schedule-starter-week','autonomous-coach-v7-new-plan','autonomous-coach-v7-new-plan-starter-week','autonomous-coach-v8-multisport','autonomous-coach-v8-multisport-starter-week','autonomous-coach-v9-detail','autonomous-coach-v9-detail-starter-week','autonomous-coach-v10-phases','autonomous-coach-v10-phases-starter-week','autonomous-coach-v11-advanced','autonomous-coach-v11-advanced-starter-block') ORDER BY updated_at DESC LIMIT 1").fetchone()
     try:
         payload=json.loads(row[0]) if row and row[0] else {}
         return payload if isinstance(payload,dict) else {}

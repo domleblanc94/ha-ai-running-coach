@@ -50,6 +50,23 @@ def race_operation(workspace, operation):
     return 0
 
 
+def chat_operation(workspace):
+    """Bounded local dispatch; no provider request or raw exception output."""
+    from contextlib import redirect_stdout
+    try:
+        payload = json.load(sys.stdin)
+        with redirect_stdout(sys.stderr):
+            from coach_chat_service import CoachChatService
+            value = CoachChatService(workspace).dispatch(payload['action'], payload['payload'])
+        envelope = {'ok': True, 'value': value}
+    except Exception as error:
+        allowed = {'invalid_input', 'not_ready', 'busy', 'source_policy', 'stale_proposal', 'not_found', 'conflict', 'unavailable'}
+        code = getattr(error, 'code', 'unavailable')
+        envelope = {'ok': False, 'code': code if code in allowed else 'unavailable'}
+    print(json.dumps(envelope, allow_nan=False))
+    return 0
+
+
 def main():
     workspace = Path(sys.argv[1]).resolve()
     operation = sys.argv[2]
@@ -62,6 +79,10 @@ def main():
         if approval:
             raise ValueError('Race planning does not use a manual-extra approval.')
         return race_operation(workspace, operation)
+    if operation == 'chat_dispatch':
+        if approval:
+            raise ValueError('Chat actions cannot use coaching request approval.')
+        return chat_operation(workspace)
     if operation == 'validate_profile':
         from planning_engine import parse_profile
 

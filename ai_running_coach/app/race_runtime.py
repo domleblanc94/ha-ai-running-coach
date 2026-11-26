@@ -42,8 +42,13 @@ class RaceFailure(RuntimeError):
 
 class RaceRuntime:
     def _race_call(self, operation, payload, *, timezone_name='UTC'):
+        timeout = 150 if operation == 'race_review' else 75 if operation == 'race_elevation' else 20
+        if operation == 'race_review':
+            limits = self.planning_rules.planning_settings(self._env())
+            if limits['mode'] == 'advanced':
+                timeout = min(345, limits['http_timeout_seconds'] + 45)
         result, output = self._command(operation, input_text=json.dumps(payload, allow_nan=False),
-                                       timeout=150 if operation == 'race_review' else 75 if operation == 'race_elevation' else 20,
+                                       timeout=timeout,
                                        timezone_name=timezone_name, capture=True)
         if result or not isinstance(output, str) or len(output) > 16 * 1024 * 1024:
             raise RaceFailure('race_unavailable')

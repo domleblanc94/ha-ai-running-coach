@@ -13,6 +13,7 @@ from types import SimpleNamespace
 from urllib.parse import quote, urlsplit
 
 import requests
+from coaching_mode import planning_settings
 
 SUPPORTED_PROVIDERS = ('gemini', 'openai', 'anthropic')
 DEFAULT_MODELS = {'gemini': 'gemini-3.5-flash-lite','openai':None,'anthropic':None}
@@ -111,7 +112,7 @@ class ProviderClient:
         custom_openai = self.provider == 'openai' and self.base_url != DEFAULT_URLS['openai']
         if not self.key and not (keyless and custom_openai):
             raise ValueError('Set ' + self.provider.upper() + '_API_KEY, or explicitly enable keyless mode for a custom OpenAI-compatible endpoint.')
-        self.timeout = max(5, min(120, int(os.getenv('COACH_HTTP_TIMEOUT_SECONDS', '60'))))
+        self.timeout = planning_settings()['http_timeout_seconds']
         self.session = session or requests.Session()
         # requests defaults to zero transport retries; make it explicit.
         if session is None:
@@ -145,13 +146,15 @@ class ProviderClient:
         return data
 
     def generate_messages(self, model, messages, config, json_mode):
-        maximum = int(config.get('max_output_tokens', 4096))
-        if not 1 <= maximum <= 8192:
-            raise ValueError('Output token budget must be between 1 and 8192.')
+        settings = planning_settings()
+        maximum = int(config.get('max_output_tokens', settings['max_output_tokens']))
+        ceiling = 32768 if settings['mode'] == 'advanced' else 8192
+        if not 1 <= maximum <= ceiling:
+            raise ValueError('Output token budget exceeds the selected planning mode limit.')
         system = config.get('system_instruction', '')
-        maximum_input=max(8000,min(120000,int(os.getenv('COACH_MAX_INPUT_CHARS','60000'))))
+        maximum_input=settings['max_input_chars']
         if len(system)+sum(len(message['content']) for message in messages)>maximum_input:
-            raise ValueError('Conversation exceeds COACH_MAX_INPUT_CHARS; shorten the context before retrying.')
+            raise ValueError('Conversation exceeds the selected planning mode input limit; shorten the context before retrying.')
         if json_mode:
             system = (system + '\nReturn only a JSON object, without Markdown fences.').strip()
         headers = {'Content-Type': 'application/json'}
@@ -165,9 +168,9 @@ class ProviderClient:
                 generation['temperature']=config['temperature']
             if json_mode:
                 generation['responseMimeType'] = 'application/json'
-            if model_name in {'gemini-2.5-flash', 'gemini-2.5-flash-lite'}:
+            if settings['mode'] == 'economical' and model_name in {'gemini-2.5-flash', 'gemini-2.5-flash-lite'}:
                 generation['thinkingConfig'] = {'thinkingBudget': 0}
-            elif model_name=='gemini-3.5-flash-lite':
+            elif settings['mode'] == 'economical' and model_name=='gemini-3.5-flash-lite':
                 generation['thinkingConfig'] = {'thinkingLevel':'MINIMAL'}
             payload = {'contents': [{'role': 'model' if message['role'] == 'assistant' else 'user',
                                      'parts': [{'text': message['content']}]} for message in messages],

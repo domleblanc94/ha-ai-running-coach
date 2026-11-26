@@ -67,6 +67,12 @@ def doctor(root,offline=False):
         config={**dotenv_values(root/".env"),**os.environ}
     except ImportError:
         config=dict(os.environ);errors.append("Install requirements.txt to read .env configuration")
+    from coaching_mode import planning_settings
+    try:
+        mode_settings=planning_settings(config)
+        print("Planning mode: "+mode_settings["mode"]+"; output limit "+str(mode_settings["max_output_tokens"])+" tokens; input limit "+str(mode_settings["max_input_chars"])+" characters; new block up to "+str(mode_settings["planning_days"])+" days")
+    except ValueError as exc:
+        errors.append(str(exc))
     provider=config.get("COACH_PROVIDER","gemini")
     if provider not in DEFAULT_MODELS:errors.append("Set COACH_PROVIDER to gemini/openai/anthropic")
     model=config.get("COACH_MODELS") or DEFAULT_MODELS.get(provider)

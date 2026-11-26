@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 from dotenv import dotenv_values
 
 from . import diagnostics, hr_learning
+from .chat_runtime import ChatRuntime
 from .race_runtime import RaceRuntime, MESSAGES as RACE_MESSAGES
 from .scheduler import due_date, validate_schedule
 from .storage import (
@@ -31,6 +32,7 @@ SETTINGS = {
     'source': 'COACH_ACTIVITY_SOURCE',
     'garmin_region': 'GARMIN_PERSONAL_REGION',
     'daily_request_limit': 'COACH_MAX_DAILY_REQUESTS',
+    'planning_mode': 'COACH_PLANNING_MODE',
 }
 SECRETS = {
     'gemini_api_key': 'GEMINI_API_KEY',
@@ -44,11 +46,14 @@ ENV_KEYS = set(SETTINGS.values()) | set(SECRETS.values()) | {
     'GARMIN_HTTP_TIMEOUT_SECONDS', 'GARMIN_MAX_REQUESTS_PER_RUN', 'GARMIN_BACKFILL_DAYS',
     'OPENAI_BASE_URL', 'OPENAI_TOKEN_PARAMETER', 'COACH_ALLOW_KEYLESS',
     'GEMINI_BASE_URL', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_VERSION',
+    'COACH_ADVANCED_MAX_OUTPUT_TOKENS', 'COACH_ADVANCED_MAX_INPUT_CHARS',
+    'COACH_ADVANCED_HTTP_TIMEOUT_SECONDS',
 }
 CHOICES = {
     'provider': {'gemini', 'openai', 'anthropic'},
     'source': {'offline', 'garmin'},
     'garmin_region': {'global', 'china'},
+    'planning_mode': {'economical', 'advanced'},
 }
 GARMIN_ISSUES = {
     'missing_key': 'Add your Garmin Personal API key in Settings.',
@@ -84,6 +89,14 @@ def load_calendar_rules(core):
                 sys.modules.pop('sports', None)
 
 
+def load_planning_rules(core):
+    """Load bounded policy from the immutable bundle, never private workspace code."""
+    specification = importlib.util.spec_from_file_location('coach_planning_rules', core / 'coaching_mode.py')
+    rules = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(rules)
+    return rules
+
+
 def utc_now():
     return datetime.now(timezone.utc)
 
@@ -101,7 +114,7 @@ def read_json(path):
     return json.loads(checked(path).read_bytes())
 
 
-class Runtime(RaceRuntime):
+class Runtime(RaceRuntime, ChatRuntime):
     @staticmethod
     def _now():
         return utc_now()
@@ -124,6 +137,7 @@ class Runtime(RaceRuntime):
             with file_lock(self.run_lock, blocking=False):
                 install_core(core, self.workspace)
             self.calendar_rules = load_calendar_rules(core)
+            self.planning_rules = load_planning_rules(core)
             if not checked(self.state_file).exists():
                 self._write_state({
                     'schema_version': 1, 'queued': None, 'running': None,
@@ -154,6 +168,11 @@ class Runtime(RaceRuntime):
     def _config(self, env):
         provider = env.get('COACH_PROVIDER', 'gemini')
         model = env.get('COACH_MODELS', 'gemini-3.5-flash-lite' if provider == 'gemini' else '')
+        mode = env.get('COACH_PLANNING_MODE', 'economical')
+        planning_keys = ('mode', 'max_output_tokens', 'max_input_chars', 'planning_days', 'activity_review_days', 'http_timeout_seconds')
+        previews = {name: {key: value for key, value in self.planning_rules.planning_settings(
+            {**env, 'COACH_PLANNING_MODE': name}).items() if key in planning_keys}
+            for name in sorted(CHOICES['planning_mode'])}
         source = env.get('COACH_ACTIVITY_SOURCE', 'offline')
         region = env.get('GARMIN_PERSONAL_REGION', 'global')
         try:
@@ -166,6 +185,9 @@ class Runtime(RaceRuntime):
             'source': source if source in CHOICES['source'] else '',
             'garmin_region': region if region in CHOICES['garmin_region'] else '',
             'daily_request_limit': request_limit,
+            'planning_mode': mode if mode in CHOICES['planning_mode'] else '',
+            'planning_limits': previews.get(mode),
+            'planning_modes': previews,
         }
         config.update({f'has_{field}': bool(env.get(key, '').strip()) for field, key in SECRETS.items()})
         return config
@@ -175,6 +197,8 @@ class Runtime(RaceRuntime):
         profile_ready = checked(self.workspace / 'athlete.md').is_file()
         plan_ready = checked(self.workspace / 'training_plan.json').is_file()
         issues = []
+        if not config['planning_mode']:
+            issues.append('Choose Economical or Advanced planning mode in Settings.')
         if config['daily_request_limit'] is None:
             issues.append('Set a daily AI request limit from 1 to 20 in Settings.')
         if not profile_ready:
@@ -192,6 +216,8 @@ class Runtime(RaceRuntime):
         return {
             'config': config, 'profile_ready': profile_ready, 'plan_ready': plan_ready,
             'dashboard_ready': checked(self.public / 'dashboard.html').is_file(),
+            'dashboard_revision': max(state.get('dashboard_revision', ''), state.get('last_success_at') or ''),
+            'chat_bridge': self._chat_status(state),
             'setup_ready': not issues, 'setup_issues': issues,
             'schedule': state['schedule'], 'last_run': self._last_run(state),
             'queued': state['queued'], 'running': state['running'],
@@ -443,7 +469,7 @@ class Runtime(RaceRuntime):
         check_tree(self.workspace)
         allowed = {'PATH', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP', 'TMPDIR', 'LANG', 'SSL_CERT_FILE', 'SSL_CERT_DIR'}
         env = {key: value for key, value in os.environ.items() if key.upper() in allowed}
-        coaching = action not in ('validate_profile', 'baseline_feedback', 'race_parse', 'race_read', 'race_export', 'race_elevation')
+        coaching = action not in ('validate_profile', 'baseline_feedback', 'race_parse', 'race_read', 'race_export', 'race_elevation', 'chat_dispatch')
         if coaching:
             env.update(self._env())
         env.update(COACH_PUBLISH_ENABLED='false', PYTHONIOENCODING='utf-8', PYTHONDONTWRITEBYTECODE='1', TZ=timezone_name)

@@ -75,7 +75,7 @@ class TrainingPhaseTests(unittest.TestCase):
         self.assertIn('[] explicitly', prompt)
         self.assertIn('same response budget', prompt)
         self.assertEqual(plan, before)
-        self.assertIn('v10-phases', ai_coach.PROMPT_VERSION)
+        self.assertIn('v11-advanced', ai_coach.PROMPT_VERSION)
 
     def test_markdown_phases_are_plain_safe_metadata_and_legacy_stays_unspecified(self):
         plan = {'goals':[], 'sessions':[{'id':'run','date':'2026-11-20','workout_type':'Easy run','amount':'30 min','target':'Easy effort'}]}

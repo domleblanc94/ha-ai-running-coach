@@ -1,5 +1,5 @@
 name: AI Multisport Coach
-version: "1.3.1"
+version: "1.4.0"
 image: ghcr.io/domleblanc94/ha-ai-running-coach
 slug: ai_running_coach
 description: "Personal AI running, cycling, swimming and triathlon coach with a private dashboard"
@@ -14,6 +14,10 @@ init: true
 timeout: 90
 ingress: true
 ingress_port: 8099
+ports:
+  8100/tcp: null
+ports_description:
+  8100/tcp: "Optional private LAN chat bridge; requires enabling and a dedicated token in the app"
 panel_admin: true
 panel_icon: mdi:run
 panel_title: AI Multisport Coach

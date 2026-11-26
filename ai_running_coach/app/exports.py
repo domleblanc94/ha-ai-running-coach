@@ -200,6 +200,24 @@ def calendar_pdf(plan, athlete_name='', *, conflicts=(), phase_rules=None):
             canvas.showPage()
             detail_page()
 
+    overview = plan.get('planning_overview', [])
+    if overview:
+        section_title = 'Planning overview'
+        section_dates = 'Coach-authored focus, reasoning, adaptations and review points.'
+        detail_page()
+        for block in overview:
+            if y < 150:
+                canvas.showPage()
+                detail_page()
+            flowing(block['focus'], bold)
+            flowing(block['start_date'] + ' - ' + block['end_date'], small)
+            for key, label in (('rationale', 'Reasoning'), ('adaptation', 'Adaptation'), ('review_trigger', 'Review point')):
+                flowing(label + ': ' + block[key])
+            y -= 8
+        canvas.showPage()
+        section_title = 'Session details'
+        section_dates = first.strftime('%d %b %Y') + ' - ' + last.strftime('%d %b %Y')
+
     if phases:
         section_title = 'Training phases'
         section_dates = 'Coach-authored progression; dates are inclusive. Unassigned dates are not inferred.'

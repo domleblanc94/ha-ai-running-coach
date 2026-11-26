@@ -307,3 +307,7 @@ The [release review](docs/RELEASE_REVIEW.md) records corrected findings, verifie
 AI-assisted development and review: **OpenAI Codex**.
 
 Codex assisted with implementation, tests, documentation and review under the project owner's direction. Maintenance, approval of changes and release decisions remain the project owner's responsibility. This acknowledgement credits AI assistance; it does not imply OpenAI maintains or endorses the project.
+
+## Detailed planning and coach chat
+
+The default economical mode keeps token use low. Opt into [Advanced planning](docs/ADVANCED_PLANNING.md) for up to four weeks of coherent planning, richer activity reviews, saved weekly rationale and deeper race guidance. It increases token use without changing the daily request allowance. [Chat with your coach](docs/CHAT_WITH_COACH.md) describes the optional MCP companion and its private connection setup.

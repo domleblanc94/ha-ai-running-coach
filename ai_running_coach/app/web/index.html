@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="./assets/leaflet.css">
   <script src="./assets/leaflet.js" defer></script>
   <script src="./assets/coach.js" defer></script>
+  <script src="./assets/chat.js" defer></script>
   <script src="./assets/race-map.js" defer></script>
   <script src="./assets/race-elevation-chart.js" defer></script>
   <script src="./assets/race.js" defer></script>
@@ -31,6 +32,7 @@
       <button id="dashboard-tab" type="button" aria-pressed="false" disabled>Training dashboard</button>
       <button id="athlete-tab" type="button" aria-pressed="false" disabled>Athlete profile</button>
       <button id="race-tab" type="button" aria-pressed="false">Race planning</button>
+      <button id="chat-tab" type="button" aria-pressed="false">Coach chat</button>
       <button id="settings-tab" type="button" aria-pressed="true">Setup &amp; settings</button>
     </nav>
     <p id="download-result" class="hint" role="status" hidden></p>
@@ -68,6 +70,24 @@
         <div id="race-strategies" class="race-strategies"></div>
       </section>
     </section>
+    <section id="chat-panel" hidden>
+      <section class="card">
+        <p class="eyebrow">CHAT WITH YOUR COACH</p><h2>Discuss your training. Review changes here.</h2>
+        <p>An optional MCP companion lets a desktop chat client read your saved coaching context, record your feedback, and propose plan changes. It does not spend your coach’s API allowance. The chat client’s own usage and data policies apply.</p>
+        <p class="hint">The companion requires setup on a computer that can reach Home Assistant. This app does not configure a public endpoint or a browser-only ChatGPT connection.</p>
+        <details id="chat-connection-details"><summary>Connect a desktop chat client</summary>
+          <p>Enable the connection below, then assign a private LAN port to <strong>8100/tcp</strong> on this app’s Home Assistant Configuration page. The port is unassigned by default.</p>
+          <p>The companion uses <strong>http://YOUR-HA-LAN-ADDRESS:YOUR-PORT/coach-chat</strong> and a dedicated token. This local HTTP connection is unencrypted: use it only on a trusted private network, and never forward it to the internet. Follow the <a href="https://github.com/domleblanc94/ai-running-coach/blob/main/docs/CHAT_WITH_COACH.md" target="_blank" rel="noopener noreferrer">desktop companion instructions</a>.</p>
+          <p>Anyone holding this token can read the shared athlete and training context, save feedback, and create proposals. Model API keys and raw GPS tracks are excluded. Only you can apply a proposed plan change here.</p>
+          <p id="chat-connection-status" class="hint" role="status"></p>
+          <div class="actions"><button id="chat-enable" type="button">Enable and create token</button><button id="chat-rotate" type="button" class="secondary" hidden>Replace token</button><button id="chat-disable" type="button" class="secondary" hidden>Disable and revoke token</button></div>
+          <div id="chat-token-box" hidden><label>New connection token · shown once<input id="chat-token" type="password" readonly autocomplete="off"></label><div class="actions"><button id="chat-token-reveal" type="button" class="secondary">Show token</button><button id="chat-token-copy" type="button" class="secondary">Copy token</button><button id="chat-token-clear" type="button" class="secondary">Hide and clear</button></div><p class="hint">Store this token in the companion’s private token file. It will not be displayed again after you clear it or refresh.</p></div>
+          <p id="chat-connection-result" class="form-result" role="status"></p>
+        </details>
+      </section>
+      <section class="card"><div class="actions"><h2>Proposed plan changes</h2><button id="chat-refresh" type="button" class="secondary">Refresh proposals</button></div><p>Read each changed session before applying. The app checks your current profile, plan revision and training rules again. Applying a valid proposal updates the plan and renders the dashboard locally without an AI request.</p><p id="chat-proposal-result" class="form-result" role="status"></p><div id="chat-proposals"></div></section>
+      <section id="chat-proposal-detail" class="card" hidden><p class="eyebrow">REVIEW BEFORE APPLYING</p><h2 id="chat-proposal-title"></h2><p id="chat-proposal-meta" class="hint"></p><div id="chat-proposal-diff"></div><details><summary>Full proposal details</summary><pre id="chat-proposal-source" class="profile-source"></pre></details><div class="actions"><button id="chat-apply" type="button">Apply these changes</button><button id="chat-reject" type="button" class="secondary">Reject proposal</button></div></section>
+    </section>
     <section id="athlete-panel" hidden>
       <div class="card">
         <p class="eyebrow">YOUR SAVED PROFILE</p><h2 id="athlete-name">Athlete profile</h2>
@@ -86,6 +106,7 @@
         <div class="grid">
           <label>Model provider<select name="provider"><option value="gemini">Google Gemini</option><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option></select></label>
           <label>Model identifier<input name="model" maxlength="120" required placeholder="gemini-3.5-flash-lite"></label>
+          <label>Planning mode<select name="planning_mode"><option value="economical">Economical</option><option value="advanced">Advanced</option></select><small>Advanced uses more activity evidence and asks for weekly reasoning, adaptations and review points.</small></label>
           <label>Daily AI request limit<input name="daily_request_limit" type="number" min="1" max="20" step="1" value="2" required><small>Normal allowance, 1–20 requests per UTC day. Failed requests count. Raising it may increase costs.</small></label>
           <label id="provider-key-label">Provider API key<input name="provider_key" type="password" maxlength="1024" autocomplete="new-password"><small id="provider-key-hint"></small></label>
           <label>Activity source<select name="source"><option value="offline">Offline / no activity sync</option><option value="garmin">Garmin Personal API</option></select></label>
@@ -94,6 +115,18 @@
             <label>Garmin account region<select name="garmin_region"><option value="global">Global</option><option value="china">China</option></select></label>
           </div>
         </div>
+        <p id="planning-mode-hint" class="hint" role="status"></p>
+        <p class="hint">Saving these settings makes no AI request. They apply to your next review or new plan. Advanced can use more tokens and cost more per request; your daily request allowance stays the same.</p>
+        <details id="openai-help" hidden><summary>Set up an OpenAI API key</summary>
+          <ol>
+            <li>Sign in to the <a href="https://platform.openai.com/" target="_blank" rel="noopener noreferrer">OpenAI API platform</a> and choose a project for your coach.</li>
+            <li>Check <a href="https://platform.openai.com/settings/organization/billing/overview" target="_blank" rel="noopener noreferrer">API billing</a> and add API credit or a payment method if required. API usage is billed separately from ChatGPT; check your account for any eligible API credits.</li>
+            <li>Open <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">API keys</a>, create a new secret key for that project, and paste it into Provider API key above. Keep the key private.</li>
+            <li>Enter a model identifier available to your API project that supports Chat Completions and JSON output. Check the <a href="https://developers.openai.com/api/docs/models" target="_blank" rel="noopener noreferrer">model catalogue</a> and <a href="https://openai.com/api/pricing/" target="_blank" rel="noopener noreferrer">token prices</a>.</li>
+            <li>Save connection, then use Run now or Generate new plan when ready. Check API usage and set the project spending controls you need in the platform.</li>
+          </ol>
+          <p class="hint">Your saved key is never shown on this page. Leave the field blank to retain it. Your selected model receives the coaching data needed for each request.</p>
+        </details>
         <p class="hint">Offline mode skips Garmin sync. Generating or reviewing a plan uses your selected model API.</p>
         <div class="actions"><button type="submit">Save connection</button><span class="form-result" role="status"></span></div>
       </form>
@@ -103,7 +136,7 @@
           <label>Athlete name<input name="name" maxlength="100" required autocomplete="off"></label>
           <label>Training focus<select name="training_mode"><option value="running">Running</option><option value="cycling">Cycling</option><option value="swimming">Swimming</option><option value="triathlon">Triathlon</option></select><small>Changing focus keeps your existing goals and saved sport settings. Generate a new plan when you are ready to change the upcoming block.</small></label>
           <label>Training goal<input name="goal" maxlength="500" placeholder="Build consistency or prepare for a race"></label>
-          <label>Coaching detail<select name="review_detail"><option value="concise">Concise</option><option value="standard" selected>Standard</option><option value="detailed">Detailed</option></select><small>Detailed asks for more activity interpretation, coaching comments and practical next steps within your existing model limits. Applies on the next review; saving this does not make an AI request.</small></label>
+          <label>Coaching detail<select name="review_detail"><option value="concise">Concise</option><option value="standard" selected>Standard</option><option value="detailed">Detailed</option></select><small>Detailed adds more activity interpretation, coaching comments and practical next steps. Planning mode in Connection controls evidence depth and the planning allowance. Applies on the next review; saving this does not make an AI request.</small></label>
           <label>Training experience<textarea name="experience" maxlength="500" rows="3" placeholder="Recent training, experience in each sport, or time away"></textarea></label>
           <label>Current injury or training constraints<textarea name="injuries" maxlength="500" rows="3" placeholder="Optional"></textarea></label>
           <fieldset class="full"><legend>Available training days</legend><div id="days" class="days"></div><p class="hint">Choose the days you can train. Leaving every day blank means availability is not set and the coach may choose days.</p></fieldset>
@@ -157,6 +190,7 @@
       <p class="hint">The coach status above reflects current runs. The dashboard shows the last saved plan.</p>
       <iframe id="dashboard" title="Saved running plan and workout downloads" sandbox="allow-scripts allow-downloads"></iframe>
     </section>
+    <dialog id="chat-apply-confirm" aria-labelledby="chat-confirm-title"><form method="dialog"><h2 id="chat-confirm-title">Apply this reviewed proposal?</h2><p id="chat-confirm-summary"></p><p>This updates the saved plan and dashboard using the changes shown above. No AI request is made. A changed profile or plan will require a fresh proposal.</p><div class="actions"><button value="cancel" class="secondary" autofocus>Cancel</button><button value="confirm">Apply proposal</button></div></form></dialog>
     <dialog id="new-plan-confirm">
       <form method="dialog">
         <h2 id="plan-confirm-title">Generate a new training plan?</h2>

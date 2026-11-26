@@ -15,6 +15,7 @@ from sports import (TRAINING_MODES, ENDURANCE_SPORTS, session_sport, effective_g
 from coaching_detail import review_detail
 from session_instructions import validate_quality_session, workout_instruction_lines
 from training_phases import PHASES_UNSET, validate_phases, replace_future_phases
+from coaching_mode import planning_settings, evidence_settings, OVERVIEW_UNSET, validate_overview, replace_future_overview
 
 POLICY_VERSION = 4
 SESSION_FIELDS = {'id', 'date', 'workout_type', 'amount', 'target', 'goal_priority', 'workout', 'sport', 'sub_sport', 'brick'}
@@ -204,6 +205,7 @@ def validate_plan(plan, profile):
     if plan.get('goals') != profile['goals']:
         raise ValueError('Canonical goals differ from configured profile.')
     validate_phases(plan.get('phases', []))
+    validate_overview(plan.get('planning_overview', []))
     sessions = plan.get('sessions')
     if not isinstance(sessions, list) or (not sessions and not plan.get('requires_coach_reconciliation')):
         raise ValueError('No validated sessions.')
@@ -250,6 +252,13 @@ def render_plan(plan):
         lines += ['', 'Dates outside these ranges: Phase not specified.', '']
     else:
         lines += ['Phase not specified. The coach can label the upcoming plan at the next successful review.', '']
+    if plan.get('planning_overview'):
+        lines += ['## Coaching plan overview', '']
+        for item in validate_overview(plan['planning_overview']):
+            lines += ['### ' + item['start_date'] + ' to ' + item['end_date'] + ': ' + phase_text(item['focus']), '',
+                      '**Why this block:** ' + phase_text(item['rationale']), '',
+                      '**Adjust if needed:** ' + phase_text(item['adaptation']), '',
+                      '**Review when:** ' + phase_text(item['review_trigger']), '']
     typed=any('sport' in session for session in plan['sessions'])
     week = None
     for s in sorted(plan['sessions'], key=lambda x: x['date']):
@@ -423,7 +432,16 @@ def build_evidence(conn, today):
         combined=aggregate(block)
         combined.pop('distance_m');combined.pop('distance_coverage')
         sport_weeks.append({'ending':end.isoformat(),'by_sport':by_sport,'combined_duration':combined})
-    return {'today': today.isoformat(), 'window_start': start, 'feedback_units':FEEDBACK_FIELD_UNITS, 'feedback_history':feedback,'current_athlete_reports':[r for r in feedback if r['current_report']], 'sport_weeks_8':sport_weeks, 'running_weeks_8':weekly, 'running_28d': {'count': len(running), 'total_km': round(km,2), 'avg_weekly_km': round(km/4,2), 'longest_km': round(max([(r.get('distance_m') or 0)/1000 for r in running] or [0]),2)},
+    extra = {}
+    if planning_settings()['mode'] == 'advanced':
+        recent_start = (today - timedelta(days=13)).isoformat()
+        context_start = (today - timedelta(days=27)).isoformat()
+        review_rows = [row for row in rows if str(row['start_date'])[:10] >= recent_start]
+        context_rows = [row for row in rows if context_start <= str(row['start_date'])[:10] < recent_start]
+        extra = {'planning_mode': 'advanced', 'recent_14d': review_rows[-40:], 'context_previous_14d': context_rows[-40:],
+                 'detailed_activity_coverage': {'review_total': len(review_rows), 'review_supplied': min(40, len(review_rows)),
+                     'context_total': len(context_rows), 'context_supplied': min(40, len(context_rows))}}
+    return {**extra, 'today': today.isoformat(), 'window_start': start, 'feedback_units':FEEDBACK_FIELD_UNITS, 'feedback_history':feedback,'current_athlete_reports':[r for r in feedback if r['current_report']], 'sport_weeks_8':sport_weeks, 'running_weeks_8':weekly, 'running_28d': {'count': len(running), 'total_km': round(km,2), 'avg_weekly_km': round(km/4,2), 'longest_km': round(max([(r.get('distance_m') or 0)/1000 for r in running] or [0]),2)},
             'recent_7d': recent, 'limitations': ['Missing subjective effort is unknown, not low fatigue.', 'Average HR does not measure time in zones.', 'Race readiness requires more evidence than plan compliance.',
                 'Official Garmin sync excludes child legs: multisport parent time is counted once and remains unallocated to individual sports.',
                 'A sport absent from a weekly by_sport map has no recorded activities that week; null metrics and coverage zero mean unknown measurement.',
@@ -445,7 +463,7 @@ def fingerprint(profile, plan, evidence, question, generation_identity=None):
     return hashlib.sha256(json.dumps(parts, sort_keys=True, allow_nan=False).encode()).hexdigest()
 
 
-def apply_plan_changes(plan, changes, profile, today, phases=PHASES_UNSET):
+def apply_plan_changes(plan, changes, profile, today, phases=PHASES_UNSET, planning_overview=OVERVIEW_UNSET):
     if not isinstance(changes,list) or len(changes)>60:
         raise ValueError('Invalid plan change count.')
     result=copy.deepcopy(plan)
@@ -491,7 +509,10 @@ def apply_plan_changes(plan, changes, profile, today, phases=PHASES_UNSET):
     if phases is not PHASES_UNSET:
         result['phases'] = replace_future_phases(plan.get('phases', []), phases, today)
     phase_changed = result.get('phases', PHASES_UNSET) != plan.get('phases', PHASES_UNSET)
-    if changes or plan.get('requires_coach_reconciliation') or phase_changed:
+    if planning_overview is not OVERVIEW_UNSET:
+        result['planning_overview'] = replace_future_overview(plan.get('planning_overview', []), planning_overview, today)
+    overview_changed = result.get('planning_overview', OVERVIEW_UNSET) != plan.get('planning_overview', OVERVIEW_UNSET)
+    if changes or plan.get('requires_coach_reconciliation') or phase_changed or overview_changed:
         result['revision']+=1
         result['requires_coach_reconciliation']=False
         result['authored_by']='AI coach'
@@ -531,7 +552,7 @@ def new_session_id_prefix(plan, today):
     return prefix
 
 
-def apply_new_plan(plan,changes,profile,today,phases=PHASES_UNSET):
+def apply_new_plan(plan,changes,profile,today,phases=PHASES_UNSET,planning_overview=OVERVIEW_UNSET):
     """Replace only future scheduling after a valid AI-authored block exists."""
     if not isinstance(changes,list) or not changes or len(changes)>60:
         raise ValueError('A new plan requires added sessions with new unique IDs.')
@@ -564,29 +585,32 @@ def apply_new_plan(plan,changes,profile,today,phases=PHASES_UNSET):
     future=[session for session in prepared['sessions'] if session['date']>=str(today)]
     prepared['sessions']=[session for session in prepared['sessions'] if session['date']<str(today)]
     prepared['retired_session_ids']=sorted(set(prepared.get('retired_session_ids',[]))|{session['id'] for session in future})
-    if future or any(phase['end_date'] >= str(today) for phase in plan.get('phases', [])):
+    if future or any(phase['end_date'] >= str(today) for phase in plan.get('phases', [])) or any(item['end_date'] >= str(today) for item in plan.get('planning_overview', [])):
         archived = {'revision':plan['revision'],'superseded_from':str(today),'sessions':future}
         if 'phases' in plan:
             archived['phases'] = copy.deepcopy(plan['phases'])
+        if 'planning_overview' in plan:
+            archived['planning_overview'] = copy.deepcopy(plan['planning_overview'])
         prepared.setdefault('superseded_blocks',[]).append(archived)
     prepared['requires_coach_reconciliation']=True
     prepared.pop('new_plan_requested',None)
     # Replacement sessions must never inherit superseded future phase labels.
     replacement = [] if phases is PHASES_UNSET else phases
-    result=apply_plan_changes(prepared,additions,profile,today,phases=replacement)
+    result=apply_plan_changes(prepared,additions,profile,today,phases=replacement,
+                              planning_overview=[] if planning_overview is OVERVIEW_UNSET else planning_overview)
     result['active_block_started_on']=str(today)
     return result
 
 
-def apply_coach_changes(plan,changes,profile,today,phases=PHASES_UNSET):
+def apply_coach_changes(plan,changes,profile,today,phases=PHASES_UNSET,planning_overview=OVERVIEW_UNSET):
     if plan.get('new_plan_requested'):
-        return apply_new_plan(plan,changes,profile,today,phases=phases)
-    return apply_plan_changes(plan,changes,profile,today,phases=phases)
+        return apply_new_plan(plan,changes,profile,today,phases=phases,planning_overview=planning_overview)
+    return apply_plan_changes(plan,changes,profile,today,phases=phases,planning_overview=planning_overview)
 
 
 def validate_review(payload, evidence, plan, today, profile=None, require_explicit_sport=False):
     required={'summary','trajectory','reviews','plan_changes'}
-    optional={'weekly_priorities','assessment','next_review_trigger','phases'}
+    optional={'weekly_priorities','assessment','next_review_trigger','phases','planning_overview'}
     if not isinstance(payload,dict) or not required.issubset(payload) or set(payload)-required-optional:
         raise ValueError('Invalid review envelope.')
     if payload['trajectory'] not in {'insufficient_evidence','on_track','ahead','behind'}:
@@ -599,16 +623,17 @@ def validate_review(payload, evidence, plan, today, profile=None, require_explic
         try:value.encode('utf-8')
         except UnicodeEncodeError:return False
         return True
-    if not coaching_text(payload['summary'],2000):
-        raise ValueError('Summary must be useful text of at most 2000 characters; short paragraphs are allowed.')
-    activities={r['activity_id'] for r in evidence['recent_7d']}
+    settings = evidence_settings(evidence)
+    if not coaching_text(payload['summary'],settings['summary_max_chars']):
+        raise ValueError('Summary must be useful text within the selected mode character limit; short paragraphs are allowed.')
+    activities={r['activity_id'] for r in evidence.get('recent_14d', evidence['recent_7d'])}
     seen=set()
     if not isinstance(payload['reviews'],list) or len(payload['reviews'])>len(activities):
         raise ValueError('Invalid review list.')
     for review in payload['reviews']:
         if not isinstance(review,dict) or set(review)!={'activity_id','feedback'} or type(review['activity_id']) is not int or review['activity_id'] not in activities or review['activity_id'] in seen:
             raise ValueError('Unknown/duplicate activity ID.')
-        if not coaching_text(review['feedback'],1800):
+        if not coaching_text(review['feedback'],settings['feedback_max_chars']):
             raise ValueError('Invalid activity feedback.')
         seen.add(review['activity_id'])
     def text(value,maximum):
@@ -624,7 +649,7 @@ def validate_review(payload, evidence, plan, today, profile=None, require_explic
                 raise ValueError('Each priority needs a reason and evidence references.')
     if 'assessment' in payload:
         assessment=payload['assessment']
-        if not isinstance(assessment,dict) or set(assessment)!={'reason','evidence','uncertainties'} or not text(assessment['reason'],1000) or not texts(assessment['evidence'],8) or not texts(assessment['uncertainties'],8):
+        if not isinstance(assessment,dict) or set(assessment)!={'reason','evidence','uncertainties'} or not text(assessment['reason'],3000 if settings['mode']=='advanced' else 1000) or not texts(assessment['evidence'],8) or not texts(assessment['uncertainties'],8):
             raise ValueError('Invalid trajectory assessment explanation.')
     if 'next_review_trigger' in payload and not text(payload['next_review_trigger'],500):
         raise ValueError('Invalid next review trigger.')
@@ -635,7 +660,7 @@ def validate_review(payload, evidence, plan, today, profile=None, require_explic
                 if not isinstance(session,dict) or 'sport' not in session:
                     raise ValueError('AI sessions must specify an explicit sport.')
     if profile is not None:
-        apply_coach_changes(plan,payload['plan_changes'],profile,today,phases=payload.get('phases',PHASES_UNSET))
-    elif payload['plan_changes'] or 'phases' in payload:
+        apply_coach_changes(plan,payload['plan_changes'],profile,today,phases=payload.get('phases',PHASES_UNSET),planning_overview=payload.get('planning_overview',OVERVIEW_UNSET))
+    elif payload['plan_changes'] or 'phases' in payload or 'planning_overview' in payload:
         raise ValueError('Profile required to validate plan changes.')
     return payload

@@ -26,6 +26,7 @@ ASSETS = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/assets/coach.css": ("coach.css", "text/css; charset=utf-8"),
     "/assets/coach.js": ("coach.js", "text/javascript; charset=utf-8"),
+    "/assets/chat.js": ("chat.js", "text/javascript; charset=utf-8"),
     "/assets/race.js": ("race.js", "text/javascript; charset=utf-8"),
     "/assets/race-map.js": ("race-map.js", "text/javascript; charset=utf-8"),
     "/assets/race-elevation-chart.js": ("race-elevation-chart.js", "text/javascript; charset=utf-8"),
@@ -397,6 +398,11 @@ class CoachHandler(BaseHTTPRequestHandler):
             session = self.session()
             new_cookie = None if session else secrets.token_hex(32)
             self.send_json(200, {**runtime.status(), "csrf": self.csrf(session or new_cookie)}, cookie=new_cookie)
+        elif path == '/api/chat/proposals':
+            try:
+                self.send_json(200, runtime.chat_dispatch('list_proposals', {}))
+            except (RuntimeError, ValueError) as error:
+                self.send_json(409, {'error': str(error)})
         elif path == "/api/profile":
             self.send_json(200, profile_view(runtime.profile()))
         elif path == "/api/profile-summary":
@@ -466,6 +472,8 @@ class CoachHandler(BaseHTTPRequestHandler):
         runtime = self.server.runtime
         actions = {
             "/api/config": runtime.save_config,
+            "/api/chat/connection": runtime.configure_chat,
+            "/api/chat/proposal": lambda payload: self.chat_proposal(runtime, payload),
             "/api/profile": lambda payload: runtime.save_profile(profile_markdown(payload, runtime.profile())),
             "/api/baseline-feedback": lambda payload: runtime.save_baseline_feedback(payload),
             "/api/action": lambda payload: self.run_action(runtime, payload),
@@ -515,6 +523,12 @@ class CoachHandler(BaseHTTPRequestHandler):
             self.send_json(200, result)
 
     @staticmethod
+    def chat_proposal(runtime, payload):
+        if set(payload) != {'action', 'payload'} or payload['action'] not in ('get_proposal', 'apply_proposal', 'reject_proposal'):
+            raise ValueError('Choose a supported proposal action.')
+        return runtime.chat_dispatch(payload['action'], payload['payload'])
+
+    @staticmethod
     def run_action(runtime, payload):
         if set(payload) not in ({"action"}, {"action", "manual_extra"}) or payload["action"] not in ("new_plan", "run_now"):
             raise ValueError("Choose a supported coach action.")
@@ -535,6 +549,7 @@ class CoachHandler(BaseHTTPRequestHandler):
 
 def main():
     from .runtime import Runtime
+    from .chat_bridge import ChatBridgeServer
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dev", action="store_true", help="Permit local browser access on 127.0.0.1.")
@@ -544,7 +559,10 @@ def main():
     runtime = Runtime(args.data_dir)
     stop = threading.Event()
     worker = threading.Thread(target=runtime.run_worker, args=(stop,), daemon=True)
-    with CoachServer(("127.0.0.1" if args.dev else "0.0.0.0", args.port), runtime, args.dev) as server:
+    bind = "127.0.0.1" if args.dev else "0.0.0.0"
+    with CoachServer((bind, args.port), runtime, args.dev) as server, ChatBridgeServer((bind, 8100), runtime) as bridge:
+        bridge_thread = threading.Thread(target=bridge.serve_forever, daemon=True)
+        bridge_thread.start()
         worker.start()
         try:
             server.serve_forever()
@@ -552,6 +570,8 @@ def main():
             pass
         finally:
             stop.set()
+            bridge.shutdown()
+            bridge_thread.join(timeout=5)
 
 
 if __name__ == "__main__":

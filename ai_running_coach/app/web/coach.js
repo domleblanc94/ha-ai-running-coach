@@ -215,9 +215,9 @@ for (const name of ["UTC", ...zones]) {
   byId("timezones").append(option);
 }
 
-async function api(path, payload) {
+async function api(path, payload, timeout = 10000) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 10000);
+  const timer = setTimeout(() => controller.abort(), timeout);
   try {
     const options = {cache: "no-store", credentials: "same-origin", signal: controller.signal};
     if (payload !== undefined) {
@@ -242,6 +242,15 @@ function connectionHints() {
   byId("garmin-key-hint").textContent = config.has_garmin_api_key
     ? "A key is saved. Leave blank to keep it." : "Use the Personal API key from your Garmin account.";
   byId("garmin-fields").hidden = field(connection, "source").value !== "garmin";
+  byId("openai-help").hidden = provider !== "openai";
+  const mode = field(connection, "planning_mode").value;
+  const limits = config.planning_modes?.[mode];
+  byId("planning-mode-hint").textContent = limits
+    ? (mode === "advanced" ? "Advanced" : "Economical") + ": up to " + limits.planning_days
+      + " days in a new training block, " + limits.activity_review_days + " days of activity review, "
+      + limits.max_input_chars.toLocaleString() + " input characters and up to "
+      + limits.max_output_tokens.toLocaleString() + " output tokens and a " + limits.http_timeout_seconds + " second provider timeout per request. These are caps, not a guaranteed plan length or bill."
+    : "Loading the planning allowance…";
 }
 
 function factsList(entries, target) {
@@ -260,6 +269,8 @@ function savedSetup() {
   factsList([
     ["AI provider", {gemini: "Google Gemini", openai: "OpenAI", anthropic: "Anthropic"}[config.provider] || config.provider],
     ["Model", config.model], ["Activity source", config.source === "garmin" ? "Garmin Personal API" : "Offline"],
+    ["Planning mode", config.planning_mode === "advanced" ? "Advanced" : config.planning_mode === "economical" ? "Economical" : "Needs a valid setting"],
+    ["Planning allowance", config.planning_limits ? "Up to " + config.planning_limits.planning_days + " days per new block · " + config.planning_limits.max_output_tokens.toLocaleString() + " output tokens · " + config.planning_limits.max_input_chars.toLocaleString() + " input characters" : "Unavailable"],
     ["Daily review", state.schedule?.enabled ? state.schedule.time + " (" + state.schedule.timezone + ")" : "Paused"],
     ["Time zone", state.schedule?.timezone],
     ["Daily AI request limit", config.daily_request_limit == null ? "Needs a valid setting" : config.daily_request_limit + " requests (UTC day)"],
@@ -337,6 +348,7 @@ function draw(next) {
   const last = next.last_run || {};
   const lastStatus = last.status || last.state || "";
   if (lastStatus === "success" && last.finished_at) dashboardRevision = last.finished_at;
+  if (next.dashboard_revision) dashboardRevision = next.dashboard_revision;
   const busy = Boolean(next.running || next.queued);
   let title = "Ready for a plan";
   let detail = "Generate a plan when your settings are ready.";
@@ -442,6 +454,7 @@ function draw(next) {
   setupWasReady = ready;
   updateDashboard();
   window.CoachRace?.updateStatus(next);
+  window.CoachChat?.updateStatus(next);
 }
 
 function drawBaseline(learning, busy) {
@@ -499,7 +512,7 @@ async function refresh() {
     if (!initialized) {
       const saved = await api("profile");
       for (const [key, value] of Object.entries(next.config || {})) {
-        if (["provider", "model", "source", "garmin_region", "daily_request_limit"].includes(key)) field(connection, key).value = value;
+        if (["provider", "model", "source", "garmin_region", "daily_request_limit", "planning_mode"].includes(key)) field(connection, key).value = value;
       }
       field(schedule, "enabled").checked = Boolean(next.schedule?.enabled);
       field(schedule, "time").value = next.schedule?.time || "03:00";
@@ -604,6 +617,7 @@ field(connection, "provider").addEventListener("change", () => {
   connectionHints();
 });
 field(connection, "source").addEventListener("change", connectionHints);
+field(connection, "planning_mode").addEventListener("change", connectionHints);
 function updateZoneMode() {
   const mode = field(profile, "zone_mode").value;
   const running = ["running", "triathlon"].includes(field(profile, "training_mode").value);
@@ -662,7 +676,7 @@ function sportSettingsPayload() {
 formAction(connection, "config", () => {
   const get = key => field(connection, key).value;
   return {provider: get("provider"), model: get("model"), source: get("source"),
-    daily_request_limit: get("daily_request_limit"),
+    daily_request_limit: get("daily_request_limit"), planning_mode: get("planning_mode"),
     garmin_region: get("garmin_region"), garmin_api_key: get("garmin_api_key"),
     [get("provider") + "_api_key"]: get("provider_key")};
 }, () => {
@@ -804,8 +818,11 @@ function selectView(view) {
   byId("dashboard-panel").hidden = view !== "dashboard";
   byId("athlete-panel").hidden = view !== "athlete";
   byId("race-panel").hidden = view !== "race";
-  for (const name of ["dashboard", "settings", "athlete", "race"]) byId(name + "-tab").setAttribute("aria-pressed", String(view === name));
+  byId("chat-panel").hidden = view !== "chat";
+  for (const name of ["dashboard", "settings", "athlete", "race", "chat"]) byId(name + "-tab").setAttribute("aria-pressed", String(view === name));
   if (view === "athlete") showAthlete();
+  if (view === "chat") window.CoachChat?.show();
+  else window.CoachChat?.clearToken();
   if (view === "race") window.CoachRace?.show();
   else window.CoachRouteMap?.deactivate();
   updateDashboard();
@@ -814,6 +831,7 @@ byId("dashboard-tab").addEventListener("click", () => selectView("dashboard"));
 byId("settings-tab").addEventListener("click", () => selectView("settings"));
 byId("athlete-tab").addEventListener("click", () => selectView("athlete"));
 byId("race-tab").addEventListener("click", () => selectView("race"));
+byId("chat-tab").addEventListener("click", () => selectView("chat"));
 byId("edit-athlete").addEventListener("click", () => { selectView("settings"); profile.scrollIntoView({behavior: "smooth"}); });
 byId("first-dashboard-plan").addEventListener("click", () => byId("new-plan").click());
 for (const link of document.querySelectorAll("a.download-link[download]")) {

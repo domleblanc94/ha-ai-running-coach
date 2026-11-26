@@ -63,6 +63,18 @@ class PhaseExportTests(unittest.TestCase):
             self.assertIn(phase['name'], text)
             self.assertIn(phase['purpose'], text)
 
+    def test_planning_overview_preserves_reasoning_adaptation_and_review_points(self):
+        blocks = [{'start_date': '2026-11-20', 'end_date': '2026-11-26',
+                   'focus': 'Consistency <first>', 'rationale': 'Reasoning & evidence ' * 45,
+                   'adaptation': 'Keep effort comfortable. ' * 45,
+                   'review_trigger': 'Review if recovery changes. ' * 20}]
+        text, pages = self.render({'revision': 4, 'sessions': [session()], 'planning_overview': blocks})
+        self.assertIn('Consistency &lt;first&gt;', text)
+        self.assertIn('Reasoning: Reasoning &amp; evidence', text)
+        self.assertIn('Adaptation: Keep effort comfortable.', text)
+        self.assertIn('Review point: Review if recovery changes.', text)
+        self.assertGreaterEqual(len(pages), 3)
+
     def test_legacy_plan_remains_unassigned_and_is_not_mutated(self):
         plan = {'revision': 1, 'sessions': [session()]}
         text, pages = self.render(plan)

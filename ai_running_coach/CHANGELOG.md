@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.0
+
+- Add an opt-in Advanced planning mode with a larger bounded evidence and response allowance, dated planning focus, reasoning, adaptations and review points in the dashboard and exports. Economical remains the default; saving settings makes no AI request and daily request limits are unchanged.
+- Add an optional desktop MCP companion connection for shared coaching context, athlete feedback and validated adjustment proposals. The private LAN port is unassigned and the connection is disabled by default; enable it and manage a dedicated revocable token through Home Assistant ingress.
+- Require human review in the app before applying a chat proposal. Recheck the profile, plan revision, local training date and training rules, preserve committed plans if dashboard rendering fails, and keep external chat usage separate from the coach API allowance.
+- Keep model credentials, raw GPS tracks and private connection tokens outside shared chat context. No public endpoint is provisioned automatically.
+
 ## 1.3.1
 
 - Label the race elevation chart with distance in kilometres and elevation in metres, with readable axis ticks on desktop and mobile.

@@ -1,6 +1,13 @@
 # AI Multisport Coach release review
 
-Status: **release 1.3.0**, intended for one athlete running a personal installation. Choose the [standalone setup guide](STANDALONE.md) or the [Home Assistant app](https://github.com/domleblanc94/ha-ai-running-coach). Repository, package and runtime identifiers remain unchanged. The version does not establish universal provider, model or watch compatibility; the evidence and remaining limits are recorded below. A separate personal Linux installation was backed up, migrated and checked against the official Garmin Personal API.
+Status: **release 1.4.0**, intended for one athlete running a personal installation. Choose the [standalone setup guide](STANDALONE.md) or the [Home Assistant app](https://github.com/domleblanc94/ha-ai-running-coach). Repository, package and runtime identifiers remain unchanged. The version does not establish universal provider, model or watch compatibility; the evidence and remaining limits are recorded below. A separate personal Linux installation was backed up, migrated and checked against the official Garmin Personal API.
+
+## Release 1.4 additions
+
+- Add explicit Economical/Advanced planning. Economical remains the default; Advanced provides a larger bounded response budget, more activity context and up to a 28-day replacement block without changing request counts, model selection, goals, zones or availability.
+- Save validated coaching overviews with dated purpose, rationale, recovery alternatives and review triggers. Preserve past guidance and last-good plans; show the overview in the training dashboard and Markdown export.
+- Add an optional coach-chat MCP companion with bounded context and structured athlete reports. Chat plan suggestions become validated proposals that require separate local app approval before changing the plan; the connector cannot apply them.
+- Keep credentials, raw activity streams, full databases and GPS out of the chat context. Optional connector access is separately configured and does not make provider calls or consume the training/race request allowance.
 
 ## Release 1.3 additions
 
