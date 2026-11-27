@@ -431,6 +431,35 @@ class Runtime(RaceRuntime, ChatRuntime):
             self._write_state(state)
             return self._status(state)
 
+    def refresh_dashboard(self, payload):
+        """Render only saved evidence; never run coaching, sync or a migration."""
+        if not isinstance(payload, dict) or payload:
+            raise ValueError('Refresh the saved dashboard without additional fields.')
+        with file_lock(self.run_lock, blocking=False), file_lock(self.state_lock):
+            state = self._state()
+            self._idle(state)
+            if checked(self.workspace / '.plan-commit.json').exists():
+                raise RuntimeError('The saved plan needs recovery before refreshing the dashboard.')
+            if not all(checked(self.workspace / name).is_file()
+                       for name in ('athlete.md', 'training_plan.json', 'ai_coach_master.sqlite')):
+                raise ValueError('Save a profile and plan with an activity database before refreshing the dashboard.')
+            output = checked(self.workspace / 'dashboard-refresh.html')
+            try:
+                output.unlink(missing_ok=True)
+                if self._command('render_dashboard', timeout=45, timezone_name=state['schedule']['timezone']):
+                    raise RuntimeError('The dashboard could not be refreshed. Your last saved dashboard remains available.')
+                if not output.is_file() or not 0 < output.stat().st_size <= 16 * 1024 * 1024:
+                    raise RuntimeError('The dashboard could not be refreshed. Your last saved dashboard remains available.')
+                page = output.read_bytes()
+                if not page.lstrip().lower().startswith(b'<!doctype html>'):
+                    raise RuntimeError('The dashboard could not be refreshed. Your last saved dashboard remains available.')
+                atomic_write(self.public / 'dashboard.html', page)
+                state['dashboard_revision'] = self._now().isoformat()
+                self._write_state(state)
+                return self._status(state)
+            finally:
+                output.unlink(missing_ok=True)
+
     def dashboard(self):
         try:
             checked(self.public)
@@ -469,7 +498,7 @@ class Runtime(RaceRuntime, ChatRuntime):
         check_tree(self.workspace)
         allowed = {'PATH', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP', 'TMPDIR', 'LANG', 'SSL_CERT_FILE', 'SSL_CERT_DIR'}
         env = {key: value for key, value in os.environ.items() if key.upper() in allowed}
-        coaching = action not in ('validate_profile', 'baseline_feedback', 'race_parse', 'race_read', 'race_export', 'race_elevation', 'chat_dispatch')
+        coaching = action not in ('validate_profile', 'baseline_feedback', 'race_parse', 'race_read', 'race_export', 'race_elevation', 'chat_dispatch', 'render_dashboard')
         if coaching:
             env.update(self._env())
         env.update(COACH_PUBLISH_ENABLED='false', PYTHONIOENCODING='utf-8', PYTHONDONTWRITEBYTECODE='1', TZ=timezone_name)

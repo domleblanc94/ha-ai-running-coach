@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "release": "1.5.1",
+  "release": "1.6.0",
   "license_status": "selected",
   "files": [
     {
@@ -25,7 +25,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "8ee2924e7ac5ec67bc1a585abb0a96156e0d000e6204d18c03cb7dfb4b36b4be"
+      "sha256": "4a62c402f2eecfef51a7eb43c2fbda5bd8d0f9bc7bc96584f34d22c6d1180766"
     },
     {
       "path": "activity_details.py",
@@ -137,11 +137,11 @@
     },
     {
       "path": "dashboard_panels.py",
-      "sha256": "e4eb5932c630b76fbbb8f1030092fe3b5e4d1d466d082a808ef3897a5bf879d3"
+      "sha256": "bc5e7e6a4895628bcf67b92c8e483946baa63b401ec14ab83b575ba6ceddf4fe"
     },
     {
       "path": "dashboard_template.py",
-      "sha256": "9f4fa358e229b52d75f12a492c071585f0bb6fa34f7792b7921da5fddb088b7f"
+      "sha256": "84a58c4092ee61ff5915a57cafdef72fd94ebd28b576ace0d7f333f741b281fc"
     },
     {
       "path": "database_manager.py",
@@ -165,7 +165,7 @@
     },
     {
       "path": "docs/RELEASE_REVIEW.md",
-      "sha256": "1e5156e2e9225450ab7d50e147191346ad9f553ce5cbb54d6caba0b514e2b14a"
+      "sha256": "4e76e1022ff10f860548e11615cc827ed725c4cb4108e447944f58e318ca5fbe"
     },
     {
       "path": "docs/STANDALONE.md",
@@ -201,7 +201,7 @@
     },
     {
       "path": "generate_dashboard.py",
-      "sha256": "7c8b3b054e31860155b9c9f60e5eebbea4057ac4d3b4ce7fa25656480f633833"
+      "sha256": "ee0a65f991685cd2237b3a3b974fd27adf38d31d2a41d1d9a447e28fd5f1408f"
     },
     {
       "path": "health_status.py",
@@ -229,7 +229,7 @@
     },
     {
       "path": "prepare_release.py",
-      "sha256": "4f8895decbf3f19e87bb4ebc6f0cff0eaa385a3a7f96f35784d4e2d9aab6f430"
+      "sha256": "df8ba75b7fcea4b145fd3bd1c44e8b60e177ec2bb190097dc955236c9342a260"
     },
     {
       "path": "publish_if_ready.py",
@@ -237,7 +237,7 @@
     },
     {
       "path": "pyproject.toml",
-      "sha256": "bac408915b4f2c38bbea1ee664e37bc2718f26d0db82d91f4644cfc2a04a6b47"
+      "sha256": "198483a9642e2cda927216719a647f7f02fca694db63ded9fd79bcf60d99f20b"
     },
     {
       "path": "race_elevation.py",
@@ -442,6 +442,14 @@
     {
       "path": "tests/test_training_availability.py",
       "sha256": "5dd21da64318c4117cdaacf6d95a9ddc17361e86199d7cca9303a5248e158bf5"
+    },
+    {
+      "path": "tests/test_training_chart.js",
+      "sha256": "8394dcd3fcda04c46823c5b008ac992db61945ce4dc2653f6af702a7781738cd"
+    },
+    {
+      "path": "tests/test_training_chart.py",
+      "sha256": "8cfa24a2245edb175bb57082c31055655340e83d05fb4f66b4b1bdc09c494c1b"
     },
     {
       "path": "tests/test_training_phases.py",

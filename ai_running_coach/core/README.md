@@ -25,6 +25,12 @@ The AI decides training progression, recovery, intensity and plan adjustments. P
 
 Version 1.3 does not certify every provider account or watch. See the [release review](docs/RELEASE_REVIEW.md) for the validation scope. Report problems through [the public repository](https://github.com/domleblanc94/ai-running-coach) with the version, Python/OS, provider/model and sanitized error; do not attach keys, real databases, profiles or request snapshots.
 
+## Training graph
+
+Open **Training trends** to compare planned and recorded training. **Week** shows daily bars with a week selector; **Plan** shows weekly bars across the saved plan. Choose kilometres, Garmin load or timer minutes, and filter by sport. The graph remembers the view, metric, sport, selected week and whether its section is open in this browser. Home Assistant's app shell also preserves these choices when the embedded dashboard cannot access browser storage.
+
+Distances use kilometres, including swimming. Combined distance across sports is not a measure of comparable training stress. Planned quantities use explicit, unambiguous saved amounts; time-only workouts are not converted to distance. Missing quantities remain blank, partial totals include known values only, and recorded totals do not confirm completion. The saved plan has no comparable Garmin-load targets, so **Garmin Load** shows recorded load with planned load explicitly unavailable.
+
 ## What it does
 
 - Imports your activities through Garmin's official Personal API, or accepts local summaries in offline mode.

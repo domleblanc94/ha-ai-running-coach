@@ -411,6 +411,7 @@ function draw(next) {
   byId("new-plan").textContent = next.hr_learning?.enabled ? "Plan baseline runs" : "Generate new plan";
   byId("run-now").disabled = byId("new-plan").disabled || !next.plan_ready;
   byId("run-now").classList.toggle("secondary", !next.plan_ready);
+  byId("refresh-dashboard").disabled = busy || working || !next.profile_ready || !next.plan_ready;
   byId("new-plan").classList.toggle("secondary", Boolean(next.plan_ready));
   const budget = next.request_budget;
   const used = Number.isSafeInteger(budget?.used) ? String(budget.used) : "Unknown";
@@ -777,6 +778,27 @@ async function run(action, manualExtra) {
   }
 }
 byId("run-now").addEventListener("click", () => run("run_now"));
+byId("refresh-dashboard").addEventListener("click", async () => {
+  if (working) return;
+  working = true;
+  draw(state);
+  const result = byId("refresh-dashboard-result");
+  result.classList.remove("error");
+  result.textContent = "Refreshing your saved dashboard…";
+  try {
+    const next = await api("dashboard/refresh", {}, 60000);
+    working = false;
+    draw(next);
+    updateDashboard();
+    result.textContent = "Dashboard refreshed from saved data. No AI request was made.";
+  } catch (error) {
+    result.textContent = error.message || "The dashboard could not be refreshed. Try again when the coach is idle.";
+    result.classList.add("error");
+  } finally {
+    working = false;
+    draw(state);
+  }
+});
 const confirm = byId("new-plan-confirm");
 byId("new-plan").addEventListener("click", () => {
   const learning = state.hr_learning?.enabled;

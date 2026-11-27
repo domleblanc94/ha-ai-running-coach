@@ -170,3 +170,34 @@ def build_panels(plan,activities,coach,today):
         history+='</tbody></table></div></details>'
     feedback='<details id="feedbackHelp" class="bg-slate-800/60 border border-slate-700 rounded-xl p-4"><summary class="font-semibold text-sky-300 cursor-pointer">Tell the coach how a session felt</summary><p class="text-sm text-slate-300 mt-3">Add a Garmin activity note/description and sync, or save a dated check-in using coach_checkin.py on the VM. The coach receives only notes returned by the Garmin API or saved locally. Browser checkboxes are reminders only.</p><p class="text-xs text-slate-400 mt-2">Use only fields you actually know; every field is optional. RPE uses 1-10; fatigue uses 0-10. Do not invent intake amounts.</p><pre class="text-xs whitespace-pre-wrap break-words bg-slate-900 p-3 rounded mt-3">[coach: rpe=4; fatigue=2; pain=none; recovery=normal; fueling=2 gels; fueling_tolerance=good]</pre><p class="text-xs text-slate-400 mt-2">Rest-day feedback can be saved through the provided coach_checkin.py command on the VM. This static page does not submit a form.</p></details>'
     return {'summary':summary,'agenda':agenda,'focus':focus,'assessment':explanation,'history':history,'feedback':feedback}
+
+
+def training_chart_data(activities, sessions, today):
+    """Known saved quantities only; Garmin load has no planned equivalent."""
+    def amount(session):
+        text = session.get('amount', '')
+        match = re.fullmatch(r'\s*(\d+(?:\.\d+)?)\s*(km|m|mi|miles?|min|minutes?|h|hours?)\s*', text, re.I)
+        if not match:return {}
+        value, unit = float(match[1]), match[2].lower()
+        if unit in ('km','m','mi','mile','miles'):
+            return {'km': value * (0.001 if unit == 'm' else 1.609344 if unit.startswith('mi') else 1)}
+        return {'minutes': value * (60 if unit.startswith('h') else 1)}
+    planned = [{'date': row['date'], 'sport': session_sport(row), **amount(row)}
+               for row in sessions if session_sport(row) != 'rest']
+    actual = []
+    for day, rows in activities.items():
+        if day > today.isoformat():continue
+        for row in rows:
+            item = {'date': day, 'sport': activity_sport(row.get('type'))}
+            for field, source, divisor in [('km','distance_m',1000),('minutes','timer_duration_s',60),('load','training_load',1)]:
+                if number(row.get(source)):item[field] = row[source] / divisor
+            actual.append(item)
+    dates = sorted(row['date'] for row in sessions)
+    monday = today - timedelta(days=today.weekday())
+    first = date.fromisoformat(dates[0]) if dates else monday
+    last = date.fromisoformat(dates[-1]) if dates else today
+    first_recorded = min((date.fromisoformat(row['date']) for row in actual), default=monday)
+    first_selectable = min(first, monday, first_recorded)
+    return {'planned': planned, 'actual': actual, 'plan_start': first.isoformat(), 'plan_end': last.isoformat(),
+            'first_week': (first_selectable - timedelta(days=first_selectable.weekday())).isoformat(),
+            'last_week': (max(last, today) - timedelta(days=max(last, today).weekday())).isoformat()}

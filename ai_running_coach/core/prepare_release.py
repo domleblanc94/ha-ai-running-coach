@@ -20,6 +20,7 @@ def build_release(source,output,create_archive=True):
     paths.extend("dashboard_assets/"+name for name in ["calendar-layout.js","chart-LICENSE.md","chart.js","fa-brands-400.woff2","fa-regular-400.woff2","fa-solid-900.woff2","fontawesome-LICENSE.txt","fontawesome.css","marked-LICENSE.md","marked.js","purify-LICENSE.txt","purify.js","sources.json","tailwind-LICENSE.txt","tailwind.js","workout-fit.js","workout-ui.js"])
     paths.extend(["examples/athlete.template.md","examples/activities.csv","examples/activities.json","docs/THIRD_PARTY.md","docs/RELEASE_REVIEW.md","docs/STANDALONE.md","docs/RACE_PLANNING.md","docs/ADVANCED_PLANNING.md","docs/CHAT_WITH_COACH.md",".github/workflows/offline-tests.yml",".github/workflows/pages.yml"])
     paths.extend(str(p.relative_to(source)).replace("\\","/") for p in (source/"tests").glob("test_*.py") if p.is_file())
+    paths.append("tests/test_training_chart.js")
     if (source/"LICENSE").is_file():paths.append("LICENSE")
     for name in sorted(set(paths)):
         origin=source/name
@@ -27,7 +28,7 @@ def build_release(source,output,create_archive=True):
             raise ValueError("Release sources must be regular files within the checkout: "+name)
         if not origin.is_file():raise ValueError("Required release source missing: "+name)
         target=output/name;target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(origin,target)
-    manifest={"format":1,"release":"1.5.1","license_status":"selected" if (output/"LICENSE").exists() else "pending maintainer decision","files":[{"path":name,"sha256":hashlib.sha256((output/name).read_bytes()).hexdigest()} for name in sorted(set(paths))]}
+    manifest={"format":1,"release":"1.6.0","license_status":"selected" if (output/"LICENSE").exists() else "pending maintainer decision","files":[{"path":name,"sha256":hashlib.sha256((output/name).read_bytes()).hexdigest()} for name in sorted(set(paths))]}
     (output/"release-manifest.json").write_text(json.dumps(manifest,indent=2)+"\n",encoding="utf-8")
     if not create_archive:return output
     with zipfile.ZipFile(archive,"w",zipfile.ZIP_DEFLATED) as z:

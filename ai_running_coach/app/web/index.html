@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="./assets/leaflet.css">
   <script src="./assets/leaflet.js" defer></script>
   <script src="./assets/coach.js" defer></script>
+  <script src="./assets/graph-preferences.js" defer></script>
   <script src="./assets/chat.js" defer></script>
   <script src="./assets/race-map.js" defer></script>
   <script src="./assets/race-elevation-chart.js" defer></script>
@@ -186,6 +187,8 @@
         <div class="actions"><a class="download-link" href="./exports/training_calendar.pdf" download="training_calendar.pdf">Download PDF calendar</a><a class="download-link" href="./exports/training_plan.md" download="training_plan.md">Training plan (Markdown)</a></div>
         <p class="hint">Exports use the current saved plan. If dashboard publication failed, the dashboard below may show an older version. The PDF includes a weekly calendar, saved training phases and full session details.</p>
       </details>
+      <div class="actions"><button id="refresh-dashboard" type="button" class="secondary">Refresh dashboard</button><span class="hint">Uses your saved plan and activities. No AI request.</span></div>
+      <p id="refresh-dashboard-result" class="form-result" role="status"></p>
       <p class="hint">The coach status above reflects current runs. The dashboard shows the last saved plan.</p>
       <iframe id="dashboard" title="Saved running plan and workout downloads" sandbox="allow-scripts allow-downloads"></iframe>
     </section>

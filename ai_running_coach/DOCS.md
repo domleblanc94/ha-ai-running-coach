@@ -1,6 +1,6 @@
 # AI Multisport Coach
 
-**Version 1.5.1** is the community release of AI Multisport Coach for Home Assistant. It serves one athlete and opens its setup and private dashboard through Home Assistant ingress.
+**Version 1.6.0** is the community release of AI Multisport Coach for Home Assistant. It serves one athlete and opens its setup and private dashboard through Home Assistant ingress.
 
 ## Choose a route or preview the dashboard
 
@@ -29,6 +29,14 @@ If you installed from the documented repository URL, you can jump to the app pag
 Provider integrations use a common request budget. Gemini remains the primary live-tested route; compatibility of other providers and models with a particular account requires verification and remains experimental. Offline transport tests do not guarantee every model supports the same request options.
 
 Local summary import is currently available through the [standalone project](https://github.com/domleblanc94/ai-running-coach/blob/main/docs/STANDALONE.md). Use the Home Assistant app logs to diagnose startup failures. Keep credentials, athlete data and model response snapshots out of support reports.
+
+## Training charts and local refresh
+
+In **Training**, expand **Training trends** to compare planned and recorded training for the selected calendar week or across the saved plan. Use the sport filter and choose distance in kilometres, recorded Garmin training load, or timer minutes. Planned load is unavailable unless saved evidence explicitly provides it; the chart does not estimate load or infer completion from a matching activity. Missing measurements remain unknown.
+
+Your chart view, metric, sport, selected week and expanded state stay saved in this browser across page refreshes and dashboard updates. Browser storage must be available for choices to survive closing or reloading the app; when storage is blocked, choices remain available for the current app session. These display choices do not change your saved training plan or use an AI request.
+
+After updating the app, select **Refresh dashboard** in Training to rebuild the dashboard from your saved profile, plan and activities. This local action makes no AI or Garmin request and does not change the request allowance. It works while the coach is idle and retains your last good dashboard if rendering fails. Generate a first plan before using it.
 
 ## Activity review detail
 

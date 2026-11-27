@@ -1,5 +1,5 @@
 """Original dashboard layout, preserved from the pre-upgrade project."""
-def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, activities_json, macro_review_json, last_updated_str, today_json, freshness_html, other_activities_html, session_ids_json, planned_json, agenda_html, focus_html, assessment_html, history_html, feedback_html, workout_sessions_json, sport_weeks_json="{}", training_mode_json='"running"', phase_overview_html='', phase_weeks_json='{}', demo_mode=False, trends_html='', coach_summary_html=''):
+def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, activities_json, macro_review_json, last_updated_str, today_json, freshness_html, other_activities_html, session_ids_json, planned_json, agenda_html, focus_html, assessment_html, history_html, feedback_html, workout_sessions_json, sport_weeks_json="{}", training_mode_json='"running"', phase_overview_html='', phase_weeks_json='{}', demo_mode=False, trends_html='', coach_summary_html='', chart_data_json='{}'):
     return f"""<!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -121,10 +121,10 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
             <div class="bg-slate-800/60 border border-slate-800 rounded-xl p-5 shadow-lg">
                 <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
                     <h2 class="text-base font-semibold text-slate-300 flex items-center gap-2">
-                        <i class="fa-solid fa-chart-simple text-sky-400"></i> Weekly Volume & Load
+                        <i class="fa-solid fa-chart-simple text-sky-400"></i> Planned &amp; recorded training
                     </h2>
                     <div class="flex flex-wrap gap-2">
-                        <label class="text-xs text-slate-400">Sport <select id="chartSport" class="bg-slate-900 border border-slate-600 rounded p-1"><option value="running">Running</option><option value="cycling">Cycling</option><option value="swimming">Swimming</option><option value="other">Other activities</option><option value="all">All sports · duration</option></select></label>
+                        <label class="text-xs text-slate-400">View <select id="chartView" class="bg-slate-900 border border-slate-600 rounded p-1"><option value="week">Week</option><option value="plan">Plan</option></select></label><label id="chartWeekLabel" class="text-xs text-slate-400">Week <select id="chartWeek" class="bg-slate-900 border border-slate-600 rounded p-1"></select></label><label class="text-xs text-slate-400">Sport <select id="chartSport" class="bg-slate-900 border border-slate-600 rounded p-1"><option value="running">Running</option><option value="cycling">Cycling</option><option value="swimming">Swimming</option><option value="other">Other activities</option><option value="all">All sports</option></select></label>
                         <button id="btnMinutes" onclick="switchChartMetric('minutes')" class="px-2.5 py-1 rounded text-xs border border-slate-700">Timer minutes</button>
                         <button id="btnKm" onclick="switchChartMetric('km')" class="px-2.5 py-1 rounded text-xs font-semibold bg-sky-500/20 text-sky-400 border border-sky-500/40">Distance (km)</button>
                         <button id="btnLoad" onclick="switchChartMetric('load')" class="px-2.5 py-1 rounded text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700 hover:text-slate-200">Garmin Load</button>
@@ -159,6 +159,7 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
         const sessionIds = {session_ids_json};
         const workoutSessions = {workout_sessions_json};
         const sportWeeks = {sport_weeks_json};
+        const chartData = {chart_data_json};
         const trainingMode = {training_mode_json};
         const trainingPhaseWeeks = {phase_weeks_json};
         const sportLabels = {{running:'Running',cycling:'Cycling',swimming:'Swimming',multisport:'Triathlon',strength:'Strength',mobility:'Mobility',rest:'Rest',other:'Other'}};
@@ -524,67 +525,82 @@ def render_layout(*, assets, weeks_json, km_json, load_json, raw_markdown_json, 
             activeWeekIndex=findCurrentWeekIndex();renderTabs();renderSelectedWeek(activeWeekIndex);
         }}
 
-        const ctx = document.getElementById('volumeChart').getContext('2d');
-        volumeChart = new Chart(ctx, {{
-            type: 'bar',
-            data: {{
-                labels: weeksData,
-                datasets: [{{
-                    label: 'Actual Kilometers Completed',
-                    data: kmData,
-                    backgroundColor: '#38bdf8',
-                    borderRadius: 6
-                }}]
-            }},
-            options: {{
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {{ legend: {{ display: false }} }},
-                scales: {{
-                    y: {{ beginAtZero: true, grid: {{ color: '#1e293b' }} }},
-                    x: {{ grid: {{ display: false }} }}
-                }}
-            }}
-        }});
-        document.getElementById('trainingTrends').addEventListener('toggle', event=>{{
-            if (event.target.open) requestAnimationFrame(()=>{{
-                if (event.target.open) {{volumeChart.resize();volumeChart.update('none');}}
-            }});
-        }});
-        document.getElementById('chartSport').value=chartSport;
-        switchChartMetric(chartSport==='all' ? 'minutes' : 'km');
+        const chartKey='coach.chart-preferences.v1';
+        const dayAfter=(iso,days)=>{{const d=new Date(iso+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+days);return d.toISOString().slice(0,10);}};
+        const mondayOf=iso=>{{const d=new Date(iso+'T00:00:00Z');return dayAfter(iso,-((d.getUTCDay()+6)%7));}};
+        let graphState={{view:'week',metric:'km',sport:chartSport,week:mondayOf(todayIso),open:false}};
+        function validGraphState(value) {{
+            return value && Object.keys(value).sort().join(',')==='metric,open,sport,view,week' && ['week','plan'].includes(value.view) && ['km','load','minutes'].includes(value.metric) && ['all','running','cycling','swimming','other'].includes(value.sport) && typeof value.open==='boolean' && typeof value.week==='string' && /^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}$/.test(value.week) && !isNaN(Date.parse(value.week+'T00:00:00Z')) && dayAfter(value.week,0)===value.week && mondayOf(value.week)===value.week;
+        }}
+        function normalizeGraphState() {{
+            if(graphState.week<chartData.first_week || graphState.week>chartData.last_week) graphState.week=mondayOf(todayIso);
 
-        function setDataWindow(days) {{
-            dataWindow=days;
-            document.querySelectorAll('[data-running-window]').forEach(el=>el.classList.toggle('hidden',Number(el.dataset.runningWindow)!==days));
-            switchChartMetric(chartMetric);
+            chartSport=graphState.sport;chartMetric=graphState.metric;
         }}
-        function switchChartSport(sport) {{
-            chartSport=sport;
-            switchChartMetric(['all','other'].includes(sport) ? 'minutes' : chartMetric);
+        try {{const saved=JSON.parse(localStorage.getItem(chartKey));if(validGraphState(saved))graphState=saved;}} catch {{}}
+        normalizeGraphState();
+        function saveGraphState() {{
+            try {{localStorage.setItem(chartKey,JSON.stringify(graphState));}} catch {{}}
+            if(window.parent!==window)window.parent.postMessage({{type:'coach:chart-preferences-change',version:1,preferences:{{...graphState}}}},'*');
         }}
-        function switchChartMetric(type) {{
-            if (['all','other'].includes(chartSport)) type='minutes';
-            chartMetric=type;
-            const count=dataWindow===28?4:8;
-            const entries=(sportWeeks[chartSport] || []).slice(-count);
-            const unit=chartSport==='swimming' ? 'm' : 'km';
-            const field=type==='km' ? 'distance' : type;
-            const label=type==='minutes' ? 'Recorded timer minutes (may include rests)' : type==='load' ? 'Recorded Garmin training load' : 'Recorded '+(sportLabels[chartSport] || 'other activities')+' distance ('+unit+')';
-            volumeChart.data.labels=weeksData.slice(-count);
-            volumeChart.data.datasets=[{{label,data:entries.map(entry=>entry[field]),backgroundColor:type==='load' ? '#f59e0b' : '#38bdf8',borderRadius:6}}];
-            if(type==='km' && chartSport==='running') volumeChart.data.datasets.push({{label:'Known planned running km (time-only sessions excluded)',data:plannedData.slice(-count),backgroundColor:'#64748b',borderRadius:6}});
+        const ctx=document.getElementById('volumeChart').getContext('2d');
+        volumeChart=new Chart(ctx,{{type:'bar',data:{{labels:[],datasets:[]}},options:{{responsive:true,maintainAspectRatio:false,plugins:{{legend:{{display:true,labels:{{color:'#cbd5e1'}}}},tooltip:{{callbacks:{{afterLabel:context=>context.dataset.coverage[context.dataIndex]}}}}}},scales:{{y:{{beginAtZero:true,grid:{{color:'#1e293b'}}}},x:{{grid:{{display:false}},ticks:{{maxTicksLimit:12}}}}}}}}}});
+        document.getElementById('chartView').addEventListener('change',event=>switchChartView(event.target.value));
+        const weekSelect=document.getElementById('chartWeek');
+        weekSelect.addEventListener('change',event=>selectChartWeek(event.target.value));
+        for(let week=chartData.first_week;week<=chartData.last_week;week=dayAfter(week,7)) {{const option=document.createElement('option');option.value=week;option.textContent='w/c '+week;weekSelect.appendChild(option);}}
+        function renderTrainingChart() {{
+            normalizeGraphState();
+            document.getElementById('chartView').value=graphState.view;
+            document.getElementById('chartSport').value=chartSport;
+            weekSelect.value=graphState.week;
+            document.getElementById('chartWeekLabel').hidden=graphState.view!=='week';
+            const step=graphState.view==='week'?1:7;
+            const start=step===1?graphState.week:mondayOf(chartData.plan_start);
+            const end=step===1?dayAfter(start,6):mondayOf(chartData.plan_end);
+            const buckets=[];for(let day=start;day<=end;day=dayAfter(day,step))buckets.push(day);
+            const fits=row=>chartSport==='all' || (chartSport==='other'?!['running','cycling','swimming'].includes(row.sport):row.sport===chartSport);
+            const series=(rows,planned)=>{{
+                const coverage=[];
+                const values=buckets.map(day=>{{
+                    const selected=rows.filter(row=>row.date>=day && row.date<=dayAfter(day,step-1) && fits(row));
+                    const known=selected.filter(row=>Number.isFinite(row[chartMetric]));
+                    coverage.push(known.length+'/'+selected.length+' '+(planned?'planned sessions':'recorded activities')+' with known '+(chartMetric==='km'?'distance':chartMetric==='load'?'Garmin load':'duration'));
+                    if(planned && chartMetric==='load')return null;
+                    if(!planned && day>todayIso)return null;
+                    if(known.length)return Math.round(known.reduce((sum,row)=>sum+row[chartMetric],0)*100)/100;
+                    // Missing quantities stay missing; zero records is a recorded total, not completion.
+                    if(selected.length || (!planned && chartMetric==='load'))return null;
+                    if(planned && (dayAfter(day,step-1)<chartData.plan_start || day>chartData.plan_end))return null;
+                    return 0;
+                }});return {{values,coverage}};
+            }};
+            const actual=series(chartData.actual,false),planned=series(chartData.planned,true);
+            const unit=chartMetric==='km'?'km':chartMetric==='load'?'Garmin load':'minutes';
+            volumeChart.data.labels=buckets.map(day=>step===1?new Date(day+'T00:00:00Z').toLocaleDateString(undefined,{{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'}}):'w/c '+day);
+            volumeChart.data.datasets=[{{label:'Planned ('+unit+')',data:planned.values,coverage:planned.coverage,backgroundColor:'#64748b',borderRadius:4}},{{label:'Recorded ('+unit+')',data:actual.values,coverage:actual.coverage,backgroundColor:chartMetric==='load'?'#f59e0b':'#38bdf8',borderRadius:4}}];
             for(const [id,key] of [['btnKm','km'],['btnLoad','load'],['btnMinutes','minutes']]) {{
-                const button=document.getElementById(id);
-                button.hidden=['all','other'].includes(chartSport) && key!=='minutes';
-                button.className='px-2.5 py-1 rounded text-xs font-semibold border '+(type===key ? 'bg-sky-500/20 text-sky-400 border-sky-500/40' : 'bg-slate-800 text-slate-400 border-slate-700');
+                const button=document.getElementById(id);button.hidden=false;button.setAttribute('aria-pressed',String(chartMetric===key));
+                button.className='px-2.5 py-1 rounded text-xs font-semibold border '+(chartMetric===key?'bg-sky-500/20 text-sky-400 border-sky-500/40':'bg-slate-800 text-slate-400 border-slate-700');
             }}
-            document.getElementById('btnKm').textContent='Distance ('+unit+')';
-            const records=entries.reduce((sum,entry)=>sum+entry.count,0);
-            const coverage=entries.reduce((sum,entry)=>sum+(entry[type==='km' ? 'distance_coverage' : 'duration_coverage'] || 0),0);
-            document.getElementById('chartCoverage').textContent=(chartSport==='all' ? 'All sports' : sportLabels[chartSport] || 'Other activities')+' · '+records+' recorded activities. '+(type==='load' ? 'Only recorded load is shown; no missing values estimated.' : coverage+'/'+records+' '+(type==='km' ? 'distances' : 'timer durations')+' known. Missing values are not estimated; partial totals contain only recorded values.');
+            document.getElementById('chartCoverage').textContent=(graphState.view==='plan'?'Saved plan: '+chartData.plan_start+' to '+chartData.plan_end+'. ':'Week beginning '+graphState.week+'. ')+(chartMetric==='load'?'Planned Garmin load is unavailable: the saved plan has no comparable load targets. Only recorded Garmin training load is shown. ':chartMetric==='km'?'Known planned and recorded kilometres; time-only or ambiguous planned distances are excluded. Swimming metres are converted to km. ':'Known planned duration and recorded timer minutes; timer duration may include rests. ')+(chartSport==='all' && chartMetric==='km'?'Combined distance across sports is not comparable training stress. ':'')+'Partial totals include known values only; hover/tap bars for coverage. Missing values and future recordings stay blank. Recorded totals do not confirm plan completion.';
             volumeChart.update();
         }}
+        function switchChartView(view){{graphState.view=view;renderTrainingChart();saveGraphState();}}
+        function selectChartWeek(week){{graphState.week=week;renderTrainingChart();saveGraphState();}}
+        function switchChartSport(sport){{graphState.sport=sport;renderTrainingChart();saveGraphState();}}
+        function switchChartMetric(metric){{graphState.metric=metric;renderTrainingChart();saveGraphState();}}
+        function setDataWindow(days){{dataWindow=days;document.querySelectorAll('[data-running-window]').forEach(el=>el.classList.toggle('hidden',Number(el.dataset.runningWindow)!==days));}}
+        const trends=document.getElementById('trainingTrends');trends.open=graphState.open;
+        trends.addEventListener('toggle',()=>{{if(graphState.open!==trends.open){{graphState.open=trends.open;saveGraphState();}}if(trends.open)requestAnimationFrame(()=>{{volumeChart.resize();volumeChart.update('none');}});}});
+        window.addEventListener('message',event=>{{
+            const message=event.data;
+            if(event.source!==window.parent || window.parent===window || !message || Object.keys(message).sort().join(',')!=='preferences,type,version' || message.type!=='coach:chart-preferences' || message.version!==1 || !validGraphState(message.preferences))return;
+            graphState={{...message.preferences}};normalizeGraphState();trends.open=graphState.open;renderTrainingChart();
+        }});
+        renderTrainingChart();
+        if(window.parent!==window)window.parent.postMessage({{type:'coach:chart-preferences-ready',version:1}},'*');
+
     </script>
 </body>
 </html>

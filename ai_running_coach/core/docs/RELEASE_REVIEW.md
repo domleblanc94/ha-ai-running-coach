@@ -1,6 +1,13 @@
 # AI Multisport Coach release review
 
-Status: **release 1.5.1**, intended for one athlete running a personal installation. Choose the [standalone setup guide](STANDALONE.md) or the [Home Assistant app](https://github.com/domleblanc94/ha-ai-running-coach). Repository, package and runtime identifiers remain unchanged. The version does not establish universal provider, model or watch compatibility; the evidence and remaining limits are recorded below. A separate personal Linux installation was backed up, migrated and checked against the official Garmin Personal API.
+Status: **release 1.6.0 candidate**, intended for one athlete running a personal installation. Choose the [standalone setup guide](STANDALONE.md) or the [Home Assistant app](https://github.com/domleblanc94/ha-ai-running-coach). Repository, package and runtime identifiers remain unchanged. The version does not establish universal provider, model or watch compatibility; the evidence and remaining limits are recorded below. A separate personal Linux installation was backed up, migrated and checked against the official Garmin Personal API.
+
+## Release 1.6.0 training graph
+
+- Add a daily Week view and weekly Plan view spanning all saved plan dates. Choose kilometres, recorded Garmin load or timer minutes for a selected discipline or all sports.
+- Compare explicit saved planned quantities with recorded actual values. Convert swimming metres to kilometres; keep unknown and future actual values blank, show partial-value coverage, and disclose that the plan has no comparable Garmin-load targets. No load estimates or automatic AI calls are added.
+- Remember view, metric, sport, week and disclosure state using validated browser preferences, with a versioned source-checked iframe protocol for the Home Assistant shell's storage bridge. Storage restrictions do not prevent graph use.
+- Offline Python and JavaScript tests cover known/missing quantities, units, saved-plan extent, graph switching, full-state reload, corrupt preferences, restricted storage and parent-message validation. Browser visual review is tracked separately before publication.
 
 ## Release 1.5.1 dashboard cleanup
 

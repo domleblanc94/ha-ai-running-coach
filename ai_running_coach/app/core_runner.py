@@ -83,6 +83,18 @@ def main():
         if approval:
             raise ValueError('Chat actions cannot use coaching request approval.')
         return chat_operation(workspace)
+    if operation == 'render_dashboard':
+        if approval:
+            raise ValueError('Dashboard refresh cannot use coaching request approval.')
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        from cron_daily_update import pipeline_lock
+        from generate_dashboard import build_dashboard
+
+        with pipeline_lock(workspace / '.pipeline.lock'), pipeline_lock(workspace / '.coach.lock'):
+            build_dashboard(output_html=workspace / 'dashboard-refresh.html',
+                            today=datetime.now(ZoneInfo(os.environ.get('TZ', 'UTC'))).date())
+        return 0
     if operation == 'validate_profile':
         from planning_engine import parse_profile
 

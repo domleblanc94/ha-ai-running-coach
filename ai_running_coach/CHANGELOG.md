@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.6.0
+
+- Compare planned and recorded training for the selected calendar week or across the saved plan, with distance in kilometres, recorded load, and timer minutes kept distinct. Missing evidence stays unknown and planned load is not invented.
+- Keep the chart view, metric, sport, selected week and expanded state in this browser across refreshes, tab navigation and saved-dashboard updates. The private dashboard sandbox remains in place.
+- Add a local **Refresh dashboard** action in Training to apply dashboard improvements to saved plans and activities. It makes no AI or Garmin request and leaves the profile, plan, activities and request allowance unchanged; a failed render retains the last good dashboard.
+
 ## 1.5.1
 
 - Put the upcoming sessions and training calendar ahead of optional charts and planning detail, with full coach reviews and training trends available to expand.

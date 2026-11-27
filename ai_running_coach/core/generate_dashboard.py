@@ -197,7 +197,7 @@ def build_dashboard(db_path=None, plan_file=None, output_html=None, today=None, 
         # WOFF2 is bundled; remove unused legacy font-format alternatives.
         css=__import__('re').sub(r',url\(\.\./webfonts/'+font+r'\.ttf\) format\("truetype"\)',"",css)
     assets["fontawesome.css"]=css
-    from dashboard_panels import activity_measure, weekly_sport_data, session_order, build_phase_display
+    from dashboard_panels import activity_measure, weekly_sport_data, session_order, build_phase_display, training_chart_data
     from sports import session_sport, sport_label, training_mode, activity_sport
     exported={}
     for d,records in activities.items():
@@ -267,8 +267,6 @@ def build_dashboard(db_path=None, plan_file=None, output_html=None, today=None, 
         # sessions of different sports. Sorting IDs here would attach the wrong FIT.
         for session in sorted(canonical["sessions"],key=lambda value:value["date"]):
             ids[session["date"]+'|'+session["workout_type"]].append(session["id"])
-    partial=sum(item['unknown_sessions'] for key,item in (overview or {}).get('planned_weeks',{}).items() if key in {week.isoformat() for week in weeks})
-    other='<p class="text-xs text-slate-400">Weekly chart: distances stay separate by sport; combined totals use recorded timer minutes only (which can include rests). Running comparison uses known planned km. '+esc(partial)+' time-only, alternative or unclassified planned sessions excluded; no completion inference.</p>'+other
     from session_instructions import workout_instruction_lines, quality_details_issue, is_quality_session
     workout_payload = {}
     pool = profile.get('sport_settings', {}).get('swimming', {})
@@ -285,7 +283,7 @@ def build_dashboard(db_path=None, plan_file=None, output_html=None, today=None, 
         workout_payload[item['id']] = item
     sport_data = weekly_sport_data(activities, weeks, today)
     phase_display = build_phase_display(canonical or {}, today, dates)
-    document=render_layout(assets=assets,weeks_json=safe_json(['w/c '+w.strftime('%d/%m') for w in weeks]),km_json=safe_json([round(totals[w.isoformat()][0],1) for w in weeks]),load_json=safe_json([round(totals[w.isoformat()][1],1) if totals[w.isoformat()][2] else None for w in weeks]),raw_markdown_json=safe_json(markdown),activities_json=safe_json(exported),macro_review_json=safe_json(review),last_updated_str=esc(generated_at),today_json=safe_json(today.isoformat()),freshness_html=freshness,other_activities_html=other,session_ids_json=safe_json(ids),planned_json=safe_json(planned_chart),agenda_html=panels["agenda"],focus_html=panels["focus"],assessment_html=panels["assessment"],history_html=panels["history"],feedback_html=panels["feedback"],workout_sessions_json=safe_json(workout_payload),sport_weeks_json=safe_json(sport_data),training_mode_json=safe_json(training_mode(profile)),phase_overview_html=phase_display["overview"],phase_weeks_json=safe_json(phase_display["weeks"]),demo_mode=demo_mode,trends_html=trends,coach_summary_html=panels["summary"])
+    document=render_layout(assets=assets,weeks_json=safe_json(['w/c '+w.strftime('%d/%m') for w in weeks]),km_json=safe_json([round(totals[w.isoformat()][0],1) for w in weeks]),load_json=safe_json([round(totals[w.isoformat()][1],1) if totals[w.isoformat()][2] else None for w in weeks]),raw_markdown_json=safe_json(markdown),activities_json=safe_json(exported),macro_review_json=safe_json(review),last_updated_str=esc(generated_at),today_json=safe_json(today.isoformat()),freshness_html=freshness,other_activities_html=other,session_ids_json=safe_json(ids),planned_json=safe_json(planned_chart),agenda_html=panels["agenda"],focus_html=panels["focus"],assessment_html=panels["assessment"],history_html=panels["history"],feedback_html=panels["feedback"],workout_sessions_json=safe_json(workout_payload),sport_weeks_json=safe_json(sport_data),chart_data_json=safe_json(training_chart_data(activities, canonical["sessions"] if canonical else sessions, today)),training_mode_json=safe_json(training_mode(profile)),phase_overview_html=phase_display["overview"],phase_weeks_json=safe_json(phase_display["weeks"]),demo_mode=demo_mode,trends_html=trends,coach_summary_html=panels["summary"])
     # Same-filesystem replacement prevents readers seeing partially written HTML.
     output_html.parent.mkdir(parents=True, exist_ok=True)
     temp_path = None
