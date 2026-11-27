@@ -67,6 +67,40 @@ def chat_operation(workspace):
     return 0
 
 
+def activity_details_backfill_operation(workspace):
+    """Explicit single-activity read from Garmin; never calls a coach/provider."""
+    from contextlib import redirect_stdout
+    from garmin_personal_api import GarminConfigurationError, GarminPersonalError
+    import garmin_sync
+    try:
+        payload = json.load(sys.stdin)
+        if (not isinstance(payload, dict) or set(payload) != {'activity_id'}
+                or type(payload['activity_id']) is not int or not 0 < payload['activity_id'] <= 2**63 - 1):
+            raise ValueError('Invalid activity ID')
+        from cron_daily_update import pipeline_lock
+        with redirect_stdout(sys.stderr), pipeline_lock(workspace / '.pipeline.lock'), pipeline_lock(workspace / '.garmin_personal_sync.lock'):
+            client = None
+            try:
+                client = garmin_sync.get_garmin_client()
+                client.timeout = 15
+                client.max_requests = 8
+                value = garmin_sync.backfill_activity_details(payload['activity_id'], client=client)
+            except (GarminConfigurationError, GarminPersonalError) as error:
+                garmin_sync.record_auth_error(garmin_sync.AUTH_STATUS_FILE, error)
+                raise
+            finally:
+                if client is not None:
+                    client.close()
+        envelope = {'ok': True, 'value': value}
+    except Exception as error:
+        allowed = {'missing_key', 'key_rejected', 'access_token_rejected', 'permission_denied',
+                   'account_binding_required', 'rate_limited', 'temporary_error'}
+        code = getattr(error, 'code', 'invalid_input' if isinstance(error, ValueError) else 'unavailable')
+        envelope = {'ok': False, 'code': code if code in allowed | {'invalid_input', 'busy'} else 'unavailable'}
+    print(json.dumps(envelope, allow_nan=False))
+    return 0
+
+
 def main():
     workspace = Path(sys.argv[1]).resolve()
     operation = sys.argv[2]
@@ -79,6 +113,10 @@ def main():
         if approval:
             raise ValueError('Race planning does not use a manual-extra approval.')
         return race_operation(workspace, operation)
+    if operation == 'activity_details_backfill':
+        if approval:
+            raise ValueError('Activity backfill cannot use coaching request approval.')
+        return activity_details_backfill_operation(workspace)
     if operation == 'chat_dispatch':
         if approval:
             raise ValueError('Chat actions cannot use coaching request approval.')

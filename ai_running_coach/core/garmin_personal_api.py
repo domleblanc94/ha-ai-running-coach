@@ -108,7 +108,7 @@ class GarminPersonalClient:
             # The service does not publish a universal quota. Do not retry in a burst.
             return self.clock() + 15 * 60
 
-    def _request(self, method, path, headers, params=None):
+    def _request(self, method, path, headers, params=None, *, stream=False):
         stage='token' if method=='POST' and path==TOKEN_PATH else 'data'
         not_before = self.cache.get('not_before', 0)
         if isinstance(not_before, (int, float)) and self.clock() < not_before:
@@ -119,9 +119,10 @@ class GarminPersonalClient:
         try:
             response = self.session.request(method, self.base_url + path, headers=headers,
                                             params=params, timeout=(min(10, self.timeout), self.timeout),
-                                            allow_redirects=False)
+                                            allow_redirects=False, stream=stream)
         except requests.RequestException:
             raise GarminPersonalError('network request failed; credentials and server bodies omitted',code='temporary_error',stage=stage) from None
+        if stream and response.status_code != 200:response.close()
         if response.status_code == 429:
             retry_at = self._retry_after(response.headers.get('Retry-After'))
             self.cache['not_before'] = retry_at
@@ -174,11 +175,11 @@ class GarminPersonalClient:
         self._token_from_cache=False
         return token
 
-    def _get_json(self, path, params=None):
+    def _get_json(self, path, params=None, *, _binary=False):
         token=self.access_token()
         was_cached=self._token_from_cache
         try:
-            response=self._request('GET',path,{'Authorization':'Bearer '+token,'Accept':'application/json'},params=params)
+            response=self._request('GET',path,{'Authorization':'Bearer '+token,'Accept':('application/zip, application/x-zip-compressed, application/octet-stream' if _binary else 'application/json')},params=params,stream=_binary)
         except GarminPersonalError as error:
             if error.status_code!=401 or error.stage!='data':raise
             if was_cached:
@@ -186,7 +187,7 @@ class GarminPersonalClient:
                 # per-run ceiling and rate-limit cooldown. Never loop on denial.
                 token=self.access_token(force_refresh=True)
                 try:
-                    response=self._request('GET',path,{'Authorization':'Bearer '+token,'Accept':'application/json'},params=params)
+                    response=self._request('GET',path,{'Authorization':'Bearer '+token,'Accept':('application/zip, application/x-zip-compressed, application/octet-stream' if _binary else 'application/json')},params=params,stream=_binary)
                 except GarminPersonalError as renewed_error:
                     if renewed_error.status_code!=401:raise
                     response=None
@@ -196,6 +197,7 @@ class GarminPersonalClient:
                 self.cache['access_rejection']={'checked_at':checked}
                 private_json_write(self.cache_path,self.cache)
                 raise GarminPersonalError('INPUT REQUIRED: Garmin rejected a newly issued access token. Verify account/API permissions; this is not proof of Personal API key expiry.',401,code='access_token_rejected',action_required=True,checked_at=checked)
+        if _binary:return response
         try:
             return response.json()
         except ValueError:
@@ -219,3 +221,22 @@ class GarminPersonalClient:
         data = self._get_json('/biometric-service/heartRateZones/v2', {'generateDefaults': 'false'})
         if not isinstance(data, list): raise GarminPersonalError('heart-rate configuration was not an array')
         return data
+
+
+    def download_activity(self, activity_id):
+        """Official original-file endpoint, streamed with a hard in-memory ceiling."""
+        if type(activity_id) is not int or activity_id <= 0: raise ValueError('Invalid activity ID.')
+        from garmin_fit import MAX_ARCHIVE_BYTES
+        response=self._get_json('/download-service/files/activity/'+str(activity_id),_binary=True)
+        try:
+            length=response.headers.get('Content-Length')
+            if length and int(length)>MAX_ARCHIVE_BYTES:raise ValueError('Garmin activity archive exceeds the supported size.')
+            chunks=[];size=0
+            for chunk in response.iter_content(chunk_size=65536):
+                size+=len(chunk)
+                if size>MAX_ARCHIVE_BYTES:raise ValueError('Garmin activity archive exceeds the supported size.')
+                chunks.append(chunk)
+            return b''.join(chunks)
+        except requests.RequestException:
+            raise GarminPersonalError('activity archive transfer failed; previous evidence was retained') from None
+        finally:response.close()

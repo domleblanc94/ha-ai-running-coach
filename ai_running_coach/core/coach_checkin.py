@@ -21,7 +21,7 @@ FEEDBACK_FIELD_UNITS = {
 
 NUMERIC_FIELDS = {'rpe':(1,10),'sleep_hours':(0,24),'carbs_g':(0,None),
                   'fluid_ml':(0,None),'gels':(0,None)}
-TEXT_FIELDS = {'recovery','fueling','fueling_tolerance','topic'}
+TEXT_FIELDS = {'recovery','fueling','fueling_tolerance','topic','felt_effort','limiting_factor'}
 KNOWN_FIELDS = set(NUMERIC_FIELDS) | TEXT_FIELDS | {'fatigue','pain','sleep_quality','status','expires'}
 
 

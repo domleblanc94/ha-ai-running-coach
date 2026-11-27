@@ -431,6 +431,41 @@ class Runtime(RaceRuntime, ChatRuntime):
             self._write_state(state)
             return self._status(state)
 
+    def backfill_activity_details(self, payload):
+        """Fetch one existing Garmin activity only on an explicit ingress request."""
+        if (not isinstance(payload, dict) or set(payload) != {'activity_id'}
+                or type(payload['activity_id']) is not int or not 0 < payload['activity_id'] <= 2**63 - 1):
+            raise ValueError('Enter one positive Garmin activity ID.')
+        with file_lock(self.run_lock, blocking=False), file_lock(self.state_lock):
+            state = self._state()
+            self._idle(state)
+            env = self._env()
+            if env.get('COACH_ACTIVITY_SOURCE', 'offline') != 'garmin':
+                raise ValueError('Choose Garmin Personal API as the saved activity source first.')
+            if not env.get('GARMIN_PERSONAL_API_KEY', '').strip():
+                raise ValueError('Add your Garmin Personal API key in Settings first.')
+            code, output = self._command('activity_details_backfill', input_text=json.dumps(payload),
+                                        timeout=150, timezone_name=state['schedule']['timezone'], capture=True)
+            try:
+                result = json.loads(output) if not code and isinstance(output, str) and len(output) <= 16384 else None
+                if not isinstance(result, dict) or type(result.get('ok')) is not bool:
+                    raise ValueError('Invalid response')
+                if not result['ok']:
+                    issue = result.get('code')
+                    message = GARMIN_ISSUES.get(issue, {
+                        'invalid_input': 'That activity must already be saved from the same bound Garmin account.',
+                        'busy': 'Another activity import is using the workspace. Try again after it finishes.',
+                    }.get(issue, 'Activity details could not be imported. Saved data is retained.'))
+                    raise RuntimeError(message)
+                value = result['value']
+                if (not isinstance(value, dict) or value.get('activity_id') != payload['activity_id'] or value.get('status') != 'updated'
+                        or any(type(value.get(key)) is not int or value[key] < 0 for key in ('stream_rows', 'laps'))
+                        or value.get('activity_hr_zones_status') not in ('recorded', 'not_recorded')):
+                    raise ValueError('Invalid response')
+                return {key: value[key] for key in ('activity_id', 'status', 'stream_rows', 'laps', 'activity_hr_zones_status')}
+            except (ValueError, KeyError, TypeError):
+                raise RuntimeError('Activity details could not be imported. Saved data is retained.') from None
+
     def refresh_dashboard(self, payload):
         """Render only saved evidence; never run coaching, sync or a migration."""
         if not isinstance(payload, dict) or payload:
@@ -498,9 +533,13 @@ class Runtime(RaceRuntime, ChatRuntime):
         check_tree(self.workspace)
         allowed = {'PATH', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP', 'TMPDIR', 'LANG', 'SSL_CERT_FILE', 'SSL_CERT_DIR'}
         env = {key: value for key, value in os.environ.items() if key.upper() in allowed}
-        coaching = action not in ('validate_profile', 'baseline_feedback', 'race_parse', 'race_read', 'race_export', 'race_elevation', 'chat_dispatch', 'render_dashboard')
+        coaching = action not in ('validate_profile', 'baseline_feedback', 'race_parse', 'race_read', 'race_export', 'race_elevation', 'chat_dispatch', 'render_dashboard', 'activity_details_backfill')
         if coaching:
             env.update(self._env())
+        elif action == 'activity_details_backfill':
+            env.update({key: value for key, value in self._env().items()
+                        if key in {'GARMIN_PERSONAL_API_KEY', 'GARMIN_PERSONAL_REGION', 'COACH_ACTIVITY_SOURCE'}})
+            env.update(GARMIN_HTTP_TIMEOUT_SECONDS='15', GARMIN_MAX_REQUESTS_PER_RUN='8')
         env.update(COACH_PUBLISH_ENABLED='false', PYTHONIOENCODING='utf-8', PYTHONDONTWRITEBYTECODE='1', TZ=timezone_name)
         if action == 'race_review':
             env['COACH_MAX_ATTEMPTS'] = '1'

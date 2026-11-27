@@ -1,6 +1,15 @@
 # AI Multisport Coach release review
 
-Status: **release 1.6.0 candidate**, intended for one athlete running a personal installation. Choose the [standalone setup guide](STANDALONE.md) or the [Home Assistant app](https://github.com/domleblanc94/ha-ai-running-coach). Repository, package and runtime identifiers remain unchanged. The version does not establish universal provider, model or watch compatibility; the evidence and remaining limits are recorded below. A separate personal Linux installation was backed up, migrated and checked against the official Garmin Personal API.
+Status: **release 1.7.0 candidate**, intended for one athlete running a personal installation. Choose the [standalone setup guide](STANDALONE.md) or the [Home Assistant app](https://github.com/domleblanc94/ha-ai-running-coach). Repository, package and runtime identifiers remain unchanged. The version does not establish universal provider, model or watch compatibility; the evidence and remaining limits are recorded below. A separate personal Linux installation was backed up, migrated and checked against the official Garmin Personal API.
+
+## Release 1.7.0 saved activity detail and ongoing coaching
+
+- Official original FIT files can be fetched by a separately invoked single-activity backfill. Approved numeric records retain individual laps, chronological 30-second buckets, cumulative distance, measured elevation/HR/speed and recorded timer events. GPS and arbitrary provider fields are discarded. Existing detail is retained on a failed refresh.
+- Activity-recorded HR upper bounds have separate provenance from Garmin profile settings captured at sync and coach athlete.md zones. FIT zone timing arrays preserve source indices when their zone mapping is unknown. Timer running/paused state does not establish physical movement. Missing activity detail remains unknown.
+- MCP can resolve either an internal ID or an unambiguous provider ID. Detail pages remain bounded and offline reads never refresh Garmin or call another AI provider.
+- Calendar summaries cover 8-12 Monday–Sunday weeks, label the current partial week, and preserve separate moving/timer/elapsed time, distance, ascent, longest run, measurement coverage and sources.
+- Past session reviews distinguish inferred candidates from explicit athlete confirmations. Corrections append audit history, retries are idempotent and changed plan hashes reject stale writes. No activity never means skipped automatically. Optional dated linked check-ins reuse validated RPE, recovery and fueling fields, with felt effort and limiting factor text. Daily coaching receives bounded evidence; detailed streams remain on demand.
+- Offline synthetic FIT decode, projection privacy, source-policy, missing-measurement, plan cache/replay and confirmation correction tests cover these boundaries. Synthetic decoding does not verify a particular live race export or establish race readiness. Live source detail must be inspected separately before claims about an actual activity.
 
 ## Release 1.6.0 training graph
 

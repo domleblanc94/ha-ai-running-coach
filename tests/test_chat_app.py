@@ -72,6 +72,105 @@ class ChatTests(unittest.TestCase):
                 self.assertEqual(caught.exception.code, code)
                 self.assertNotIn('private provider response', str(caught.exception))
 
+    def test_review_summary_and_explicit_session_links_use_authenticated_dispatch(self):
+        for action in ('session_review', 'save_session_link', 'weekly_summary'):
+            with self.subTest(action=action), patch.object(self.runtime, '_command', return_value=(0, '{"ok":true,"value":{}}')) as command:
+                self.runtime.chat_dispatch(action, {}, remote=True)
+                self.assertEqual(json.loads(command.call_args.kwargs['input_text'])['action'], action)
+        with patch.object(self.runtime, '_command') as command:
+            for action in ('activity_details_backfill', 'sync', 'run_now'):
+                with self.assertRaises(ValueError):
+                    self.runtime.chat_dispatch(action, {}, remote=True)
+            command.assert_not_called()
+
+    def test_explicit_detail_import_is_bounded_and_never_invokes_coaching(self):
+        for payload in ({}, {'activity_id': True}, {'activity_id': 0}, {'activity_id': -1},
+                        {'activity_id': '12'}, {'activity_id': 2**63}, {'activity_id': 12, 'sync': True}):
+            with self.subTest(payload=payload), patch.object(self.runtime, '_command') as command:
+                with self.assertRaises(ValueError):
+                    self.runtime.backfill_activity_details(payload)
+                command.assert_not_called()
+        with self.assertRaises(ValueError):
+            self.runtime.backfill_activity_details({'activity_id': 12})
+        self.runtime.save_config({'source': 'garmin', 'garmin_api_key': 'synthetic-key'})
+        result = {'activity_id': 12, 'status': 'updated', 'stream_rows': 2, 'laps': 1,
+                  'activity_hr_zones_status': 'recorded'}
+        with patch.object(self.runtime, '_command', return_value=(0, json.dumps({'ok': True, 'value': result}))) as command:
+            self.assertEqual(self.runtime.backfill_activity_details({'activity_id': 12}), result)
+        self.assertEqual(command.call_args.args, ('activity_details_backfill',))
+        self.assertEqual(command.call_args.kwargs['timeout'], 150)
+        with patch.object(self.runtime, '_command', return_value=(0, '{"ok":false,"code":"rate_limited","message":"PRIVATE-SECRET"}')):
+            with self.assertRaises(RuntimeError) as caught:
+                self.runtime.backfill_activity_details({'activity_id': 12})
+        self.assertNotIn('PRIVATE-SECRET', str(caught.exception))
+        self.assertIn('limiting requests', str(caught.exception))
+        with patch.object(self.runtime, '_command', return_value=(0, json.dumps({'ok': True, 'value': {**result, 'activity_id': 13}}))):
+            with self.assertRaises(RuntimeError):
+                self.runtime.backfill_activity_details({'activity_id': 12})
+        state = self.runtime._state()
+        state['queued'] = {'action': 'run_now'}
+        self.runtime._write_state(state)
+        with patch.object(self.runtime, '_command') as command:
+            with self.assertRaises(RuntimeError):
+                self.runtime.backfill_activity_details({'activity_id': 12})
+            command.assert_not_called()
+
+    def test_backfill_runner_locks_and_bounds_official_reads(self):
+        import contextlib
+        import io
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        from ai_running_coach.app.core_runner import activity_details_backfill_operation
+        class PersonalError(RuntimeError):
+            code = 'rate_limited'
+        class ConfigurationError(ValueError):
+            code = 'account_binding_required'
+        client = SimpleNamespace(timeout=120, max_requests=500, close=Mock())
+        result = {'activity_id': 12, 'status': 'updated', 'stream_rows': 2, 'laps': 1}
+        sync = SimpleNamespace(get_garmin_client=Mock(return_value=client),
+                               backfill_activity_details=Mock(return_value=result),
+                               record_auth_error=Mock(), AUTH_STATUS_FILE='private-status')
+        locks = []
+        @contextlib.contextmanager
+        def lock(path):
+            locks.append(Path(path).name)
+            yield
+        modules = {'garmin_sync': sync, 'garmin_personal_api': SimpleNamespace(
+            GarminConfigurationError=ConfigurationError, GarminPersonalError=PersonalError),
+            'cron_daily_update': SimpleNamespace(pipeline_lock=lock)}
+        output = io.StringIO()
+        with patch.dict(sys.modules, modules), patch('sys.stdin', io.StringIO('{"activity_id":12}')), contextlib.redirect_stdout(output):
+            self.assertEqual(activity_details_backfill_operation(self.runtime.workspace), 0)
+        self.assertEqual(json.loads(output.getvalue()), {'ok': True, 'value': result})
+        self.assertEqual(locks, ['.pipeline.lock', '.garmin_personal_sync.lock'])
+        self.assertEqual((client.timeout, client.max_requests), (15, 8))
+        client.close.assert_called_once()
+        sync.backfill_activity_details.assert_called_once_with(12, client=client)
+        sync.backfill_activity_details.side_effect = PersonalError('PRIVATE-SECRET')
+        output = io.StringIO()
+        with patch.dict(sys.modules, modules), patch('sys.stdin', io.StringIO('{"activity_id":12}')), contextlib.redirect_stdout(output):
+            activity_details_backfill_operation(self.runtime.workspace)
+        self.assertEqual(json.loads(output.getvalue()), {'ok': False, 'code': 'rate_limited'})
+        self.assertNotIn('PRIVATE-SECRET', output.getvalue())
+        sync.record_auth_error.assert_called_once()
+
+    def test_detail_import_subprocess_gets_only_bounded_garmin_configuration(self):
+        self.runtime.save_config({'source': 'garmin', 'garmin_api_key': 'synthetic-garmin',
+                                  'gemini_api_key': 'synthetic-coach'})
+        with patch('ai_running_coach.app.runtime.subprocess.Popen') as popen:
+            process = popen.return_value.__enter__.return_value
+            process.communicate.return_value = ('{}', None)
+            process.returncode = 0
+            self.runtime._command('activity_details_backfill', input_text='{"activity_id":12}', capture=True)
+            env = popen.call_args.kwargs['env']
+        self.assertEqual(env['GARMIN_PERSONAL_API_KEY'], 'synthetic-garmin')
+        self.assertEqual(env['GARMIN_MAX_REQUESTS_PER_RUN'], '8')
+        self.assertEqual(env['GARMIN_HTTP_TIMEOUT_SECONDS'], '15')
+        self.assertEqual(env['COACH_PUBLISH_ENABLED'], 'false')
+        self.assertNotIn('GEMINI_API_KEY', env)
+        self.assertNotIn('COACH_PROVIDER', env)
+        self.assertNotIn('COACH_MODELS', env)
+
     def test_bundled_activity_details_read_saved_data_without_plan_or_profile(self):
         seed = """
 import json, sqlite3

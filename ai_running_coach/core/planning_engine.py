@@ -17,7 +17,7 @@ from session_instructions import validate_quality_session, workout_instruction_l
 from training_phases import PHASES_UNSET, validate_phases, replace_future_phases
 from coaching_mode import planning_settings, evidence_settings, OVERVIEW_UNSET, validate_overview, replace_future_overview
 
-POLICY_VERSION = 4
+POLICY_VERSION = 5
 SESSION_FIELDS = {'id', 'date', 'workout_type', 'amount', 'target', 'goal_priority', 'workout', 'sport', 'sub_sport', 'brick'}
 
 
@@ -364,7 +364,7 @@ def collect_feedback(conn, rows, today):
     return records
 
 
-def build_evidence(conn, today):
+def build_evidence(conn, today, plan=None):
     from coach_checkin import FEEDBACK_FIELD_UNITS
     today = date.fromisoformat(today) if isinstance(today, str) else today
     cols = {row[1] for row in conn.execute('PRAGMA table_info(activities)')}
@@ -432,15 +432,18 @@ def build_evidence(conn, today):
         combined=aggregate(block)
         combined.pop('distance_m');combined.pop('distance_coverage')
         sport_weeks.append({'ending':end.isoformat(),'by_sport':by_sport,'combined_duration':combined})
-    extra = {}
+    from session_review import weekly_summary, review
+    extra = {'weekly_summary': weekly_summary(conn, today.isoformat(), 8)}
+    if plan is not None:
+        extra['session_review'] = review(conn, plan, today.isoformat(), days=28, limit=20, compact=True)
     if planning_settings()['mode'] == 'advanced':
         recent_start = (today - timedelta(days=13)).isoformat()
         context_start = (today - timedelta(days=27)).isoformat()
         review_rows = [row for row in rows if str(row['start_date'])[:10] >= recent_start]
         context_rows = [row for row in rows if context_start <= str(row['start_date'])[:10] < recent_start]
-        extra = {'planning_mode': 'advanced', 'recent_14d': review_rows[-40:], 'context_previous_14d': context_rows[-40:],
+        extra.update({'planning_mode': 'advanced', 'recent_14d': review_rows[-40:], 'context_previous_14d': context_rows[-40:],
                  'detailed_activity_coverage': {'review_total': len(review_rows), 'review_supplied': min(40, len(review_rows)),
-                     'context_total': len(context_rows), 'context_supplied': min(40, len(context_rows))}}
+                     'context_total': len(context_rows), 'context_supplied': min(40, len(context_rows))}})
     return {**extra, 'today': today.isoformat(), 'window_start': start, 'feedback_units':FEEDBACK_FIELD_UNITS, 'feedback_history':feedback,'current_athlete_reports':[r for r in feedback if r['current_report']], 'sport_weeks_8':sport_weeks, 'running_weeks_8':weekly, 'running_28d': {'count': len(running), 'total_km': round(km,2), 'avg_weekly_km': round(km/4,2), 'longest_km': round(max([(r.get('distance_m') or 0)/1000 for r in running] or [0]),2)},
             'recent_7d': recent, 'limitations': ['Missing subjective effort is unknown, not low fatigue.', 'Average HR does not measure time in zones.', 'Race readiness requires more evidence than plan compliance.',
                 'Official Garmin sync excludes child legs: multisport parent time is counted once and remains unallocated to individual sports.',
@@ -455,6 +458,13 @@ def fingerprint(profile, plan, evidence, question, generation_identity=None):
     for week in stable_evidence.get('sport_weeks_8',[]): week.pop('ending',None)
     for key in ('feedback_history','current_athlete_reports'):
         for report in stable_evidence.get(key,[]):report.pop('age_days',None)
+    summary = stable_evidence.get('weekly_summary', {})
+    for week in summary.get('weeks', []):
+        for key in ('from','through','calendar_week_ending','partial_week','as_of'):week.pop(key,None)
+    comparison = stable_evidence.pop('session_review', {})
+    confirmed = [{'session_id':s['intent']['id'], 'confirmation':s.get('confirmation'), 'athlete_reports':s.get('athlete_reports', [])}
+                 for s in comparison.get('sessions', []) if s.get('confirmation') or s.get('athlete_reports')]
+    if confirmed:stable_evidence['confirmed_sessions'] = confirmed
     today=date.fromisoformat(evidence['today'])
     stable_evidence['weekly_review_due']=(today-timedelta(days=today.weekday())).isoformat()
     stable_evidence['elapsed_scheduled_sessions']=[s['id'] for s in plan['sessions'] if s['date']<today.isoformat() and 'rest' not in s['workout_type'].lower()]

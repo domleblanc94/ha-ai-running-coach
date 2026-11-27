@@ -216,14 +216,14 @@ class RelayTests(unittest.TestCase):
 
 @unittest.skipUnless(importlib.util.find_spec('mcp'), 'Optional MCP SDK is not installed')
 class OfficialSDKTests(unittest.IsolatedAsyncioTestCase):
-    async def test_real_sdk_discovers_only_seven_bounded_tools_and_calls_backend(self):
+    async def test_real_sdk_discovers_ten_bounded_tools_and_calls_backend(self):
         from mcp import Client
         from coach_mcp import build_server
         backend = Mock()
         backend.dispatch.return_value = {'revision':3}
         async with Client(build_server(backend)) as client:
             tools = (await client.list_tools()).tools
-            self.assertEqual({tool.name for tool in tools}, {'get_coach_context','get_training_plan','get_recent_activities','get_activity_details','get_race_context','save_athlete_feedback','propose_plan_adjustment'})
+            self.assertEqual({tool.name for tool in tools}, {'get_coach_context','get_training_plan','get_recent_activities','get_activity_details','get_race_context','get_weekly_summary','get_session_review','save_session_link','save_athlete_feedback','propose_plan_adjustment'})
             result = await client.call_tool('get_training_plan',{'days':2})
             self.assertEqual(json.loads(result.content[0].text),{'ok':True,'value':{'revision':3}})
             backend.dispatch.assert_called_once_with('plan',{'days':2})
@@ -239,6 +239,21 @@ class OfficialSDKTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(envelope['value']['activity']['id'],123)
             backend.dispatch.assert_called_once_with('activity_details', {'activity_id':123, 'include_streams':True, 'offset':2, 'limit':3})
 
+    async def test_real_sdk_provider_id_and_session_tools(self):
+        from mcp import Client
+        from coach_mcp import build_server
+        backend = Mock()
+        backend.dispatch.return_value = {'status':'available'}
+        async with Client(build_server(backend)) as client:
+            await client.call_tool('get_activity_details', {'source':'garmin_personal','source_activity_id':'12345678901'})
+            backend.dispatch.assert_called_with('activity_details', {'source':'garmin_personal','source_activity_id':'12345678901','include_streams':False,'offset':0,'limit':100})
+            await client.call_tool('get_weekly_summary', {'weeks':12})
+            backend.dispatch.assert_called_with('weekly_summary', {'weeks':12})
+            await client.call_tool('get_session_review', {'days':28,'limit':20})
+            backend.dispatch.assert_called_with('session_review', {'days':28,'limit':20})
+            await client.call_tool('save_session_link', {'request_id':'confirm-001','base_plan_hash':'hash','session_id':'run','outcome':'skipped','athlete_confirmed':True})
+            backend.dispatch.assert_called_with('save_session_link', {'request_id':'confirm-001','base_plan_hash':'hash','session_id':'run','outcome':'skipped','athlete_confirmed':True,'activity_id':None,'comment':''})
+
     async def test_real_stdio_process_discovery_and_sanitized_not_ready(self):
         from mcp import Client
         from mcp.client.stdio import StdioServerParameters
@@ -247,7 +262,7 @@ class OfficialSDKTests(unittest.IsolatedAsyncioTestCase):
                 args=['-B',str(Path(__file__).resolve().parents[1]/'coach_mcp.py'),'--workspace',directory])
             async with Client(transport, read_timeout_seconds=15) as client:
                 tools = (await client.list_tools()).tools
-                self.assertEqual(len(tools),7)
+                self.assertEqual(len(tools),10)
                 result = await client.call_tool('get_coach_context',{})
                 envelope = json.loads(result.content[0].text)
                 self.assertEqual(envelope['code'],'not_ready')

@@ -21,6 +21,7 @@
     byId("chat-enable").hidden = !!saved.enabled;
     byId("chat-rotate").hidden = byId("chat-disable").hidden = !saved.enabled;
     for (const id of ["chat-enable", "chat-rotate", "chat-disable", "chat-refresh"]) byId(id).disabled = busy;
+    byId("activity-details-import").disabled = busy || !!next.running || !!next.queued;
     const unavailable = busy || !!next.running || !!next.queued || selected?.status !== "pending";
     byId("chat-apply").disabled = byId("chat-reject").disabled = unavailable;
   }
@@ -132,5 +133,22 @@
     finally { busy = false; updateStatus(latest); }
   }
   byId("chat-refresh").addEventListener("click", show);
+  byId("activity-details-backfill").addEventListener("submit", async event => {
+    event.preventDefault();
+    if (busy || latest.running || latest.queued) return;
+    const raw = byId("activity-details-backfill").elements.namedItem("activity_id").value.trim();
+    const id = Number(raw);
+    const output = byId("activity-details-result");
+    if (!/^[1-9][0-9]{0,15}$/.test(raw) || !Number.isSafeInteger(id)) {
+      output.textContent = "Enter one valid Garmin activity ID."; return;
+    }
+    busy = true; updateStatus(latest); byId("activity-details-import").disabled = true;
+    output.textContent = "Importing this activity’s details…";
+    try {
+      const result = await api("activities/details-backfill", {activity_id: id}, 165000);
+      output.textContent = "Details imported: " + result.stream_rows + " sensor records and " + result.laps + " laps. Your chat coach can now read the saved activity.";
+    } catch (error) { output.textContent = error.message; }
+    finally { busy = false; byId("activity-details-import").disabled = false; updateStatus(latest); await refresh(); }
+  });
   window.CoachChat = {show, updateStatus, clearToken};
 })();

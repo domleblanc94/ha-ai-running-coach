@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.7.0
+
+- Add an explicit one-activity Garmin detail import in Coach chat for an activity already saved from the same bound account. Import available original FIT sensor records, laps and recorded activity HR-zone evidence using the private Garmin connection, with bounded requests and no coaching call or daily-sync freshness change.
+- Share paginated 30-second evidence with time, cumulative distance, elevation, HR, speed and known timer states through the desktop companion. Timer-running/paused evidence does not establish physical movement; missing fields and historical HR-zone labels remain unknown.
+- Review planned and completed sessions together, save explicit athlete-confirmed links for completions, shorter sessions, substitutions and skips, and include optional effort, limiting factors, next-day recovery and fueling observations in coaching evidence. These reports do not edit the saved plan.
+- Read 8–12 calendar weeks of recorded training totals with duration, distance, ascent, longest runs and missing-data coverage. Shared data continues to exclude raw GPS, private keys and tokens; desktop clients cannot trigger Garmin imports or arbitrary sync jobs.
+
 ## 1.6.0
 
 - Compare planned and recorded training for the selected calendar week or across the saved plan, with distance in kilometres, recorded load, and timer minutes kept distinct. Missing evidence stays unknown and planned load is not invented.

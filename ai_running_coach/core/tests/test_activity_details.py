@@ -92,11 +92,18 @@ class ActivityDetailTests(unittest.TestCase):
         self.assertEqual(garmin['splits']['items'][0]['split_type'],'MARKER_KILOMETER')
         self.assertEqual(garmin['splits']['items'][0]['timer_duration_s'],350)
         self.assertEqual(garmin['hr_zone_configuration']['configurations'][0]['zone2Floor'],158)
+        self.assertEqual(garmin['hr_zone_configuration']['source'],'garmin_personal')
+        self.assertEqual(garmin['hr_zone_configuration']['configuration_role'],'garmin_profile_settings_at_sync')
+        self.assertIn('not coach athlete.md zones',garmin['hr_zone_configuration']['scope'])
         self.assertEqual(self.service.dispatch('activity_details',{'activity_id':22,'include_streams':True})['streams']['status'],'not_stored')
         offline=self.service.dispatch('activity_details',{'activity_id':23,'include_streams':True})
         self.assertEqual(offline['streams']['items'][0]['heartrate_bpm'],135)
         self.assertEqual(offline['streams']['items'][0]['moving'],0.5)
         self.assertEqual(offline['hr_zone_configuration']['configurations'][0]['zones'][1]['max'],-1)
+        self.assertEqual(offline['hr_zone_configuration']['source'],'local:fixture')
+        self.assertEqual(offline['hr_zone_configuration']['configuration_role'],'imported_source_configuration')
+        self.assertIn('historical/activity-specific origin unknown',offline['hr_zone_configuration']['scope'])
+        self.assertFalse(offline['hr_zone_configuration']['coach_profile_substitution'])
         self.assertNotIn('CREDENTIAL-SECRET',json.dumps(garmin))
 
     def test_invalid_unknown_and_signed_internal_ids(self):

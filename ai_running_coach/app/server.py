@@ -474,6 +474,7 @@ class CoachHandler(BaseHTTPRequestHandler):
         actions = {
             "/api/config": runtime.save_config,
             "/api/chat/connection": runtime.configure_chat,
+            "/api/activities/details-backfill": runtime.backfill_activity_details,
             "/api/chat/proposal": lambda payload: self.chat_proposal(runtime, payload),
             "/api/profile": lambda payload: runtime.save_profile(profile_markdown(payload, runtime.profile())),
             "/api/baseline-feedback": lambda payload: runtime.save_baseline_feedback(payload),

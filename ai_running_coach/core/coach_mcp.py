@@ -119,15 +119,44 @@ def build_server(backend):
         return call('activities', {'days': days, 'limit': limit})
 
     @server.tool(annotations=reads)
-    def get_activity_details(activity_id: int, include_streams: bool = False, offset: int = 0, limit: int = 100) -> dict:
+    def get_activity_details(activity_id: int | None = None, include_streams: bool = False, offset: int = 0, limit: int = 100, source: str | None = None, source_activity_id: str | None = None) -> dict:
         """Read saved measurements and split summaries for one internal activity ID, without GPS or refresh.
 
-        Missing values are unknown. No separate laps/raw streams are stored. Opt in to stored 30-second
-        stream averages with include_streams. offset (0-1000000), limit (1-200) page splits and streams
+        Use either internal activity_id, or source='garmin_personal' and source_activity_id as a string.
+        Missing values are unknown. Laps and activity HR-zone bounds require saved records. Opt in to 30-second
+        streams with include_streams. offset (0-1000000), limit (1-200) page splits, laps and streams
         independently; follow each section's next_offset. Does not call Garmin or another AI provider.
         """
-        return call('activity_details', {'activity_id': activity_id, 'include_streams': include_streams,
-                                         'offset': offset, 'limit': limit})
+        payload = {'include_streams': include_streams, 'offset': offset, 'limit': limit}
+        if activity_id is not None:payload['activity_id'] = activity_id
+        if source is not None:payload['source'] = source
+        if source_activity_id is not None:payload['source_activity_id'] = source_activity_id
+        return call('activity_details', payload)
+
+    @server.tool(annotations=reads)
+    def get_weekly_summary(weeks: int = 8) -> dict:
+        """Read 8-12 weeks of measured duration/distance/ascent/longest activity by sport with coverage and sources."""
+        return call('weekly_summary', {'weeks': weeks})
+
+    @server.tool(annotations=reads)
+    def get_session_review(days: int = 28, limit: int = 50) -> dict:
+        """Compare past planned intent with confirmed activity; inferred candidates need athlete confirmation. Never infer skipped."""
+        return call('session_review', {'days': days, 'limit': limit})
+
+    @server.tool(annotations=writes)
+    def save_session_link(request_id: str, base_plan_hash: str, session_id: str, outcome: str,
+                          athlete_confirmed: bool, activity_id: int | None = None, comment: str = '') -> dict:
+        """Save an explicit athlete confirmation or correction after reading get_session_review.
+
+        outcome completed/shortened/swapped requires internal activity_id; skipped/unlinked requires null.
+        athlete_confirmed must be true. New request_id for corrections; reuse identical requests for retries.
+        Prior confirmations remain audited. Never save inferred completion, shortening, swapping or skipping.
+        Optional post-session reports use save_athlete_feedback: rpe, felt_effort, limiting_factor,
+        recovery and fueling_tolerance; next-day recovery is a separate dated linked report.
+        """
+        return call('save_session_link', {'request_id':request_id, 'base_plan_hash':base_plan_hash,
+            'session_id':session_id, 'outcome':outcome, 'athlete_confirmed':athlete_confirmed,
+            'activity_id':activity_id, 'comment':comment})
 
     @server.tool(annotations=reads)
     def get_race_context() -> dict:
@@ -139,7 +168,7 @@ def build_server(backend):
         """Save explicitly reported athlete feedback when asked. Date YYYY-MM-DD, unique request_id (8-100 letters/digits/-/_).
 
         Reuse request_id unchanged when retrying. Fields: rpe 1-10, fatigue/pain 0-10 or none/low/moderate/high,
-        sleep_hours, sleep_quality good/fair/poor, recovery/fueling/fueling_tolerance/topic text,
+        sleep_hours, sleep_quality good/fair/poor, recovery/fueling/fueling_tolerance/felt_effort/limiting_factor/topic text,
         carbs_g/fluid_ml/gels SESSION TOTALS (not per-hour), status active/resolved, expires ISO date.
         Unknown remains unknown. Never save inferred symptoms or your advice as athlete observations.
         """

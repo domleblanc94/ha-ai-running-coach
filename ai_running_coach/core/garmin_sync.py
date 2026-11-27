@@ -326,8 +326,59 @@ def finish_history_verification(state_file):
     return 1 if missing else 0
 
 
+
+def backfill_activity_details(activity_id, *, client=None, db_path=None, state_file=None):
+    """Refresh one existing official activity; no coaching or daily-freshness writes.
+
+    Callers hold pipeline and Garmin sync locks. All provider/parser work completes
+    before the single database transaction; failed detail never erases saved data.
+    """
+    if type(activity_id) is not int or not 0<activity_id<=9223372036854775807:
+        raise ValueError('Activity ID must be a positive integer.')
+    db_path=Path(db_path or DB_PATH);state_file=Path(state_file or STATE_FILE)
+    assert_existing_database_safe(db_path)
+    if not db_path.exists():raise ValueError('Run the official Garmin sync before requesting detail backfill.')
+    try:binding=json.loads(state_file.read_text(encoding='utf-8'))
+    except (OSError,ValueError):binding={}
+    if not isinstance(binding,dict) or not binding.get('source_identity') or not binding.get('base_url'):
+        raise GarminConfigurationError('Run the official Garmin sync successfully before backfilling details; its account binding is required.')
+    with closing(sqlite3.connect(db_path.resolve().as_uri()+'?mode=ro',uri=True)) as conn:
+        conn.row_factory=sqlite3.Row
+        row=conn.execute("SELECT * FROM activities WHERE source='garmin_personal' AND COALESCE(source_activity_id,CAST(id AS TEXT))=?",(str(activity_id),)).fetchone()
+        if row is None:raise ValueError('The requested activity must already be imported from the official Garmin Personal API.')
+        existing=dict(row)
+    own_client=client is None
+    try:
+        client=client or get_garmin_client()
+        client.max_requests=min(client.max_requests,8)
+        client.timeout=min(client.timeout,15)
+        if binding['source_identity']!=client.fingerprint or binding['base_url']!=client.base_url:
+            raise GarminConfigurationError('Activity detail backfill requires the existing Garmin account/key binding; verify normal sync first.')
+        details=client.activity(activity_id)
+        if details.get('activityId') not in (None,activity_id):raise ValueError('Garmin activity identity did not match the requested activity.')
+        from garmin_fit import decode_activity_archive
+        detail=decode_activity_archive(client.download_activity(activity_id))
+        summary={'activityId':activity_id,'activityName':existing.get('name'),
+                 'activityType':{'typeKey':existing.get('type')},'startTimeLocal':existing.get('start_date')}
+        payload=map_garmin_to_payload(summary,details)
+        # Current biometric profile settings are not historical race zones.
+        for key in ('hr_zones_json','hr_zone_seconds_json','hr_zone_basis',*(f'hr_zone_{i}_pct' for i in range(1,6))):
+            payload['activity_metrics'].pop(key,None)
+        payload['activity_detail']=detail
+        from database_manager import ensure_schema,ingest_payload
+        with closing(sqlite3.connect(db_path)) as conn,conn:
+            conn.row_factory=sqlite3.Row
+            ensure_schema(conn)
+            ingest_payload(conn,payload)
+        return {'activity_id':activity_id,'status':'updated','stream_rows':len(detail['rows']),
+                'laps':len(detail['laps']),'activity_hr_zones_status':detail['activity_hr_zones']['status']}
+    finally:
+        if own_client and client is not None:client.close()
+
+
 def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--activity-details',type=int,help='Fetch original FIT details for one already imported official Garmin activity; no coaching call')
     parser.add_argument('--start-date',help='YYYY-MM-DD, or earliest for official historical discovery');parser.add_argument('--end-date')
     parser.add_argument('--backfill-days',type=int)
     parser.add_argument('--historical-backfill',action='store_true',help='Import an explicit historical window using an isolated resumable checkpoint; never marks daily sync fresh')
@@ -340,7 +391,7 @@ def main(argv=None):
         from contextlib import nullcontext
         # Historical batches also ingest their queue under the daily pipeline lock.
         # This prevents cron ingest from racing a replacement/deletion of payloads.
-        outer=pipeline_lock(SCRIPT_DIR/'.pipeline.lock') if args.historical_backfill else nullcontext()
+        outer=pipeline_lock(SCRIPT_DIR/'.pipeline.lock') if args.historical_backfill or args.activity_details is not None else nullcontext()
         with outer:
             return run_locked_sync(args)
     except (ValueError,GarminPersonalError,OSError,RuntimeError) as exc:
@@ -356,6 +407,11 @@ def run_locked_sync(args):
         # Separate from the outer pipeline lock: direct backfills and cron must
         # never race the same private token/checkpoint files.
         with pipeline_lock(SCRIPT_DIR/'.garmin_personal_sync.lock'):
+            if args.activity_details is not None:
+                if args.start_date or args.end_date or args.backfill_days is not None or args.historical_backfill or args.verify_history or args.refresh_token or args.accept_key_rotation:
+                    raise ValueError('Use --activity-details by itself for one activity.')
+                print(json.dumps(backfill_activity_details(args.activity_details),allow_nan=False))
+                return 0
             if args.backfill_days is not None and not 1<=args.backfill_days<=3650:raise ValueError('Backfill days must be between 1 and 3650.')
             if args.historical_backfill and (not args.start_date or not args.end_date or args.refresh_token or args.backfill_days is not None):
                 raise ValueError('Use --historical-backfill with explicit --start-date and --end-date only.')

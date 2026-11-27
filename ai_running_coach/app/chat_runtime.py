@@ -8,7 +8,7 @@ import secrets
 
 from .storage import atomic_write, checked, file_lock
 
-REMOTE_ACTIONS = frozenset({'context', 'plan', 'activities', 'activity_details', 'race_context', 'save_feedback', 'propose_adjustment'})
+REMOTE_ACTIONS = frozenset({'context', 'plan', 'activities', 'activity_details', 'race_context', 'session_review', 'save_session_link', 'weekly_summary', 'save_feedback', 'propose_adjustment'})
 REVIEW_ACTIONS = frozenset({'list_proposals', 'get_proposal', 'apply_proposal', 'reject_proposal'})
 CHAT_MESSAGES = {
     'invalid_input': 'The chat request is invalid. Check its fields and try again.',

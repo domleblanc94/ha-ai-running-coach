@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "release": "1.6.0",
+  "release": "1.7.0",
   "license_status": "selected",
   "files": [
     {
@@ -29,11 +29,11 @@
     },
     {
       "path": "activity_details.py",
-      "sha256": "b40f96c9a33425e92c1d24462414dd8d2504b312f68a19e8c5e969e0d321c67a"
+      "sha256": "383b6e4f9814ee9b91066dda7c3539afd515bd7866fe13d58484388e767c5dcf"
     },
     {
       "path": "ai_coach.py",
-      "sha256": "0da905e59fbc91bfabba56cbd6e57667b27927be04a0db78125e7e31118331e2"
+      "sha256": "85cfd1f33b73a1086abdf92e4f6ed1ebe4fb7e199940510abd3a6dafa1881b70"
     },
     {
       "path": "build_demo_site.py",
@@ -41,15 +41,15 @@
     },
     {
       "path": "coach_chat_service.py",
-      "sha256": "00603ab7a17a424476d164c9e0d9f4ad12425fa126613675cf74223dc3db2383"
+      "sha256": "6db3f95c19e19175d9c52e9f6e5438bf5329685ce05623d2ef7e2c2e616cd3c2"
     },
     {
       "path": "coach_checkin.py",
-      "sha256": "fc795638f0614855a5f92c5f860ed4003084515636cf04cc544a9659a42a1ea7"
+      "sha256": "8dea029ffcdd89556d2b0d6d3141b75fab94d7a5168c55055ad454a236c06bd7"
     },
     {
       "path": "coach_mcp.py",
-      "sha256": "f7f602b287dc56e2ce8429b97ce630af9813315fecc67a45ee4100ec51180cfb"
+      "sha256": "5dbd1cebec5c874ae050ab243695dbda86921dc3f030819fb2ef69932cbaecfc"
     },
     {
       "path": "coaching_detail.py",
@@ -145,7 +145,7 @@
     },
     {
       "path": "database_manager.py",
-      "sha256": "98dceaa3dc7ce368226b7808b659cd69cb98758382e79b66f9f1c739bd667640"
+      "sha256": "07332541dbd48e67f94891b07a3573a5a97d2fa700f7979f53c92b650b52910c"
     },
     {
       "path": "demo_data.py",
@@ -157,7 +157,7 @@
     },
     {
       "path": "docs/CHAT_WITH_COACH.md",
-      "sha256": "afc0106a0f7d393ac256fe809124f2aea30f1e1dd30edbd287ef991380bc50b3"
+      "sha256": "771160844457df64547d8027fda9e50b7ca2d365826b2be48665c1d3ae90ce17"
     },
     {
       "path": "docs/RACE_PLANNING.md",
@@ -165,7 +165,7 @@
     },
     {
       "path": "docs/RELEASE_REVIEW.md",
-      "sha256": "4e76e1022ff10f860548e11615cc827ed725c4cb4108e447944f58e318ca5fbe"
+      "sha256": "ad8d1ea7740fcc406d2990c1bfa34e34bfc2db360d6d7b36beb66377fecaf789"
     },
     {
       "path": "docs/STANDALONE.md",
@@ -173,7 +173,7 @@
     },
     {
       "path": "docs/THIRD_PARTY.md",
-      "sha256": "f4e3d7513cb2cbae0975bfb9d67fadb3893b44691690ab13250afb4989a7e612"
+      "sha256": "8f0decc68cc9ff222f1203f9081d9e569cf5f36c53f40004fcd023ecd0f1f422"
     },
     {
       "path": "eval_cases.json",
@@ -192,12 +192,16 @@
       "sha256": "0210d00bf6fded79fe7eeed36c9028bfac821d5349ad9174fd93d4a449d7f48d"
     },
     {
+      "path": "garmin_fit.py",
+      "sha256": "5577eb5e397862efadd09f55ca0ecb45c9668115fb78878973d5002c311b610e"
+    },
+    {
       "path": "garmin_personal_api.py",
-      "sha256": "e2d133014b551f89ce4592a7a71b9fe8caa75a6b988c674c9efa5d9305434c9a"
+      "sha256": "276d453a4e11a383108c0c3586cd1a02f25c1d6550c5282476066c108bf10a15"
     },
     {
       "path": "garmin_sync.py",
-      "sha256": "f133bd1ef9f71383013f63c48d111baa1189c4284385d1b3f822c58de7829eb9"
+      "sha256": "12ef0b3a8671ac6d7acd82a0a051e50fac5be51c47d44536bf5d83a5f83012a1"
     },
     {
       "path": "generate_dashboard.py",
@@ -225,11 +229,11 @@
     },
     {
       "path": "planning_engine.py",
-      "sha256": "e4b97848de77fdd233c2d8a518bc6c01406badaa062d132d088e099cd818c44d"
+      "sha256": "e1de34257a1c4ca24dcfd85f9c20f03fb311ec4b05117908d0c5505c0d58b4fd"
     },
     {
       "path": "prepare_release.py",
-      "sha256": "df8ba75b7fcea4b145fd3bd1c44e8b60e177ec2bb190097dc955236c9342a260"
+      "sha256": "54519361651c8d492716733ad5d513ed483fb87381d1ad4148b95498f9324511"
     },
     {
       "path": "publish_if_ready.py",
@@ -237,7 +241,7 @@
     },
     {
       "path": "pyproject.toml",
-      "sha256": "198483a9642e2cda927216719a647f7f02fca694db63ded9fd79bcf60d99f20b"
+      "sha256": "57e4507e903858c4dd53b84bd6f2b0cf07734a2960ab2b486568073c8be006ce"
     },
     {
       "path": "race_elevation.py",
@@ -257,15 +261,19 @@
     },
     {
       "path": "requirements.txt",
-      "sha256": "f81a6416bcf70ed5013024bd4cfd66d89192b00fd1811aaa269f7ab31fe4bd86"
+      "sha256": "d31e7c4b2c83dcd473133f68a36020278ebda7e02ae7741e1163fad5e60983e0"
     },
     {
       "path": "run_offline_tests.py",
-      "sha256": "377601b44481c36d5eb3b6005686d9a2fb2fe85ea65dfa145ee698071b624a2f"
+      "sha256": "82c02a815411d81f0fbb33311b3d703c5f5a8a4be4dba8cc3c56bd769c7b156b"
     },
     {
       "path": "session_instructions.py",
       "sha256": "1cc8a2c5c7a89d4e3a8a7f4d3009a7e9b527ecffbc1c8bbcf6bba73dbab49f89"
+    },
+    {
+      "path": "session_review.py",
+      "sha256": "c5b040937578298679c9747a85ba4dd670bc7350fa345ce131b75798485b4938"
     },
     {
       "path": "setup_coach.py",
@@ -281,7 +289,7 @@
     },
     {
       "path": "tests/test_activity_details.py",
-      "sha256": "f3bb65280de2a302749a224c46b1813e6789b7c21571e825a24bb4d9f687e9ee"
+      "sha256": "46c4a030f039a76c1168478576714995e8ce83cae41c564a95b77fff7cfe82f7"
     },
     {
       "path": "tests/test_advanced_mode.py",
@@ -293,7 +301,7 @@
     },
     {
       "path": "tests/test_coach_chat.py",
-      "sha256": "c5f2e7f6852e548cba53e50ce9c5b13ee6f76a7eb4f9c4d82358d261c833e96b"
+      "sha256": "51b929d875beb5e9fe6e3735c45774f2c2049dc16e70f78c396c52fe446c37b6"
     },
     {
       "path": "tests/test_coaching_detail.py",
@@ -340,6 +348,10 @@
       "sha256": "411cc3eb92ce883050c9e25862a8a4c3b4e29c5f4b7b3628c523259589514a20"
     },
     {
+      "path": "tests/test_garmin_detail_backfill.py",
+      "sha256": "c974a940ec964e262ce4753854277d1fed7e54b5191f0ec9fd53f3125edb912a"
+    },
+    {
       "path": "tests/test_garmin_history.py",
       "sha256": "616fb2c7f768ba6b47fb9566c96064094dff7b3f8853e9544f4eb99ee7687239"
     },
@@ -357,7 +369,7 @@
     },
     {
       "path": "tests/test_model_providers.py",
-      "sha256": "defbe415964fc53850b9a962bdac16105e350aa0fd2263076308c4819dbe8f3d"
+      "sha256": "40840c78eeea033fba66e45cd6940a1aac06ca9b24543e706c64774a0f1a2451"
     },
     {
       "path": "tests/test_multisport_dashboard.py",
@@ -378,6 +390,14 @@
     {
       "path": "tests/test_new_plan_contract.py",
       "sha256": "0c98d13d213686c82b2659faf82c2fd51c801c63c901f7beb92a9e53b4fffd36"
+    },
+    {
+      "path": "tests/test_offline_guard.py",
+      "sha256": "c4763ce068d9796c631f0b11a2604d9bf6a05c24f9de808d2f4de39fb0e3c591"
+    },
+    {
+      "path": "tests/test_ongoing_coaching.py",
+      "sha256": "0257822344c2ed188f397ca991641f68738b95b2fd769348b8acd7fff9634988"
     },
     {
       "path": "tests/test_operations.py",

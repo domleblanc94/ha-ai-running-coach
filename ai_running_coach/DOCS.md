@@ -1,6 +1,6 @@
 # AI Multisport Coach
 
-**Version 1.6.0** is the community release of AI Multisport Coach for Home Assistant. It serves one athlete and opens its setup and private dashboard through Home Assistant ingress.
+**Version 1.7.0** is the community release of AI Multisport Coach for Home Assistant. It serves one athlete and opens its setup and private dashboard through Home Assistant ingress.
 
 ## Choose a route or preview the dashboard
 
@@ -46,7 +46,7 @@ New interval and strides sessions must explain warm-up, work repetitions and dur
 
 ## Desktop MCP activity details
 
-The optional desktop MCP companion can request full details for a saved activity by its activity ID. It returns the stored activity metrics, source provenance and units, plus paginated splits. Sensor streams are included only when requested and are paginated separately. Missing measurements remain unknown; the response identifies missing streams and laps that are not stored. It does not fetch new Garmin data or invent missing records.
+The optional desktop MCP companion can request full details for a saved activity by its activity ID. It returns the stored activity metrics, source provenance and units, plus paginated splits. Sensor streams are included only when requested and are paginated separately. Missing measurements remain unknown; the response identifies missing streams and laps that are not stored. Reading activity details does not fetch new Garmin data or invent missing records. FIT timer-running/paused evidence identifies whether the activity timer was active; it does not prove physical movement, and speed remains a separate measurement. Streams identify their actual stored sampling interval and units; missing paused/moving states, speed, laps or activity-specific Garmin HR zones remain unknown.
 
 Enable the private connection and create its dedicated token through Home Assistant ingress, then configure the desktop companion using the [MCP setup guide](https://github.com/domleblanc94/ai-running-coach/blob/main/docs/CHAT_WITH_COACH.md). The LAN port is unassigned and the connection is disabled by default. The same token and source-policy checks protect detail requests. Shared details exclude raw GPS coordinates, credentials and private connection tokens.
 
@@ -162,3 +162,11 @@ A future cutover needs a consistent source backup and one active scheduler. The 
 Garmin account binding is preserved if a key changes. Version 1.3 has no in-app confirmation for key rotation. Back up the app and pause its schedule before rotating a key. Ask the maintainer for the same-account recovery procedure, and keep the sync checkpoint with its matching database. An account or region change requires a new workspace.
 
 FIT workout export remains experimental and requires manual transfer to a compatible watch.
+
+## Saved training evidence and one-activity import
+
+The desktop companion can read planned-to-completed session reviews and 8–12 weekly totals for recorded duration, distance, ascent and longest run. Explicit athlete reports can link a completed activity to a planned session, record a shortened session, substitution or skip, and save optional effort, limiting-factor, recovery and fueling observations. These reports are saved evidence; they do not rewrite the plan. Review proposed plan changes in Home Assistant before applying them. All companion actions use the existing dedicated token, source policy and workspace locks.
+
+In **Coach chat**, use **Import detailed Garmin activity** to request details for one Garmin activity ID already saved from the same bound account. Select Garmin Personal API and save its private key in Settings first. This explicit ingress action reads only that activity through Garmin's official API, imports available sensor records and laps, and reports unavailable measurements without inventing them. It does not call a model, spend the coaching allowance, mark the daily sync fresh or render a new dashboard. Read the imported evidence through the companion afterward; use the existing local dashboard refresh when needed. Desktop MCP clients cannot start imports or arbitrary sync jobs.
+
+A failed import retains saved evidence and returns a fixed diagnostic. A rate limit requires waiting; rejected credentials or account binding require Settings/recovery attention. Existing account binding is required and cannot be bypassed by this action. This feature does not provide an SSH or remote migration path. Keep original FIT archives, raw GPS and private keys out of shared troubleshooting output.

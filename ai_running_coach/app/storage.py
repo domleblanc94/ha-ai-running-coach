@@ -11,10 +11,10 @@ import tempfile
 RUNTIME_SCRIPTS = {
     'ai_coach.py', 'coach_checkin.py', 'cron_daily_update.py', 'dashboard_panels.py',
     'dashboard_template.py', 'database_manager.py', 'garmin_personal_api.py',
-    'garmin_sync.py', 'generate_dashboard.py', 'health_status.py',
+    'garmin_sync.py', 'garmin_fit.py', 'generate_dashboard.py', 'health_status.py',
     'migrate_plan.py', 'model_provider.py', 'planning_engine.py', 'publish_if_ready.py',
     'source_policy.py', 'sports.py', 'training_calendar.py', 'workout_schema.py',
-    'coach_chat_service.py', 'activity_details.py', 'coaching_mode.py', 'coaching_detail.py', 'session_instructions.py', 'race_gpx.py', 'race_planner.py', 'race_exports.py', 'race_elevation.py', 'training_phases.py',
+    'coach_chat_service.py', 'activity_details.py', 'session_review.py', 'coaching_mode.py', 'coaching_detail.py', 'session_instructions.py', 'race_gpx.py', 'race_planner.py', 'race_exports.py', 'race_elevation.py', 'training_phases.py',
 }
 
 

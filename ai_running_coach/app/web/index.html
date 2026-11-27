@@ -87,6 +87,13 @@
           <p id="chat-connection-result" class="form-result" role="status"></p>
         </details>
       </section>
+      <form id="activity-details-backfill" class="card">
+        <h2>Import detailed Garmin activity</h2>
+        <p>Import sensor records and laps for one activity already saved from your Garmin account. This fetches one activity using your saved connection. It does not start a coaching review.</p>
+        <label>Garmin activity ID<input name="activity_id" inputmode="numeric" pattern="[1-9][0-9]{0,15}" maxlength="16" required></label>
+        <div class="actions"><button id="activity-details-import" type="submit">Import this activity’s details</button></div>
+        <p id="activity-details-result" class="form-result" role="status"></p>
+      </form>
       <section class="card"><div class="actions"><h2>Proposed plan changes</h2><button id="chat-refresh" type="button" class="secondary">Refresh proposals</button></div><p>Read each changed session before applying. The app checks your current profile, plan revision and training rules again. Applying a valid proposal updates the plan and renders the dashboard locally without an AI request.</p><p id="chat-proposal-result" class="form-result" role="status"></p><div id="chat-proposals"></div></section>
       <section id="chat-proposal-detail" class="card" hidden><p class="eyebrow">REVIEW BEFORE APPLYING</p><h2 id="chat-proposal-title"></h2><p id="chat-proposal-meta" class="hint"></p><div id="chat-proposal-diff"></div><details><summary>Full proposal details</summary><pre id="chat-proposal-source" class="profile-source"></pre></details><div class="actions"><button id="chat-apply" type="button">Apply these changes</button><button id="chat-reject" type="button" class="secondary">Reject proposal</button></div></section>
     </section>

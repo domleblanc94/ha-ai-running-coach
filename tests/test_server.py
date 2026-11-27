@@ -75,6 +75,17 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(before, self.runtime.profile())
         self.assertEqual(self.request("POST", "/api/action", '{"action":"arbitrary"}', session)[0], 400)
 
+    def test_detail_backfill_requires_ingress_session_csrf_and_explicit_id(self):
+        body = json.dumps({'activity_id': 12})
+        with patch.object(self.runtime, 'backfill_activity_details', return_value={'status': 'updated'}) as call:
+            self.assertEqual(self.request('POST', '/api/activities/details-backfill', body,
+                                          {'Content-Type': 'application/json'})[0], 403)
+            call.assert_not_called()
+            code, response, _ = self.request('POST', '/api/activities/details-backfill', body, self.session())
+            self.assertEqual(code, 200)
+            self.assertEqual(json.loads(response)['status'], 'updated')
+            call.assert_called_once_with({'activity_id': 12})
+
     def test_unexpected_error_is_redacted(self):
         with patch.object(self.runtime, "status", side_effect=OSError("sensitive failure detail")):
             code, body, _ = self.request("GET", "/api/status")

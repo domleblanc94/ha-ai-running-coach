@@ -115,6 +115,7 @@ BASE_COLUMNS = {'name':'TEXT','description':'TEXT','type':'TEXT','start_date':'T
     'downsampled_streams_json':'TEXT','ai_feedback':'TEXT','notes':'TEXT','source':'TEXT',
     'source_activity_id':'TEXT','normalized_type':'TEXT','source_start_date_utc':'TEXT',
     'hr_zones_json':'TEXT','hr_zone_basis':'TEXT','drift_validity':'TEXT','imported_at':'TEXT','metrics_source':'TEXT','stream_source':'TEXT'}
+BASE_COLUMNS.update({'raw_laps_json':'TEXT','activity_hr_zones_json':'TEXT','stream_metadata_json':'TEXT'})
 BASE_COLUMNS.update({'training_load':'REAL','provider_metrics_json':'TEXT','hr_zone_seconds_json':'TEXT','elapsed_time_s':'REAL','timer_duration_s':'REAL'})
 
 
@@ -230,8 +231,17 @@ def ingest_payload(conn, payload):
         values['downsampled_streams_json'] = json.dumps(_downsample(streams),allow_nan=False)
     if 'splits_metric' in metrics and (metrics['splits_metric'] or not payload.get('metadata_only')):
         values['raw_splits_json'] = json.dumps(metrics['splits_metric'],allow_nan=False)
+    detail=payload.get('activity_detail')
+    if isinstance(detail,dict):
+        if detail.get('rows'):
+            values['downsampled_streams_json']=json.dumps(detail['rows'],allow_nan=False)
+            values['stream_source']=source
+            values['stream_metadata_json']=json.dumps(detail['metadata'],allow_nan=False)
+        if detail.get('laps'):values['raw_laps_json']=json.dumps(detail['laps'],allow_nan=False)
+        if detail.get('activity_hr_zones',{}).get('status')=='recorded' or not old or not old['activity_hr_zones_json']:
+            values['activity_hr_zones_json']=json.dumps(detail['activity_hr_zones'],allow_nan=False)
     if old:
-        values = {k:v for k,v in values.items() if v is not None or k.startswith('hr_zone_') or k=='cardiac_drift_pct'}
+        values = {k:v for k,v in values.items() if v is not None}
         conn.execute('UPDATE activities SET '+','.join(f'"{k}"=?' for k in values)+' WHERE id=?',[*values.values(),internal])
     else:
         conn.execute('INSERT INTO activities (id,'+','.join(f'"{k}"' for k in values)+') VALUES ('+','.join('?' for _ in range(len(values)+1))+')',[internal,*values.values()])
